@@ -1,0 +1,19 @@
+# Aturan cache buat Cloudflare Pages / Netlify (berkas ini otomatis ikut ke dist/ waktu build).
+
+# Model face-api: 6,4 MB dan ISINYA NGGAK PERNAH BERUBAH (nama berkasnya tetap, bobotnya fix dari
+# rilis library-nya). Tanpa aturan ini browser bakal nanya ulang ke server tiap kali fitur kenal
+# wajah dibuka - di HP pemilik warung dengan sinyal pas-pasan, itu yang bikin "load lama".
+# immutable = browser nggak usah nanya sama sekali selama masih dalam masa cache.
+/models/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Aset hasil build Vite namanya udah ber-hash (index-eMNTrsJm.js) - isi berubah = nama berubah,
+# jadi aman di-cache selamanya. Nggak akan ada kasus "user kebagian versi lama" gara-gara ini.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# index.html JANGAN di-cache lama: ini pintu masuknya, yang nunjuk ke nama-nama aset ber-hash di
+# atas. Kalau dia ikut di-cache, user bisa nyangkut di versi lama berhari-hari walaupun aplikasinya
+# udah di-deploy ulang.
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
