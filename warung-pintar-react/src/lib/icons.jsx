@@ -100,7 +100,9 @@ const IKON = {
   web: '<circle cx="12" cy="12" r="8.2"/><path d="M3.8 12h16.4"/><path d="M12 3.8c2.2 2.3 3.3 5.1 3.3 8.2s-1.1 5.9-3.3 8.2c-2.2-2.3-3.3-5.1-3.3-8.2S9.8 6.1 12 3.8Z"/>',
   chat: '<path d="M20 12.5c0 3.7-3.6 6.7-8 6.7-1 0-2-.2-2.9-.5L4 20l1.4-3.6A6.4 6.4 0 0 1 4 12.5c0-3.7 3.6-6.7 8-6.7s8 3 8 6.7Z"/>',
   nota: '<path d="M6 3.5h12v17l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4Z"/><path d="M9 8h6M9 11.5h6M9 15h3"/>',
-  jabat: '<path d="M3 11.5 7 8l3 2.5 2-1.5 2 1.5L20 8l1 3.5-4.5 5-2-1.5-2.5 2-2.5-2L7 16.5Z"/>',
+  // Dipakai buat Kasbon. Sempat digambar jabat tangan, tapi di ukuran 26px bentuknya cuma kebaca
+  // zigzag nggak jelas - dompet jauh lebih kebaca di ukuran kecil, dan artinya tetap nyambung.
+  dompet: '<rect x="3.5" y="6.5" width="17" height="12" rx="2.5"/><path d="M3.5 10h17"/><circle cx="16.5" cy="14" r="1.2"/>',
   label: '<path d="M4 11.5V5.5A1.5 1.5 0 0 1 5.5 4h6l8.5 8.5-7 7L4 11.5Z"/><circle cx="8.5" cy="8.5" r="1.2"/>',
   printer: '<path d="M7 9V4h10v5"/><rect x="4" y="9" width="16" height="7" rx="2"/><path d="M7 14h10v6H7z"/>',
   robot: '<rect x="4.5" y="8" width="15" height="11" rx="3"/><path d="M12 8V4.5"/><circle cx="12" cy="3.5" r="1.2"/><path d="M9 13h.01M15 13h.01"/><path d="M9.5 16.2h5"/>',
@@ -113,7 +115,13 @@ const IKON = {
 
 // `nama` wajib ada di IKON. Sengaja nggak ada fallback diam-diam ke ikon lain: kalau salah ketik
 // nama, lebih baik kelihatan kosong waktu dites daripada nongol ikon yang salah arti di produksi.
-export function Ikon({ nama, className = 'emo', style }) {
+//
+// Default class-nya 'emo picon', BUKAN 'emo' doang - dan ini penting. '.emo' cuma ngatur
+// font-size, yang ngaruh ke emoji (teks) tapi NGGAK NGARUH SAMA SEKALI ke SVG: tanpa lebar/tinggi
+// eksplisit, SVG muai memenuhi wadahnya. Pernah kejadian: ikon nota di Beranda jadi setinggi
+// kartunya. Aturan '.emo.picon' (lihat index.css) yang ngunci 26x26 - itu yang dipakai
+// ProductIcon dari dulu, jadi tinggal dipakai ulang, bukan bikin aturan baru.
+export function Ikon({ nama, className = 'emo picon', style }) {
   const isi = IKON[nama];
   if (!isi) return null;
   return (

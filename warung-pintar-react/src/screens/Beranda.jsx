@@ -141,7 +141,7 @@ export default function Beranda() {
           <p className="v p-num">{S.trx}×</p>
         </div>
         <div className="tile ink tap" onClick={() => setDaftarOpen('kasbon')}>
-          <Ikon nama="jabat" />
+          <Ikon nama="dompet" />
           <p className="k">Kasbon ›</p>
           <p className="v p-num">{sisaKasbon ? singkat(sisaKasbon) : '0'}</p>
         </div>
