@@ -883,7 +883,7 @@ function SheetBarcode({ mode, onClose, onKelola }) {
                       {rupiah(p.harga)} · sisa {p.stok}
                     </div>
                   </div>
-                  <span className="mirip">{skor == null ? '🤖 AI' : `${Math.round(skor * 100)}%`}</span>
+                  <span className="mirip">{skor == null ? 'AI' : `${Math.round(skor * 100)}%`}</span>
                 </button>
               ))}
             </div>

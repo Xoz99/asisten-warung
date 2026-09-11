@@ -202,6 +202,17 @@ export function AppProvider({ children }) {
   // yang token-nya dicuri/kedaluwarsa nggak bisa dipakai selamanya tanpa pernah nyentuh server.
   const [perluOnlineDuluan, setPerluOnlineDuluan] = useState(false);
 
+  // Keranjang DISIMPAN di localStorage, bukan cuma di memori. Dulu cuma useState kosong: begitu
+  // halaman ke-reload (HP kehabisan memori terus browser buang tab-nya, kepencet refresh, atau
+  // aplikasi ditinggal lama lalu dibuka lagi) barang yang udah disebut satu per satu HILANG dan
+  // pemilik warung harus ngulang dari nol - padahal pembelinya lagi nunggu di depan.
+  //
+  // Ini BUKAN berarti keranjang masuk database: dia baru jadi transaksi beneran waktu ditekan
+  // Bayar/Kasbon (lihat SELESAI_BAYAR/CATAT_KASBON). Yang disimpan di sini cuma "belanjaan yang
+  // lagi disusun", murni lokal di HP itu.
+  //
+  // Dipisah per warung, alasannya sama kayak riwayat chat: satu HP bisa dipakai login akun beda
+  // (apalagi buat demo), dan keranjang warung lain nyangkut di akun berikutnya itu bikin kacau.
   const [cart, setCart] = useState({});
   const [pelangganTerpilih, setPelangganTerpilih] = useState(null);
   const [screen, setScreen] = useState('s-home');
@@ -424,6 +435,29 @@ export function AppProvider({ children }) {
       /* nggak bisa nyimpen penanda - efeknya cuma kebersihan berlebih di login berikutnya */
     }
   }, []);
+
+  // Muat keranjang milik warung yang lagi login, dan simpan tiap kali berubah.
+  const cartKey = authWarung?.id ? `warungpintar_cart_${authWarung.id}` : null;
+  useEffect(() => {
+    if (!cartKey) return;
+    try {
+      const tersimpan = JSON.parse(localStorage.getItem(cartKey) || 'null');
+      setCart(tersimpan && typeof tersimpan === 'object' ? tersimpan : {});
+    } catch {
+      setCart({});
+    }
+  }, [cartKey]);
+  useEffect(() => {
+    if (!cartKey) return;
+    try {
+      // Keranjang kosong dihapus aja, jangan nyimpen "{}" - biar localStorage nggak penuh sampah
+      // dari akun yang cuma sekali dipakai.
+      if (Object.keys(cart).length) localStorage.setItem(cartKey, JSON.stringify(cart));
+      else localStorage.removeItem(cartKey);
+    } catch {
+      /* mode privat/kuota penuh - keranjang cuma nggak kesimpen, bukan alasan gagalin apa pun */
+    }
+  }, [cart, cartKey]);
 
   // ---- autentikasi akun warung ----
   const login = useCallback(async (username, password) => {

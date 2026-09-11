@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
-import { ProductIcon } from '../lib/icons.jsx';
+import { ProductIcon, Ikon } from '../lib/icons.jsx';
 import { rupiah, singkat, tglID, jamID } from '../lib/format';
 import { api } from '../lib/api';
 
@@ -376,12 +376,12 @@ export default function Laporan() {
 
       <div className="bento">
         <div className="tile tap" onClick={() => setKasJenis('masuk')}>
-          <span className="emo">💰</span>
+          <Ikon nama="modal" />
           <p className="k">Uang masuk ›</p>
           <p className="v p-num">{singkat(masuk)}</p>
         </div>
         <div className="tile tap" onClick={() => setKasJenis('modal')}>
-          <span className="emo">🛒</span>
+          <Ikon nama="belanja" />
           <p className="k">Modal ›</p>
           <p className="v p-num">{singkat(modal)}</p>
         </div>

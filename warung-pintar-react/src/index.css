@@ -132,9 +132,14 @@ body{font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased
 .linkkecil{display:block;width:100%;margin:26px 0 0;background:none;border:0;color:var(--abu);font:inherit;
   font-size:14px;font-weight:600;text-decoration:underline;cursor:pointer;padding:12px}
 
-.total{margin-top:16px;background:var(--ink);color:var(--bg);border-radius:var(--rbig);padding:24px;border:var(--tepi)}
-.total .t{margin:0;font-size:16px;font-weight:600;opacity:.6}
-.total .n{margin:10px 0 0;font-size:44px;color:var(--aksen)}
+/* padding & angka pakai clamp biar nggak kesempitan di HP kecil: di layar 360px paddingnya
+   mengecil ke 16px & angkanya ke 32px, di layar lebar balik ke 24px/44px. Sebelumnya dipatok
+   24px/44px - di iPhone layar sempit, "Rp 3.650.000" mepet ke tepi kotak. */
+.total{margin-top:16px;background:var(--ink);color:var(--bg);border-radius:var(--rbig);padding:clamp(16px,4.5vw,24px);border:var(--tepi)}
+/* Baris judul + tombol "pasang target" dibikin flex yang BOLEH turun baris - dulu tombolnya
+   ditempel inline di belakang teks, jadi di layar sempit dia kepotong/mepet. */
+.total .t{margin:0;font-size:clamp(14px,3.8vw,16px);font-weight:600;opacity:.6;display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.total .n{margin:10px 0 0;font-size:clamp(32px,10vw,44px);color:var(--aksen);line-height:1.1;word-break:break-all}
 .t-dark .total{background:var(--surface);color:var(--ink)}
 .qty{display:flex;align-items:center;gap:12px;margin-left:auto}
 .qty .p-num{font-size:20px;min-width:18px;text-align:center}

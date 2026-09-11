@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { Ikon } from '../lib/icons.jsx';
 import { useApp } from '../state/AppContext.jsx';
 import { FONTS } from '../lib/data';
 import Auth from '../screens/Auth.jsx';
@@ -287,7 +288,7 @@ function SheetUpgradeSukses({ data, onClose }) {
   return (
     <div className="sheet show">
       <div className="panel" style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 48, lineHeight: 1, marginBottom: 8 }}>🎉</div>
+        <Ikon nama="pesta" style={{ width: 48, height: 48, margin: '0 auto 8px', display: 'block' }} />
         <h3>Mantap, langganan aktif!</h3>
         <p>
           Paket <b style={{ color: 'var(--ink)' }}>{LABEL[data.plan] || data.plan}</b> udah nyala.

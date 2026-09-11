@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
-import { ProductIcon } from '../lib/icons.jsx';
+import { ProductIcon, Ikon } from '../lib/icons.jsx';
 import { kritisQ } from '../lib/voice';
 import { rupiah, singkat, tglID, jamID, escapeHtml } from '../lib/format';
 import { ambilCuaca, ikonCuaca } from '../lib/weather';
@@ -136,12 +136,12 @@ export default function Beranda() {
 
       <div className="bento">
         <div className="tile tap" onClick={() => setDaftarOpen('jual')}>
-          <span className="emo">🧾</span>
+          <Ikon nama="nota" />
           <p className="k">Penjualan ›</p>
           <p className="v p-num">{S.trx}×</p>
         </div>
         <div className="tile ink tap" onClick={() => setDaftarOpen('kasbon')}>
-          <span className="emo">🤝</span>
+          <Ikon nama="jabat" />
           <p className="k">Kasbon ›</p>
           <p className="v p-num">{sisaKasbon ? singkat(sisaKasbon) : '0'}</p>
         </div>
@@ -164,7 +164,7 @@ export default function Beranda() {
 
       <p className="p-sec">Sebentar lagi habis</p>
       <div className="card">
-        {kritis.length === 0 && <div className="kosong">Semua stok aman 👍</div>}
+        {kritis.length === 0 && <div className="kosong">Semua stok aman</div>}
         {kritis.map((p) => (
           <div className="item" key={p.id}>
             <ProductIcon id={p.id} foto={p.foto} />
@@ -244,7 +244,7 @@ export default function Beranda() {
         <SheetDaftar
           judul="Yang masih ngutang"
           sub={`${S.kasbon.filter((k) => !k.lunas).length} orang · total ${rupiah(sisaKasbon)} · tap nama untuk terima bayaran`}
-          kosong="Semua kasbon sudah lunas 🎉"
+          kosong="Semua kasbon sudah lunas"
           rows={S.kasbon
             .filter((k) => !k.lunas)
             .map((k) => ({

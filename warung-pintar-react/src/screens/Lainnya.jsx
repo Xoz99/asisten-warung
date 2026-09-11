@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Ikon } from '../lib/icons.jsx';
 import { useApp } from '../state/AppContext.jsx';
 import { WARNA, FONTS, UKURAN } from '../lib/data';
 import { escapeHtml, tampilNoHp } from '../lib/format';
@@ -215,11 +216,11 @@ export default function Lainnya() {
 
       <p className="p-sec">Bantuan Konsulin</p>
       <div className="linkrow">
-        <a href="https://konsulin.id" target="_blank" rel="noopener noreferrer">
-          🌐 Website Konsulin
+        <a href="https://www.konsulin.com" target="_blank" rel="noopener noreferrer">
+          <Ikon nama="web" /> Website Konsulin
         </a>
         <a href="https://wa.me/6281234567890" target="_blank" rel="noopener noreferrer">
-          💬 WhatsApp Konsulin
+          <Ikon nama="chat" /> WhatsApp Konsulin
         </a>
       </div>
 
@@ -784,19 +785,27 @@ function SheetCaraPasang({ iOS, onClose }) {
           </>
         ) : (
           <>
-            <p>Browser kamu belum nawarin tombol pasang otomatis. Coba lewat menu browser:</p>
+            <p>
+              Chrome belum nawarin tombol pasang otomatis buat aplikasi ini. Biasanya karena dia
+              nunggu kamu beberapa kali buka dulu. Sementara itu bisa lewat menu Chrome:
+            </p>
             <div className="menu" style={{ marginTop: 12 }}>
               <div className="mrow" style={{ cursor: 'default' }}>
                 <span className="ic aksen">1</span>
-                <span className="tx"><b>Buka menu browser</b><span>Ikon titik tiga di pojok</span></span>
+                <span className="tx"><b>Tap titik tiga</b><span>Pojok kanan atas layar Chrome</span></span>
               </div>
               <div className="mrow" style={{ cursor: 'default' }}>
                 <span className="ic aksen">2</span>
-                <span className="tx"><b>Pilih "Pasang aplikasi"</b><span>Atau "Add to Home screen"</span></span>
+                <span className="tx"><b>Pilih "Tambahkan ke layar Utama"</b><span>Di sebagian Chrome tertulis "Instal aplikasi"</span></span>
+              </div>
+              <div className="mrow" style={{ cursor: 'default' }}>
+                <span className="ic aksen">3</span>
+                <span className="tx"><b>Tap Instal</b><span>Ikon Mang Warung muncul di layar HP</span></span>
               </div>
             </div>
             <p className="opnhint" style={{ marginTop: 12 }}>
-              Chrome kadang baru nawarin setelah kamu beberapa kali buka aplikasi ini.
+              Kalau kamu buka dari dalam WhatsApp atau Instagram, menunya nggak lengkap — buka
+              dulu di Chrome.
             </p>
           </>
         )}

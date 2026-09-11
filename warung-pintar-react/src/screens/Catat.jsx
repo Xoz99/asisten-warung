@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
-import { ProductIcon, CameraIcon } from '../lib/icons.jsx';
+import { ProductIcon, CameraIcon, Ikon } from '../lib/icons.jsx';
 import { parseUcapan } from '../lib/voice';
 import { rupiah, inisial, escapeHtml } from '../lib/format';
 import { api } from '../lib/api';
@@ -266,11 +266,7 @@ export default function Catat() {
       <div className="total">
         <p className="t">
           {target > 0 ? 'Sudah terkumpul' : 'Total belanja pembeli'}
-          <button
-            className="linkkecil"
-            style={{ marginLeft: 8, display: 'inline', width: 'auto' }}
-            onClick={() => setTargetOpen(true)}
-          >
+          <button className="linkkecil" style={{ width: 'auto', flex: '0 0 auto' }} onClick={() => setTargetOpen(true)}>
             {target > 0 ? 'ubah target' : 'pasang target'}
           </button>
         </p>
@@ -334,7 +330,13 @@ export default function Catat() {
 
       <p className="p-sec">Di keranjang</p>
       <div className="card">
-        {cartIds.length === 0 && <div className="kosong">Belum ada barang.<br />Tekan 🎙️ dan sebutkan barangnya</div>}
+        {cartIds.length === 0 && (
+          <div className="kosong">
+            Belum ada barang.
+            <br />
+            Tekan <Ikon nama="mikrofon" style={{ width: 16, height: 16, verticalAlign: '-3px' }} /> <b>Sebut barang</b> dan sebutkan barangnya
+          </div>
+        )}
         {cartIds.map((id) => {
           const p = produkById[id];
           return (
@@ -570,8 +572,32 @@ function SheetVoice({ rec, onClose }) {
       clearTimeout(timeoutTimer);
       matikanMic(rec);
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-        toast('Akses mikrofon ditolak — izinkan dulu lewat pengaturan browser');
-      } else if (e.error !== 'aborted') {
+        // Pesannya dibedain per platform, karena PENYEBAB & CARA BENERINNYA beda jauh - dan
+        // pesan generik "izinkan lewat pengaturan browser" nggak nolong sama sekali di iPhone,
+        // di mana menunya bahkan nggak ada di tempat yang orang cari.
+        //
+        // Kasus paling sering di iPhone: aplikasi dibuka dari ikon HOME SCREEN (mode standalone).
+        // Di situ Safari nggak nampilin dialog izin mikrofon sama sekali - langsung ditolak,
+        // tanpa pernah nanya. Satu-satunya jalan: buka lewat Safari biasa.
+        const standalone =
+          window.matchMedia?.('(display-mode: standalone)')?.matches || navigator.standalone === true;
+        const iOS =
+          /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+          (/macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+
+        if (iOS && standalone) {
+          toast('Di iPhone, "Sebut barang" belum bisa dipakai dari ikon layar HP. Buka lewat Safari, atau ketik manual.');
+        } else if (iOS) {
+          toast('Mikrofon ditolak. Cek Pengaturan &gt; Safari &gt; Mikrofon, dan pastikan Siri &amp; Dikte aktif.');
+        } else {
+          toast('Akses mikrofon ditolak. Tap ikon gembok di address bar &gt; izinkan Mikrofon.');
+        }
+        // Dialihkan ke ketik manual, JANGAN cuma ditutup - pembelinya lagi nunggu di depan,
+        // jangan sampai pemilik warung mentok tanpa jalan lain gara-gara mic bermasalah.
+        setStep('teks');
+        return;
+      }
+      if (e.error !== 'aborted') {
         toast('Nggak kedengeran jelas. Coba lagi.');
       }
       onClose();
@@ -638,7 +664,7 @@ function SheetVoice({ rec, onClose }) {
         if (hasilAi.length) {
           hasilAi.forEach(({ produk, qty }) => tambah(produk.id, qty, true));
           const tambahan = hasilAi.reduce((a, { produk, qty }) => a + produk.harga * qty, 0);
-          toast(`🤖 ${hasilAi.length} jenis barang (dibantu AI) — <b>${rupiah(totalCart + tambahan)}</b>`);
+          toast(`${hasilAi.length} jenis barang (dibantu AI) — <b>${rupiah(totalCart + tambahan)}</b>`);
           return tutupManual();
         }
       } catch {
@@ -1030,7 +1056,7 @@ function SheetVisual({ onClose }) {
         )}
         {status === 'hasil-banyak' && (
           <>
-            <h3 style={{ textAlign: 'center' }}>🤖 {hasilBanyak.length} barang dikenali AI</h3>
+            <h3 style={{ textAlign: 'center' }}>{hasilBanyak.length} barang dikenali AI</h3>
             <p style={{ textAlign: 'center' }}>Cek dulu — hapus yang salah/nggak sesuai, baru tambahin semua ke keranjang</p>
             <div>
               {hasilBanyak.map(({ produk, qty }) => (

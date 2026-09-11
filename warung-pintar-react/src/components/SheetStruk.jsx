@@ -1,4 +1,5 @@
 import { useApp } from '../state/AppContext.jsx';
+import { Ikon } from '../lib/icons.jsx';
 import { rupiah, tglID, jamID } from '../lib/format';
 
 // items di sini array teks "qtyx nama produk" (lihat itemsTxt di Catat.jsx) — dicocokkan balik ke
@@ -112,10 +113,10 @@ export default function SheetStruk({ data, onClose }) {
           </div>
         </div>
         <button className="btn utama brand" style={{ width: '100%', marginTop: 16 }} onClick={print}>
-          🖨️ Print printer Bluetooth
+          <Ikon nama="printer" /> Print printer Bluetooth
         </button>
         <button className="btn" style={{ width: '100%', marginTop: 10 }} onClick={waLink}>
-          💬 Kirim ke WhatsApp
+          <Ikon nama="chat" /> Kirim ke WhatsApp
         </button>
         <button className="btn" style={{ width: '100%', marginTop: 10 }} onClick={onClose}>
           Tutup

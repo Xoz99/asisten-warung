@@ -4,7 +4,7 @@ import { api } from '../lib/api';
 import { escapeHtml, rupiah, tglID, jamID, inisial } from '../lib/format';
 import { hargaDariMargin, modalDariHarga, MARGIN_DEFAULT } from '../lib/harga';
 import { Sheet } from '../components/SharedSheets.jsx';
-import { CameraIcon } from '../lib/icons.jsx';
+import { CameraIcon, Ikon } from '../lib/icons.jsx';
 import { bukaKamera, tutupKamera, jepretFrame, keWebp } from '../lib/kamera';
 import mangWarungImg from '../assets/mangwarung.webp';
 
@@ -215,7 +215,7 @@ function TanyaAI() {
             id: idBaru(),
             who: 'bot',
             html:
-              '⚡ <b>Jatah AI hari ini habis</b><br>Mang Warung lagi jawab seadanya dulu. ' +
+              '<b>Jatah AI hari ini habis</b><br>Mang Warung lagi jawab seadanya dulu. ' +
               'Reset otomatis besok jam 00:00, atau upgrade paket buat jatah lebih besar.',
           },
         ]);
@@ -437,7 +437,7 @@ function TanyaAI() {
               setKameraNotaOpen(true);
             }}
           >
-            📄 Foto nota belanja
+            <Ikon nama="nota" /> Foto nota belanja
           </button>
           <p style={{ fontSize: 12, opacity: 0.6, textAlign: 'center', margin: '6px 0 0' }}>
             Baca banyak barang sekaligus dari struk, langsung ke stok
@@ -450,7 +450,7 @@ function TanyaAI() {
               inputFotoRef.current?.click();
             }}
           >
-            🏷️ Foto barang
+            <Ikon nama="label" /> Foto barang
           </button>
           <p style={{ fontSize: 12, opacity: 0.6, textAlign: 'center', margin: '6px 0 0' }}>
             Misal foto 1 barang buat ditanyain/ditambahin ke katalog
@@ -540,7 +540,7 @@ function BubbleCatatModal({ data, onSelesai, onBatal }) {
 
   return (
     <div className="bubble bot bubble-nota">
-      <p className="nota-judul">💰 Usul catat modal</p>
+      <p className="nota-judul"><Ikon nama="modal" /> Usul catat modal</p>
       {status === 'menunggu' ? (
         <>
           <div className="field">
@@ -641,7 +641,7 @@ function BubbleBelanjaBanyak({ data, onSelesai, onBatal }) {
 
   return (
     <div className="bubble bot bubble-nota">
-      <p className="nota-judul">🛒 Usul daftar belanja ({baris.length} barang)</p>
+      <p className="nota-judul"><Ikon nama="belanja" /> Usul daftar belanja ({baris.length} barang)</p>
       {status === 'menunggu' ? (
         <>
           <p className="opnhint">
@@ -724,7 +724,7 @@ function BubbleTargetPenjualan({ data, onSelesai, onBatal }) {
 
   return (
     <div className="bubble bot bubble-nota">
-      <p className="nota-judul">🎯 Pasang target setoran</p>
+      <p className="nota-judul"><Ikon nama="target" /> Pasang target setoran</p>
       {status === 'menunggu' ? (
         <>
           <div className="field">
@@ -840,11 +840,12 @@ function BubbleAksi({ data, onSelesai, onBatal }) {
     }
   };
 
-  const judul = tipe === 'tambah' ? '➕ Usul tambah barang' : tipe === 'ubah' ? '✏️ Usul ubah barang' : '🗑️ Usul hapus barang';
+  const ikonJudul = tipe === 'tambah' ? 'tambah' : tipe === 'ubah' ? 'ubah' : 'hapus';
+  const judul = tipe === 'tambah' ? 'Usul tambah barang' : tipe === 'ubah' ? 'Usul ubah barang' : 'Usul hapus barang';
 
   return (
     <div className="bubble bot bubble-nota">
-      <p className="nota-judul">{judul}</p>
+      <p className="nota-judul"><Ikon nama={ikonJudul} /> {judul}</p>
 
       {produkHilang && (
         <p className="opnhint" style={{ color: '#e5484d' }}>

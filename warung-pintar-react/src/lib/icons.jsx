@@ -84,3 +84,46 @@ export function EyeIcon({ open, style }) {
     </svg>
   );
 }
+
+// Ikon garis buat menggantikan emoji di UI. Kenapa diganti: emoji itu DIGAMBAR OLEH SISTEM, jadi
+// bentuk & warnanya beda-beda per HP (Android satu merek bisa beda sama merek lain, iOS beda
+// lagi) - aplikasi jadi kelihatan nggak konsisten & nggak rapi. Ikon SVG tampil sama persis di
+// semua HP dan ikut warna teks di sekitarnya lewat currentColor.
+//
+// Dipakai sebagai <Ikon nama="modal" /> - satu komponen, nggak perlu impor belasan nama.
+const IKON = {
+  modal: '<path d="M12 3v18"/><path d="M16.5 7.5c-.6-1.4-2.3-2.2-4.5-2.2-2.5 0-4.2 1.1-4.2 2.8 0 4 8.7 2 8.7 6.1 0 1.8-1.8 3-4.5 3-2.4 0-4.2-.9-4.8-2.4"/>',
+  belanja: '<path d="M4 6h2.2l1.9 9.6a2 2 0 0 0 2 1.6h6.5a2 2 0 0 0 2-1.6L20 9H7"/><circle cx="10.5" cy="20" r="1.1"/><circle cx="17" cy="20" r="1.1"/>',
+  target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/>',
+  petir: '<path d="M13.5 3 6 13.2h5l-.8 7.8 7.6-10.3h-5Z"/>',
+  pesta: '<path d="M4.5 20 9 8.5l6.5 6.5L4.5 20Z"/><path d="M14 4.5v2M18.5 7l-1.4 1.4M20 12.5h-2"/>',
+  web: '<circle cx="12" cy="12" r="8.2"/><path d="M3.8 12h16.4"/><path d="M12 3.8c2.2 2.3 3.3 5.1 3.3 8.2s-1.1 5.9-3.3 8.2c-2.2-2.3-3.3-5.1-3.3-8.2S9.8 6.1 12 3.8Z"/>',
+  chat: '<path d="M20 12.5c0 3.7-3.6 6.7-8 6.7-1 0-2-.2-2.9-.5L4 20l1.4-3.6A6.4 6.4 0 0 1 4 12.5c0-3.7 3.6-6.7 8-6.7s8 3 8 6.7Z"/>',
+  nota: '<path d="M6 3.5h12v17l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4Z"/><path d="M9 8h6M9 11.5h6M9 15h3"/>',
+  jabat: '<path d="M3 11.5 7 8l3 2.5 2-1.5 2 1.5L20 8l1 3.5-4.5 5-2-1.5-2.5 2-2.5-2L7 16.5Z"/>',
+  label: '<path d="M4 11.5V5.5A1.5 1.5 0 0 1 5.5 4h6l8.5 8.5-7 7L4 11.5Z"/><circle cx="8.5" cy="8.5" r="1.2"/>',
+  printer: '<path d="M7 9V4h10v5"/><rect x="4" y="9" width="16" height="7" rx="2"/><path d="M7 14h10v6H7z"/>',
+  robot: '<rect x="4.5" y="8" width="15" height="11" rx="3"/><path d="M12 8V4.5"/><circle cx="12" cy="3.5" r="1.2"/><path d="M9 13h.01M15 13h.01"/><path d="M9.5 16.2h5"/>',
+  mikrofon: '<rect x="9.5" y="3" width="5" height="10" rx="2.5"/><path d="M6 11.5a6 6 0 0 0 12 0"/><path d="M12 17.5V21"/>',
+  orang: '<circle cx="12" cy="8.5" r="3.6"/><path d="M5 20c0-3.6 3.1-5.6 7-5.6s7 2 7 5.6"/>',
+  tambah: '<path d="M12 5.5v13M5.5 12h13"/>',
+  ubah: '<path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="M14.5 5.5 18.5 9.5"/>',
+  hapus: '<path d="M4.5 6.5h15"/><path d="M9 6.5V4.5h6v2"/><path d="M6.5 6.5 7.5 20h9l1-13.5"/><path d="M10 10v6.5M14 10v6.5"/>',
+};
+
+// `nama` wajib ada di IKON. Sengaja nggak ada fallback diam-diam ke ikon lain: kalau salah ketik
+// nama, lebih baik kelihatan kosong waktu dites daripada nongol ikon yang salah arti di produksi.
+export function Ikon({ nama, className = 'emo', style }) {
+  const isi = IKON[nama];
+  if (!isi) return null;
+  return (
+    <span
+      className={className}
+      style={style}
+      aria-hidden="true"
+      dangerouslySetInnerHTML={{
+        __html: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${isi}</svg>`,
+      }}
+    />
+  );
+}

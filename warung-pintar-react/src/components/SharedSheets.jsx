@@ -3,7 +3,7 @@ import { useApp } from '../state/AppContext.jsx';
 import { api } from '../lib/api';
 import { ambilDeskriptorWajah, gambarDariDataUrl } from '../lib/wajah';
 import { keWebp } from '../lib/kamera';
-import { CameraIcon } from '../lib/icons.jsx';
+import { CameraIcon, Ikon } from '../lib/icons.jsx';
 import { escapeHtml } from '../lib/format';
 
 // Diekspor (bukan cuma dipakai internal file ini) - Chat.jsx pakai ini juga buat sheet detail
@@ -189,7 +189,7 @@ function SheetPelangganForm() {
       <h3>Daftarkan pelanggan</h3>
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
         <div className="ava" style={{ width: 110, height: 110, borderRadius: 34, fontSize: 34 }}>
-          {foto ? <img src={foto} alt="" /> : '🙂'}
+          {foto ? <img src={foto} alt="" /> : <Ikon nama="orang" />}
         </div>
       </div>
       <label className="btn" style={{ width: '100%', marginTop: 14, display: 'block', textAlign: 'center' }}>
