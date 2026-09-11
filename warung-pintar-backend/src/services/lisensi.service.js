@@ -1,5 +1,5 @@
 import { query } from '../db.js';
-import { HARGA_PLAN } from './midtrans.service.js';
+import { HARGA_PLAN, hitungBersih } from './midtrans.service.js';
 
 // Berapa hari lisensi diperpanjang per paket. DULU ditulis sebagai ternary di webhook:
 //   p.plan === 'permanen' ? 36500 : p.plan === 'tahunan' ? 365 : 30
@@ -35,9 +35,16 @@ export async function aktifkanPembayaran(p, notifikasi = null, transactionId = n
     );
   }
 
+  // Metode bayar baru ketahuan DI SINI - pas pelanggan udah beneran bayar. Sebelum itu kita cuma
+  // tau dia diarahkan ke Snap, bukan dia milih apa. Makanya penerimaan bersih dihitung belakangan,
+  // bukan diperkirakan di depan waktu checkout dibikin.
+  const paymentType = notifikasi?.payment_type || null;
+  const bersih = paymentType ? hitungBersih(p.jumlah, paymentType) : null;
+
   await query(
-    "UPDATE pembayaran SET status='settlement', midtrans_transaction_id=$1, raw_notifikasi=$2, updated_at=now() WHERE id=$3",
-    [transactionId || null, notifikasi ? JSON.stringify(notifikasi) : null, p.id]
+    `UPDATE pembayaran SET status='settlement', midtrans_transaction_id=$1, raw_notifikasi=$2,
+       payment_type=$3, jumlah_bersih=$4, updated_at=now() WHERE id=$5`,
+    [transactionId || null, notifikasi ? JSON.stringify(notifikasi) : null, paymentType, bersih, p.id]
   );
   // perpanjang dari tanggal expired sekarang kalau masih aktif, atau dari sekarang kalau sudah lewat
   await query(

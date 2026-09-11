@@ -362,3 +362,12 @@ CREATE TABLE IF NOT EXISTS kode_otp (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_kode_otp_warung ON kode_otp (warung_id, tujuan, dipakai);
+
+-- Pencatatan penerimaan BERSIH per pembayaran. Sebelum ini tabel pembayaran cuma nyimpen `jumlah`
+-- (yang DITAGIH ke pelanggan) - nggak ada catatan berapa yang beneran masuk ke rekening setelah
+-- dipotong MDR Midtrans. Akibatnya laporan pendapatan kebaca lebih besar dari kenyataan, dan
+-- nggak ada dasar buat mutusin harga paket berikutnya.
+ALTER TABLE pembayaran ADD COLUMN IF NOT EXISTS payment_type TEXT;
+-- Diisi pas pembayaran diaktifkan (webhook / sinkron), dihitung dari MDR metode yang BENERAN
+-- dipakai pelanggan - bukan asumsi di depan, karena metodenya baru ketahuan setelah dia bayar.
+ALTER TABLE pembayaran ADD COLUMN IF NOT EXISTS jumlah_bersih NUMERIC;

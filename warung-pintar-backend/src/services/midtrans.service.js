@@ -1,11 +1,53 @@
 import crypto from 'crypto';
 
-// Harga plan — sesuaikan sendiri, satuan Rupiah, harus bilangan bulat (Midtrans nggak terima desimal).
+// Harga plan — satuan Rupiah, harus bilangan bulat (Midtrans nggak terima desimal).
+//
+// Angkanya SENGAJA dinaikin ke bilangan bulat dari harga lama (49rb/490rb/3,62jt) supaya setelah
+// dipotong MDR QRIS ~0,7% yang masuk ke rekening tetap di atas target itu:
+//   50.000    - fee    350 = 49.650 bersih
+//   500.000   - fee  3.500 = 496.500 bersih
+//   3.650.000 - fee 25.550 = 3.624.450 bersih
+//
+// Ini PENETAPAN HARGA, bukan "biaya admin" yang ditambahin di kasir - dan bedanya penting:
+// aturan QRIS Bank Indonesia melarang pedagang membebankan MDR ke pembeli, jadi nampilin
+// "Rp 49.000 + admin Rp 345" itu berisiko. Naikin harga jual nggak kena larangan itu, dan
+// angkanya juga lebih enak diucapkan ke pemilik warung.
 export const HARGA_PLAN = {
-  bulanan: 49000,
-  tahunan: 490000, // setara 2 bulan gratis dibanding bulanan
-  permanen: 3620000, // sekali bayar, seumur hidup - lihat lisensiWebhook.routes.js (direpresentasiin sebagai "berlaku 100 tahun", bukan expiry beneran)
+  bulanan: 50000,
+  tahunan: 500000, // setara 2 bulan gratis dibanding bulanan
+  permanen: 3650000, // sekali bayar, seumur hidup - lihat lisensiWebhook.routes.js (direpresentasiin sebagai "berlaku 100 tahun", bukan expiry beneran)
 };
+
+// MDR per metode bayar, dalam {persen, flat}. Dipakai buat NGITUNG penerimaan bersih SETELAH
+// pelanggan bayar - bukan buat nambahin biaya di depan.
+//
+// ⚠️ Angka di bawah tarif UMUM Midtrans, BUKAN kontrak Anda. Tiap merchant bisa beda (apalagi
+// setelah nego volume). Cek di dashboard Midtrans > Settings > Fee, lalu sesuaikan di sini -
+// kalau meleset, kolom `jumlah_bersih` di tabel pembayaran ikut meleset dan laporan pendapatan
+// Anda salah tanpa ketahuan.
+export const MDR = {
+  qris: { persen: 0.007, flat: 0 },
+  gopay: { persen: 0.02, flat: 0 },
+  shopeepay: { persen: 0.02, flat: 0 },
+  bank_transfer: { persen: 0, flat: 4000 },
+  echannel: { persen: 0, flat: 4000 },
+  permata: { persen: 0, flat: 4000 },
+  bca_klikpay: { persen: 0, flat: 4000 },
+  cstore: { persen: 0, flat: 5000 },
+  credit_card: { persen: 0.029, flat: 2000 },
+};
+
+// Berapa yang BENERAN masuk rekening. `paymentType` dari notifikasi Midtrans (field payment_type).
+// Metode yang nggak dikenal dibalikin null - SENGAJA, bukan diisi 0 atau ditebak pakai tarif
+// rata-rata: angka karangan di kolom pendapatan lebih berbahaya daripada kolom kosong yang
+// kelihatan jelas perlu diisi manual.
+export function hitungBersih(jumlah, paymentType) {
+  const m = MDR[paymentType];
+  if (!m) return null;
+  const bruto = Number(jumlah);
+  if (!Number.isFinite(bruto)) return null;
+  return Math.round(bruto - (bruto * m.persen + m.flat));
+}
 
 const isProd = process.env.MIDTRANS_IS_PRODUCTION === 'true';
 const BASE_URL = isProd ? 'https://app.midtrans.com' : 'https://app.sandbox.midtrans.com';
@@ -29,6 +71,15 @@ export async function buatTransaksiSnap({ orderId, plan, jumlah, namaWarung, ema
     item_details: [{ id: plan, price: jumlah, quantity: 1, name: `Langganan Warung Pintar - ${LABEL_PLAN[plan] || plan}` }],
     callbacks: { finish: `${appUrl}/?lisensi=selesai` },
   };
+
+  // Batasi metode bayar lewat MIDTRANS_METODE (dipisah koma, mis. "qris" atau "qris,gopay").
+  // Kalau kosong, Midtrans nampilin semua metode yang aktif di akun merchant - itu perilaku lama.
+  //
+  // Kenapa perlu dibatasi: MDR-nya beda jauh antar metode, dan di harga paket bulanan bedanya
+  // menentukan. QRIS motong 0,7% (Rp 350), tapi retail Indomaret motong Rp 5.000 flat - 10% dari
+  // harga paket bulanan. Tanpa pembatasan, margin Anda ditentukan pilihan pelanggan, bukan Anda.
+  const metode = (process.env.MIDTRANS_METODE || '').split(',').map((x) => x.trim()).filter(Boolean);
+  if (metode.length) body.enabled_payments = metode;
 
   let res;
   try {
