@@ -1,0 +1,25 @@
+{
+  // Konfigurasi buat Cloudflare Workers (Workers Builds). Dipakai waktu dashboard Cloudflare
+  // jalanin "npx wrangler deploy" - tanpa berkas ini wrangler nggak tau apa yang mau di-deploy
+  // dan langsung gagal.
+  //
+  // Ini Worker "assets-only": NGGAK ada field "main", jadi nggak ada kode server yang jalan -
+  // Cloudflare cuma nyajiin isi folder dist/ sebagai situs statis. Itu yang kita butuh, karena
+  // frontend Warung Pintar hasil build Vite emang statis murni (nggak ada server-side render).
+  "name": "asisten-warung",
+
+  // Tanggal ini ngunci perilaku runtime Cloudflare ke versi tanggal segitu - biar update di sisi
+  // mereka nggak diam-diam ngubah kelakuan aplikasi yang udah jalan.
+  "compatibility_date": "2026-09-11",
+
+  "assets": {
+    // Relatif ke lokasi berkas ini (warung-pintar-react/), hasil "npm run build".
+    "directory": "./dist",
+
+    // Semua path yang nggak ketemu berkasnya dibalikin index.html. Aplikasi ini pindah layar
+    // pakai state (bukan react-router), jadi sebenernya cuma "/" yang kepakai - tapi setelan ini
+    // bikin orang yang nge-bookmark/refresh di URL apa pun tetap mendarat di aplikasinya, bukan
+    // halaman 404 Cloudflare yang bikin bingung.
+    "not_found_handling": "single-page-application"
+  }
+}
