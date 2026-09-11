@@ -120,3 +120,30 @@ export async function outboxHapus(clientId) {
 export async function outboxUpdate(entry) {
   return outboxTambah(entry); // put() = upsert, sama aja
 }
+
+// Bersihin SEMUA cache lokal. Dipanggil waktu warung yang login BERGANTI (lihat AppContext).
+//
+// Kenapa perlu: DB_NAME-nya satu buat seluruh app, nggak dipisah per warung. Tanpa ini, produk /
+// kasbon / pelanggan warung SEBELUMNYA masih nongkrong di IndexedDB, terus ke-load lagi lewat
+// muatDariCache() pas akun LAIN login - jadi pemilik warung B bisa ngeliat data warung A di
+// HP yang sama. Kejadian beneran waktu login akun demo setelah akun lain: datanya ikut kebawa.
+//
+// `outbox` SENGAJA NGGAK ikut dihapus: isinya transaksi yang udah dicatat pemilik warung tapi
+// belum kekirim ke server (lihat outbox.js). Ngehapusnya = ngilangin jualan orang yang belum
+// sempet nyampe server - jauh lebih merusak daripada kebocoran cache yang lagi diberesin di sini.
+// Baris outbox tetap nempel ke warung asalnya lewat token waktu dikirim, bukan lewat cache ini.
+export async function hapusCacheWarung() {
+  const stores = ['produk', 'kasbon', 'pelanggan', 'transaksi', 'riwayatJaga', 'masukLog', 'modalLog', 'meta'];
+  try {
+    const db = await bukaDb();
+    await Promise.all(
+      stores.map(async (s) => {
+        const tx = db.transaction(s, 'readwrite');
+        await tx.store.clear();
+        await tx.done;
+      })
+    );
+  } catch {
+    /* gagal bersihin cache - sama kontraknya kayak fungsi lain di file ini, jangan bikin app crash */
+  }
+}

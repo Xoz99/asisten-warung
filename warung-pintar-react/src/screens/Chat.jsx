@@ -18,7 +18,15 @@ const formatBot = (s) => escapeHtml(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').re
 // Komunitas terus balik ke Mang AI (lihat gimana <Screen> nge-null-in children pas nggak aktif di
 // PhoneShell.jsx). localStorage dipilih (bukan IndexedDB kayak lib/localdb.js) karena ini cuma
 // preferensi/isi lokal per-HP, sama kayak PREFS_KEY di AppContext.jsx - nggak butuh disinkronkan.
-const CHAT_LOG_KEY = 'warungpintar_chat_log_v1';
+// Kunci riwayat chat DIPISAH PER WARUNG. Dulu satu kunci global buat semua akun, jadi login akun
+// lain di HP yang sama nampilin obrolan akun sebelumnya - dan itu bukan cuma kelihatan salah:
+// riwayat ini ikut DIKIRIM ke Gemini sebagai konteks (lihat riwayatBuatAi), jadi Mang AI di akun
+// B bisa "inget" obrolan akun A. Kejadian beneran waktu demo: login idah lalu login demo.
+//
+// Dipisah (bukan dihapus pas logout) supaya tiap akun tetap punya riwayatnya sendiri waktu
+// balik login - pemilik warung yang logout-login ulang nggak kehilangan obrolannya.
+const CHAT_LOG_KEY_DASAR = 'warungpintar_chat_log_v1';
+const chatLogKey = (warungId) => (warungId ? `${CHAT_LOG_KEY_DASAR}_${warungId}` : CHAT_LOG_KEY_DASAR);
 const CHAT_LOG_MAKS = 60; // batasin biar localStorage-nya nggak numpuk tak terbatas
 
 // Id lokal buat tiap bubble (dipakai sebagai React key, dan nargetin bubble "nota-hasil" tertentu
@@ -33,9 +41,9 @@ const SAPAAN_AWAL = () => ({ id: idBaru(), who: 'bot', html: 'Pagi. Ada yang mau
 // - ditangani LOKAL di client (lihat tanya() di TanyaAI), nggak lewat API sama sekali.
 const PERINTAH_RESET = new Set(['reset', 'reset chat', 'reset obrolan', 'mulai ulang', 'mulai ulang obrolan', 'hapus riwayat', 'hapus chat', 'hapus obrolan']);
 
-function muatLogTersimpan() {
+function muatLogTersimpan(warungId) {
   try {
-    const parsed = JSON.parse(localStorage.getItem(CHAT_LOG_KEY));
+    const parsed = JSON.parse(localStorage.getItem(chatLogKey(warungId)));
     if (!Array.isArray(parsed) || !parsed.length) return [SAPAAN_AWAL()];
     // Riwayat lama (sebelum bubble tipe foto/nota-hasil ada) belum punya field `id` - dikasih di
     // sini biar tetep aman dipakai sebagai React key & target Terapkan/Batal, bukan cuma pas bubble
@@ -124,8 +132,12 @@ export default function Chat() {
 }
 
 function TanyaAI() {
-  const { dispatch, refreshData, toast, cekLisensi } = useApp();
-  const [log, setLog] = useState(muatLogTersimpan);
+  const { dispatch, refreshData, toast, cekLisensi, authWarung } = useApp();
+  const warungId = authWarung?.id || null;
+  // Riwayat dimuat pakai kunci milik warung yang LAGI login - bukan kunci global. Sengaja lewat
+  // fungsi (lazy initializer), bukan muatLogTersimpan(warungId) langsung, biar localStorage-nya
+  // cuma dibaca sekali pas komponennya pertama kali dipasang.
+  const [log, setLog] = useState(() => muatLogTersimpan(warungId));
   const [typing, setTyping] = useState(false);
   const [draf, setDraf] = useState('');
   const [kameraNotaOpen, setKameraNotaOpen] = useState(false); // kamera buat "foto nota, kirim ke Mang AI"
@@ -143,11 +155,11 @@ function TanyaAI() {
   // disimpen (lihat CHAT_LOG_MAKS), riwayat lama nggak sepenting itu buat disimpen selamanya.
   useEffect(() => {
     try {
-      localStorage.setItem(CHAT_LOG_KEY, JSON.stringify(log.slice(-CHAT_LOG_MAKS)));
+      localStorage.setItem(chatLogKey(warungId), JSON.stringify(log.slice(-CHAT_LOG_MAKS)));
     } catch {
       /* kuota localStorage penuh / mode privat - riwayat cuma nggak kesimpen, bukan fatal */
     }
-  }, [log]);
+  }, [log, warungId]);
 
   // Nge-scroll .chat-log (scrollbox internalnya sendiri, punya overflow-y:auto - lihat index.css)
   // langsung ke scrollHeight-nya tiap ada pesan baru / status ngetik berubah. Dulu pakai

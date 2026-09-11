@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, useRef, useCal
 import { api, sesi } from '../lib/api';
 import { inisial, escapeHtml } from '../lib/format';
 import { simpanSemuaKeCache, muatSemuaDariCache } from '../lib/dataCache';
-import { getMeta, setMeta } from '../lib/localdb';
+import { getMeta, setMeta, hapusCacheWarung } from '../lib/localdb';
 import { tambahKeOutbox, hapusDariOutbox, ambilOutboxPending, prosesOutbox } from '../lib/outbox';
 
 // Preferensi tampilan itu per-HP (tema/warna/font/ukuran), jadi tetap disimpan lokal di
@@ -398,17 +398,46 @@ export function AppProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed]);
 
+  // Cache lokal (IndexedDB + riwayat chat) itu SATU buat seluruh app, nggak dipisah per warung.
+  // Jadi tiap kali warung yang login BERGANTI, sisa punya warung sebelumnya wajib dibuang - kalau
+  // nggak, pemilik warung B bakal ngeliat produk/kasbon/pelanggan warung A di HP yang sama (dan
+  // riwayat obrolan Mang AI-nya juga kebawa, padahal itu ikut dikirim ke AI sebagai konteks).
+  //
+  // Penanda warung terakhir disimpen di localStorage, BUKAN di IndexedDB yang mau dihapus itu
+  // sendiri - biar nggak ikut kebersihan & jadi nggak pernah nyadar ada pergantian.
+  const pastikanCacheMilikWarungIni = useCallback(async (warungId) => {
+    const KUNCI = 'warungpintar_warung_terakhir';
+    let sebelumnya = null;
+    try {
+      sebelumnya = localStorage.getItem(KUNCI);
+    } catch {
+      /* mode privat - anggap aja beda, lebih aman kebanyakan bersih daripada kebocoran */
+    }
+    if (sebelumnya && sebelumnya !== warungId) {
+      await hapusCacheWarung();
+      setS(dataKosong());
+      setPenjagaRows([]);
+    }
+    try {
+      localStorage.setItem(KUNCI, warungId);
+    } catch {
+      /* nggak bisa nyimpen penanda - efeknya cuma kebersihan berlebih di login berikutnya */
+    }
+  }, []);
+
   // ---- autentikasi akun warung ----
   const login = useCallback(async (username, password) => {
     const { warung, token } = await api.login(username, password);
+    await pastikanCacheMilikWarungIni(warung.id);
     sesi.simpan(token, warung);
     setAuthWarung(warung);
-  }, []);
+  }, [pastikanCacheMilikWarungIni]);
   const register = useCallback(async (namaWarung, username, password, noHp) => {
     const { warung, token } = await api.register(namaWarung, username, password, noHp);
+    await pastikanCacheMilikWarungIni(warung.id);
     sesi.simpan(token, warung);
     setAuthWarung(warung);
-  }, []);
+  }, [pastikanCacheMilikWarungIni]);
   const logout = useCallback(() => {
     sesi.hapus();
     setAuthWarung(null);
