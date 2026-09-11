@@ -57,7 +57,7 @@ function keMingguan(data) {
 const URUT_HERO = ['bar', 'pie', 'target'];
 
 export default function Laporan() {
-  const { S } = useApp();
+  const { S, targetSetoran } = useApp();
   const [rngN, setRngN] = useState(7);
   const [rngOffset, setRngOffset] = useState(0);
   const [selDay, setSelDay] = useState(null); // index terpilih di grafik
@@ -68,13 +68,18 @@ export default function Laporan() {
   const [transisi, setTransisi] = useState(false); // true = transform translateX pakai transisi CSS mulus, false = "teleport" instan (dipakai sesaat pas ganti konten - lihat sentuhSelesai)
   const touchXRef = useRef(null);
 
+  // S.trx & targetSetoran ikut jadi pemicu, bukan cuma rentang tanggal. Tanpa itu, grafiknya cuma
+  // kebentuk sekali waktu layar dibuka: catat jualan baru atau ganti target nggak kelihatan sampai
+  // layarnya ditinggal lalu dibuka lagi. Dua nilai ini murni ANGKA (jumlah transaksi hari ini &
+  // nominal target), jadi aman dipakai sebagai dependency - nggak bikin fetch berulang tiap render
+  // kayak kalau yang dipasang objek S utuh.
   useEffect(() => {
     let hidup = true;
     api.laporan.ringkasan(rngN, rngOffset).then((r) => hidup && setRingkasan(r));
     return () => {
       hidup = false;
     };
-  }, [rngN, rngOffset]);
+  }, [rngN, rngOffset, S.trx, targetSetoran]);
 
   const data = useMemo(
     () => (ringkasan ? deretPenuh(rngN, rngOffset, ringkasan.deret, ringkasan.target || []) : []),
@@ -161,6 +166,18 @@ export default function Laporan() {
   };
 
   const labelMinggu = (r) => `Untung ${tglID(r.awal)} – ${tglID(r.akhir)}`;
+  // Label RENTANG saja, tanpa kata "Untung" di depannya - dipakai grafik target, yang bandingannya
+  // omzet vs target, bukan untung. Sempat pakai chartLbl langsung & hasilnya "Target vs jualan
+  // Untung Jumat, 11 Sep" - dua judul ketumpuk jadi satu.
+  const rentangLbl =
+    selDay !== null
+      ? rngN === 30
+        ? labelMinggu(chartRows[selDay])
+        : chartRows[selDay].d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short' })
+      : rngN === 7
+        ? '7 hari ini'
+        : '1 bulan terakhir';
+
   const chartLbl =
     selDay !== null
       ? rngN === 30
@@ -339,7 +356,7 @@ export default function Laporan() {
           // di HP, 7 pasang batang berdesakan jadi terlalu sempit buat kebaca. Marker di dalam
           // batang bikin "kekejar / nggak" langsung kelihatan sekali lihat.
           <>
-            <p className="lbl">Target vs jualan {chartLbl}</p>
+            <p className="lbl">Target vs jualan {rentangLbl}</p>
             <p className="big p-num" style={{ fontSize: 44 }}>
               {rupiah(targetTercapai.omzet)}
             </p>
