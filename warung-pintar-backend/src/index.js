@@ -6,6 +6,9 @@ import morgan from 'morgan';
 import { requireAuth } from './middleware/auth.js';
 import { requireLisensiAktif } from './middleware/lisensi.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { cekKonsistensiPlan } from './services/lisensi.service.js';
 
 import authRoutes from './routes/auth.routes.js';
@@ -83,6 +86,42 @@ app.use('/api/koperasi', koperasiRoutes);
 app.use('/api/langganan', langgananRoutes);
 app.use('/api/tukar', tukarRoutes);
 app.use('/api/komunitas', komunitasRoutes);
+
+// ---- Melayani frontend (produksi) ----
+// Di server, Node ini sekalian nyajiin hasil build React - jadi frontend & API satu origin, satu
+// port, satu proses yang diurus pm2. Alasannya praktis: Caddy di VPS jalan DI DALAM container,
+// jadi dia nggak bisa baca folder dist/ di host tanpa nambah volume mount ke compose punya
+// proyek lain. Dengan cara ini Caddy cukup nerusin satu domain ke satu port, nggak usah tau
+// apa-apa soal berkas statis.
+//
+// Efek sampingnya bagus: `/api` tetap RELATIF kayak waktu development (proxy Vite), jadi
+// VITE_API_URL nggak perlu diisi & nggak ada urusan CORS sama sekali.
+//
+// Kalau dist/ belum ada (mis. lagi jalan di laptop pakai `npm run dev` di frontend terpisah),
+// blok ini dilewat - jadi nggak ngerusak alur development.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DIST = path.resolve(__dirname, '../../warung-pintar-react/dist');
+if (fs.existsSync(path.join(DIST, 'index.html'))) {
+  // Aset ber-hash (index-a1b2c3.js) & model face-api isinya nggak pernah berubah buat nama yang
+  // sama - aman di-cache lama. index.html JANGAN: dia yang nunjuk ke nama-nama ber-hash itu,
+  // kalau ikut ke-cache user nyangkut di versi lama walau udah deploy ulang.
+  app.use(
+    express.static(DIST, {
+      index: false,
+      setHeaders: (res, berkas) => {
+        if (berkas.endsWith('index.html')) res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+        else res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      },
+    })
+  );
+  // Semua path NON-/api dibalikin index.html. Dicek eksplisit biar URL /api yang salah ketik tetap
+  // dapet JSON 404 yang jelas - bukan halaman HTML yang bikin bingung waktu debug.
+  app.get(/^(?!\/api\/).*/, (req, res) => {
+    res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+    res.sendFile(path.join(DIST, 'index.html'));
+  });
+  console.log(`Frontend disajikan dari ${DIST}`);
+}
 
 app.use((req, res) => res.status(404).json({ error: 'Rute tidak ditemukan' }));
 app.use(errorHandler);
