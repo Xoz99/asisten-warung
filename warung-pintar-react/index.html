@@ -14,6 +14,14 @@
     <!-- Dipakai waktu pemilik warung "Add to Home Screen" di HP - ini yang paling sering kejadian,
          karena app-nya dipakai sambil jaga warung, bukan dibuka lewat tab browser tiap kali. -->
     <link rel="apple-touch-icon" sizes="180x180" href="/mangwarung-180.png" />
+    <!-- PWA: bikin aplikasi bisa dipasang ke layar HP (lihat tombol "Pasang aplikasi" di layar
+         Lainnya). iOS nggak baca manifest buat ini - dia pakai apple-touch-icon di atas +
+         apple-mobile-web-app-* di bawah. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Warung Pintar" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

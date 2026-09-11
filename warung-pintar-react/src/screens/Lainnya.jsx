@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { WARNA, FONTS, UKURAN } from '../lib/data';
 import { escapeHtml, tampilNoHp } from '../lib/format';
@@ -66,6 +66,9 @@ export default function Lainnya() {
           <span className="ar">›</span>
         </button>
       </div>
+
+      <p className="p-sec">Aplikasi</p>
+      <BarisPasangApp />
 
       <p className="p-sec">Langganan</p>
       <SectionLangganan />
@@ -652,6 +655,153 @@ function SheetNoHp({ onClose }) {
         </button>
         <button className="btn" style={{ width: '100%', marginTop: 10 }} onClick={onClose}>
           Batal
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Tombol "Pasang aplikasi" - biar Warung Pintar nongol sebagai ikon di layar HP, kebuka tanpa
+// address bar browser, persis kayak aplikasi biasa.
+//
+// Cara masangnya BEDA JAUH antara Android & iPhone, dan itu yang bikin komponen ini nggak bisa
+// cuma satu tombol:
+//
+//   Android/Chrome - browser ngasih event 'beforeinstallprompt'. Kita tahan event-nya, terus
+//                    dipanggil pas user nge-tap. Sekali tap, muncul dialog resmi Android.
+//   iPhone/Safari  - Apple NGGAK nyediain event itu sama sekali. Nggak ada cara memicu dialog
+//                    dari kode - user WAJIB lewat tombol Share > "Add to Home Screen" manual.
+//                    Jadi buat iPhone yang bisa kita kasih cuma petunjuk langkahnya.
+//
+// Kalau petunjuk iPhone ini nggak ada, pemilik warung ber-iPhone bakal nge-tap tombol yang nggak
+// ngapa-ngapain & nyimpulin aplikasinya rusak.
+function BarisPasangApp() {
+  const [promptPasang, setPromptPasang] = useState(null);
+  const [sheetIos, setSheetIos] = useState(false);
+
+  // Udah kebuka SEBAGAI aplikasi terpasang? Dua cara deteksinya beda: standar web pakai
+  // display-mode, Safari iOS pakai properti non-standar navigator.standalone.
+  const terpasang =
+    (typeof window !== 'undefined' && window.matchMedia?.('(display-mode: standalone)')?.matches) ||
+    (typeof navigator !== 'undefined' && navigator.standalone === true);
+
+  // iPad generasi baru ngaku-ngaku Macintosh di userAgent, makanya dicek juga lewat maxTouchPoints -
+  // Mac beneran nggak punya layar sentuh.
+  const iOS =
+    typeof navigator !== 'undefined' &&
+    (/iphone|ipad|ipod/i.test(navigator.userAgent) ||
+      (/macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1));
+
+  useEffect(() => {
+    const tangkap = (e) => {
+      // Ditahan supaya Chrome nggak nampilin banner-nya sendiri di tempat yang nggak kita atur -
+      // event-nya disimpen buat dipakai pas user nge-tap baris ini.
+      e.preventDefault();
+      setPromptPasang(e);
+    };
+    window.addEventListener('beforeinstallprompt', tangkap);
+    const selesai = () => setPromptPasang(null);
+    window.addEventListener('appinstalled', selesai);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', tangkap);
+      window.removeEventListener('appinstalled', selesai);
+    };
+  }, []);
+
+  const tap = async () => {
+    if (promptPasang) {
+      promptPasang.prompt();
+      await promptPasang.userChoice.catch(() => {});
+      setPromptPasang(null); // event cuma bisa dipakai SEKALI
+      return;
+    }
+    setSheetIos(true);
+  };
+
+  const keterangan = terpasang
+    ? 'Sudah terpasang di HP ini'
+    : promptPasang
+      ? 'Buka langsung dari layar HP, tanpa browser'
+      : iOS
+        ? 'Lihat caranya buat iPhone'
+        : 'Lihat caranya';
+
+  return (
+    <>
+      <div className="menu">
+        <button className="mrow" onClick={terpasang ? undefined : tap} disabled={terpasang} style={terpasang ? { cursor: 'default' } : undefined}>
+          <span className={terpasang ? 'ic' : 'ic aksen'}>
+            <svg viewBox="0 0 24 24">
+              <path d="M12 4v11" />
+              <path d="M8 11.5 12 15.5l4-4" />
+              <path d="M5 19h14" />
+            </svg>
+          </span>
+          <span className="tx">
+            <b>{terpasang ? 'Aplikasi terpasang' : 'Pasang aplikasi di HP'}</b>
+            <span>{keterangan}</span>
+          </span>
+          {!terpasang && <span className="ar">›</span>}
+        </button>
+      </div>
+      {sheetIos && <SheetCaraPasang iOS={iOS} onClose={() => setSheetIos(false)} />}
+    </>
+  );
+}
+
+// Petunjuk manual - dipakai buat iPhone (yang emang nggak punya tombol pasang otomatis), dan juga
+// buat browser lain yang belum ngasih event-nya (mis. Chrome yang baru sekali buka situsnya -
+// dia nunggu user "cukup sering" berkunjung dulu sebelum nawarin install).
+function SheetCaraPasang({ iOS, onClose }) {
+  return (
+    <div className="sheet show">
+      <div className="panel">
+        <h3>Pasang di layar HP</h3>
+        {iOS ? (
+          <>
+            <p>
+              Di iPhone, pemasangan harus lewat menu Safari — Apple nggak ngizinin aplikasi
+              memunculkan tombolnya sendiri. Caranya:
+            </p>
+            <div className="menu" style={{ marginTop: 12 }}>
+              <div className="mrow" style={{ cursor: 'default' }}>
+                <span className="ic aksen">1</span>
+                <span className="tx"><b>Tap tombol Bagikan</b><span>Ikon kotak dengan panah ke atas, di bawah layar Safari</span></span>
+              </div>
+              <div className="mrow" style={{ cursor: 'default' }}>
+                <span className="ic aksen">2</span>
+                <span className="tx"><b>Geser ke bawah</b><span>Cari "Add to Home Screen" / "Tambah ke Layar Utama"</span></span>
+              </div>
+              <div className="mrow" style={{ cursor: 'default' }}>
+                <span className="ic aksen">3</span>
+                <span className="tx"><b>Tap Tambah</b><span>Ikon Mang Warung muncul di layar HP</span></span>
+              </div>
+            </div>
+            <p className="opnhint" style={{ marginTop: 12 }}>
+              Harus lewat <b>Safari</b>. Kalau kamu buka lewat Chrome atau dari dalam WhatsApp,
+              menunya nggak ada.
+            </p>
+          </>
+        ) : (
+          <>
+            <p>Browser kamu belum nawarin tombol pasang otomatis. Coba lewat menu browser:</p>
+            <div className="menu" style={{ marginTop: 12 }}>
+              <div className="mrow" style={{ cursor: 'default' }}>
+                <span className="ic aksen">1</span>
+                <span className="tx"><b>Buka menu browser</b><span>Ikon titik tiga di pojok</span></span>
+              </div>
+              <div className="mrow" style={{ cursor: 'default' }}>
+                <span className="ic aksen">2</span>
+                <span className="tx"><b>Pilih "Pasang aplikasi"</b><span>Atau "Add to Home screen"</span></span>
+              </div>
+            </div>
+            <p className="opnhint" style={{ marginTop: 12 }}>
+              Chrome kadang baru nawarin setelah kamu beberapa kali buka aplikasi ini.
+            </p>
+          </>
+        )}
+        <button className="btn utama" style={{ width: '100%', marginTop: 18 }} onClick={onClose}>
+          Mengerti
         </button>
       </div>
     </div>
