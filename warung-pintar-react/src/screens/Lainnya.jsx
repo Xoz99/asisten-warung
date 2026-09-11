@@ -298,7 +298,7 @@ function SectionLangganan() {
             </span>
             <span className="tx" style={{ flex: 1 }}>
               <b>Jatah AI Mang Warung</b>
-              <span>Mang AI v1 24B · paling ngerti warung kamu</span>
+              <span>Mang AI v1 55B · paling ngerti warung kamu</span>
             </span>
             <b style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--abu)', whiteSpace: 'nowrap' }}>
               {lisensi.aiUsage.terpakai.toLocaleString('id-ID')} / {lisensi.aiUsage.jatah.toLocaleString('id-ID')}

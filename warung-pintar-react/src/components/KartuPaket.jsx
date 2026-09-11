@@ -23,7 +23,6 @@ export default function KartuPaket({ paket = [], pilih, onPilih }) {
             key={p.id}
             onClick={() => onPilih(p.id)}
             style={{
-              position: 'relative',
               textAlign: 'left',
               background: dipilih ? 'var(--ink)' : 'var(--surface)',
               color: dipilih ? 'var(--bg)' : 'var(--ink)',
@@ -32,21 +31,50 @@ export default function KartuPaket({ paket = [], pilih, onPilih }) {
               padding: '16px 14px',
               font: 'inherit',
               cursor: 'pointer',
+              // minWidth:0 WAJIB. Tanpa ini, item grid nggak mau nyusut di bawah lebar min-content
+              // isinya - dan isinya ada teks white-space:nowrap ("Rp 3.650.000"), jadi kolomnya
+              // melar & kartu kanan kepotong keluar layar di HP. Ini jebakan grid/flex yang sama
+              // kayak yang udah ada catatannya di .ai-row (index.css).
+              minWidth: 0,
+              overflow: 'hidden',
             }}
           >
-            {p.badge && (
-              <span
-                style={{
-                  position: 'absolute', top: -9, right: 10,
-                  background: 'var(--brand)', color: '#0A0A0A',
-                  fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 99, whiteSpace: 'nowrap',
-                }}
-              >
-                {p.badge}
-              </span>
-            )}
-            <div style={{ fontWeight: 800, fontSize: 15 }}>{p.label}</div>
-            <div className="p-num" style={{ fontSize: 22, fontWeight: 800, marginTop: 4 }}>
+            {/* Badge ditaruh DI DALAM kartu, bukan nongol keluar lewat top:-9px. Di grid 2 kolom
+                (HP), kartu baris kedua badge-nya naik ke celah antar baris & kelihatan menggantung
+                lepas dari kartunya - persis kayak nempel di kartu yang di atasnya. Di satu baris
+                (layar lebar) kelihatan oke, makanya kelewat waktu dicek di 1000px. */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minHeight: 18, marginBottom: 2 }}>
+              <span style={{ fontWeight: 800, fontSize: 15 }}>{p.label}</span>
+              {p.badge && (
+                <span
+                  style={{
+                    background: 'var(--brand)', color: '#0A0A0A',
+                    fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 99,
+                    whiteSpace: 'nowrap', letterSpacing: '.02em', flex: 'none',
+                  }}
+                >
+                  {p.badge}
+                </span>
+              )}
+            </div>
+            {/* Ukuran huruf ikut lebar layar. Diukur beneran di browser, bukan dikira-kira:
+                  layar 320px -> grid jadi 1 kolom, kartu 282px, 22px muat
+                  layar 360px -> 2 kolom, kartu 155px, 22px MELUBER (137>127), 20px ke bawah muat
+                  layar 390px+ -> 2 kolom, kartu 170px+, 22px muat
+                Jadi yang bermasalah cuma sekitar 360px (iPhone SE & banyak Android) - pas kartunya
+                udah 2 kolom tapi layarnya masih sempit. clamp 18-22px: di 360px jadi ~18,7px
+                (aman), di 430px balik 22px penuh. Sempat dipasang 4.6vw & itu kekecilan - HP lebar
+                ikut kena padahal nggak perlu. */}
+            <div
+              className="p-num"
+              style={{
+                fontSize: 'clamp(18px, 5.2vw, 22px)',
+                fontWeight: 800,
+                marginTop: 4,
+                letterSpacing: '-.01em',
+                whiteSpace: 'nowrap',
+              }}
+            >
               {rupiah(p.harga)}
             </div>
             {/* Padanan per bulan cuma buat paket yang punya durasi - ini yang bikin "hemat"-nya
