@@ -271,7 +271,7 @@ export default function Catat() {
           layar, NGGAK ikut kesimpen ke transaksi. */}
       <div className="total">
         <p className="t">
-          {target > 0 ? 'Terkumpul hari ini' : 'Total belanja pembeli'}
+          Total belanja pembeli
           {/* marginTop DIMATIKAN: .linkkecil defaultnya punya margin-top 26px (buat link yang berdiri
               sendiri di bawah form). Di sini dia nempel di baris judul, jadi margin itu bikin
               tombolnya turun & kelihatan nggak sebaris sama "Total belanja pembeli". */}
@@ -283,7 +283,10 @@ export default function Catat() {
             {target > 0 ? 'ubah target' : 'pasang target'}
           </button>
         </p>
-        <p className="n p-num">{rupiah(target > 0 ? terkumpul : totalCart)}</p>
+        {/* SELALU total keranjang, jangan akumulasi harian. Tugas utama angka ini ngasih tau
+            PEMBELI harus bayar berapa - sempat diganti jadi terkumpul-hari-ini, dan itu ngerusak
+            fungsi pokoknya. Progress target cukup di baris kecil di bawah. */}
+        <p className="n p-num">{rupiah(totalCart)}</p>
         {target > 0 && (
           <>
             <div
@@ -308,11 +311,6 @@ export default function Catat() {
                 <>Kurang {rupiah(target - terkumpul)} dari target {rupiah(target)}</>
               )}
             </p>
-            {totalCart > 0 && (
-              <p className="t" style={{ marginTop: 4, opacity: 0.45 }}>
-                Sudah kejual {rupiah(S.omzetHariIni)} + keranjang sekarang {rupiah(totalCart)}
-              </p>
-            )}
           </>
         )}
       </div>
