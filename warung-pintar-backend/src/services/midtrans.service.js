@@ -13,9 +13,9 @@ import crypto from 'crypto';
 // "Rp 49.000 + admin Rp 345" itu berisiko. Naikin harga jual nggak kena larangan itu, dan
 // angkanya juga lebih enak diucapkan ke pemilik warung.
 export const HARGA_PLAN = {
-  bulanan: 50000,
-  triwulan: 135000, // 3 bulan - hemat Rp 15.000 dibanding bayar bulanan 3x
-  tahunan: 500000, // setara 2 bulan gratis dibanding bulanan
+  bulanan: 78000,
+  triwulan: 210000, // 3 bulan - Rp 70.000/bulan
+  tahunan: 684000, // Rp 57.000/bulan - setara 3 bulan lebih gratis dibanding bulanan
   permanen: 3650000, // sekali bayar, seumur hidup - lihat lisensiWebhook.routes.js (direpresentasiin sebagai "berlaku 100 tahun", bukan expiry beneran)
 };
 
@@ -95,7 +95,7 @@ export const KATALOG_PLAN = [
   {
     id: 'tahunan',
     label: 'Tahunan',
-    sub: 'Bayar setahun, hemat 2 bulan',
+    sub: 'Bayar setahun, hemat lebih dari 3 bulan',
     bulan: 12,
     badge: 'PALING HEMAT',
     manfaat: ['Semua fitur kebuka penuh', 'Jatah AI 2,4x lipat bulanan', 'Tenang setahun, nggak mikir perpanjang'],
