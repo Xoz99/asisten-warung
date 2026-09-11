@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0A0A0A">
+<title>Warung Pintar — Tanya & Komunitas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+body{font-family:'Inter',system-ui,sans-serif;background:#E7E6E2;min-height:100vh;
+  display:flex;flex-direction:column;align-items:center;gap:14px;padding:20px 12px 34px;-webkit-font-smoothing:antialiased}
+
+.switch{display:flex;gap:6px;background:#fff;padding:6px;border-radius:999px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+.switch button{border:0;background:none;font:inherit;font-size:13.5px;font-weight:700;color:#8A8A85;
+  padding:11px 18px;border-radius:999px;cursor:pointer;transition:background .2s,color .2s}
+.switch button.on{background:#0A0A0A;color:#FFD400}
+.note{font-size:13px;color:#7A7A75;font-weight:600;text-align:center;max-width:390px;line-height:1.5}
+
+/* ================= TEMA ================= */
+.t-mono{
+  --ink:#0A0A0A; --bg:#F2F1EE; --surface:#FFFFFF; --abu:#7A7A75; --garis:#E4E3DE;
+  --aksen:#FFD400; --aksen-fg:#0A0A0A;
+  --r:26px; --rbig:34px; --rbtn:22px;
+  --f-head:'Bricolage Grotesque'; --h1:30px; --body:17px; --small:15px;
+  --frame:#111; --frame2:#2A2A2A; --tepi:none;
+}
+.t-bold{
+  --ink:#141414; --bg:#FFFDF7; --surface:#FFFFFF; --abu:#4B4B4B; --garis:#141414;
+  --aksen:#FFD400; --aksen-fg:#141414;
+  --r:20px; --rbig:24px; --rbtn:18px;
+  --f-head:'Bricolage Grotesque'; --h1:32px; --body:18px; --small:16px;
+  --frame:#141414; --frame2:#141414; --tepi:3px solid #141414;
+}
+.t-dark{
+  --ink:#F2F4F8; --bg:#0E1116; --surface:#171B22; --abu:#8B93A3; --garis:#242A33;
+  --aksen:#FFD400; --aksen-fg:#0A0A0A;
+  --r:24px; --rbig:30px; --rbtn:20px;
+  --f-head:'Bricolage Grotesque'; --h1:30px; --body:17px; --small:15px;
+  --frame:#000; --frame2:#333; --tepi:none;
+}
+
+/* ================= FRAME ================= */
+.phone{width:390px;height:844px;max-height:calc(100vh - 130px);background:var(--bg);color:var(--ink);position:relative;overflow:hidden;
+  display:flex;flex-direction:column;border-radius:52px;transition:background .25s,color .25s;
+  box-shadow:0 2px 6px rgba(10,10,10,.05),0 14px 30px rgba(10,10,10,.08),0 40px 70px rgba(10,10,10,.14),
+    0 0 0 11px var(--frame),0 0 0 12.5px var(--frame2)}
+.notch{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:104px;height:28px;background:var(--frame);border-radius:20px;z-index:9}
+.sb{flex:0 0 50px;display:flex;align-items:center;justify-content:space-between;padding:0 30px;font-size:13px;font-weight:700}
+.sb .sync{font-size:11.5px;font-weight:700;opacity:.7}
+.vp{flex:1;overflow-y:auto;scrollbar-width:none;scroll-behavior:smooth}
+.vp::-webkit-scrollbar{display:none}
+.layar{display:none;padding:4px 18px 24px}
+.layar.on{display:block;animation:slidein .28s cubic-bezier(.2,.7,.3,1)}
+@keyframes slidein{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.layar.on{animation:none}}
+
+/* ================= TIPOGRAFI ================= */
+.p-h1{font-family:var(--f-head),sans-serif;font-size:var(--h1);font-weight:800;letter-spacing:-.035em;line-height:1.05;margin:0}
+.p-sub{margin:8px 0 0;color:var(--abu);font-size:15px;font-weight:600}
+
+.head{display:flex;align-items:flex-start;gap:14px;padding-top:18px}
+.ava{width:54px;height:54px;border-radius:18px;background:var(--ink);color:var(--aksen);display:grid;place-items:center;
+  font-family:var(--f-head),sans-serif;font-weight:800;font-size:19px;flex:none}
+.ava.kom{background:var(--aksen);color:#0A0A0A;font-size:25px}
+.t-dark .ava{background:var(--aksen);color:#0A0A0A}
+.t-dark .ava.kom{background:var(--ink);color:var(--aksen)}
+
+/* ================= SEGMENTED TAB ================= */
+.seg{display:flex;gap:6px;background:var(--surface);border:var(--tepi);padding:6px;border-radius:999px;margin-top:14px}
+.t-mono .seg,.t-dark .seg{box-shadow:inset 0 0 0 1.5px var(--garis)}
+.seg button{flex:1;border:0;background:none;font:inherit;font-size:15px;font-weight:700;color:var(--abu);
+  padding:12px 10px;border-radius:999px;cursor:pointer;transition:background .2s,color .2s;min-height:48px}
+.seg button.on{background:var(--ink);color:var(--aksen)}
+.t-dark .seg button.on{background:var(--aksen);color:#0A0A0A}
+
+/* ================= CHAT MANG AI ================= */
+.bubble{max-width:82%;padding:16px 19px;border-radius:var(--rbig);font-size:var(--body);line-height:1.55;font-weight:500;margin-top:12px;
+  animation:masuk .3s cubic-bezier(.2,.9,.3,1);border:var(--tepi)}
+.bot{background:var(--surface);border-bottom-left-radius:10px}
+.me{margin-left:auto;background:var(--ink);color:var(--bg);border-bottom-right-radius:10px;font-weight:600}
+.t-dark .me{background:var(--aksen);color:#0A0A0A}
+@keyframes masuk{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:none}}
+.typing{display:flex;gap:6px;align-items:center;width:70px;justify-content:center}
+.typing i{width:9px;height:9px;border-radius:50%;background:var(--abu);animation:dot 1.2s infinite}
+.typing i:nth-child(2){animation-delay:.16s}.typing i:nth-child(3){animation-delay:.32s}
+@keyframes dot{0%,100%{opacity:.25;transform:translateY(0)}50%{opacity:1;transform:translateY(-4px)}}
+.saran{display:flex;gap:9px;flex-wrap:wrap;margin-top:18px}
+.saran button{background:var(--surface);border:var(--tepi);border-radius:999px;padding:13px 17px;
+  font:inherit;font-size:var(--small);font-weight:600;color:var(--abu);cursor:pointer;min-height:48px;transition:transform .12s}
+.saran button:active{transform:scale(.95)}
+.t-mono .saran button,.t-dark .saran button{box-shadow:inset 0 0 0 1.5px var(--garis)}
+
+/* ================= KOMUNITAS ================= */
+.tabs{display:flex;justify-content:flex-start;gap:8px;margin-top:16px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{white-space:nowrap;padding:12px 17px;border-radius:999px;border:var(--tepi);background:var(--surface);color:var(--abu);
+  font:inherit;font-size:var(--small);font-weight:700;cursor:pointer;transition:background .18s,color .18s;min-height:48px}
+.tab.act{background:var(--ink);color:var(--aksen)}
+.t-dark .tab.act{background:var(--aksen);color:#0A0A0A}
+
+.posts{display:flex;flex-direction:column;gap:12px;margin-top:16px}
+.post{background:var(--surface);border:var(--tepi);border-radius:var(--r);padding:18px;cursor:pointer;
+  animation:masuk .3s cubic-bezier(.2,.9,.3,1);transition:transform .12s}
+.post:active{transform:scale(.985)}
+.post-head{display:flex;align-items:center;gap:12px}
+.bulat{width:44px;height:44px;border-radius:15px;background:var(--bg);display:grid;place-items:center;
+  font-family:var(--f-head),sans-serif;font-weight:800;font-size:15px;flex:none;border:var(--tepi)}
+.post-id{min-width:0}
+.post-id b{display:block;font-size:15.5px;line-height:1.2}
+.post-id span{display:block;font-size:12.5px;color:var(--abu);font-weight:600;margin-top:3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tag{margin-left:auto;flex:none;padding:7px 12px;border-radius:999px;font-size:12.5px;font-weight:700;background:var(--bg);color:var(--ink)}
+.tag.hot{background:var(--ink);color:var(--aksen)}
+.t-dark .tag.hot{background:var(--aksen);color:#0A0A0A}
+.post-q{margin:13px 0 0;font-size:var(--body);font-weight:600;line-height:1.5}
+.post-meta{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13.5px;font-weight:700;color:var(--abu)}
+.aksi{border:0;background:none;font:inherit;font-size:13.5px;font-weight:700;color:var(--abu);
+  padding:9px 12px;border-radius:999px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .15s,color .15s}
+.aksi:active{transform:scale(.94)}
+.aksi.suka-on{color:var(--ink);background:var(--aksen)}
+.t-dark .aksi.suka-on{color:#0A0A0A}
+.lihat{margin-left:auto;font-size:13px;color:var(--abu);font-weight:700}
+
+/* baris "disukai oleh" ala Facebook, cuma muncul di detail */
+.suka-row{display:flex;align-items:center;gap:4px;margin-top:16px}
+.suka-badges{display:flex}
+.suka-avatar{width:26px;height:26px;border-radius:50%;background:var(--ink);color:var(--aksen);display:grid;place-items:center;
+  font-size:10px;font-weight:800;border:2px solid var(--surface);margin-left:-8px;flex:none}
+.suka-avatar:first-child{margin-left:0}
+.t-dark .suka-avatar{background:var(--aksen);color:#0A0A0A}
+.suka-teks{flex:1;margin-left:10px;font-size:13px;color:var(--abu);font-weight:600}
+
+/* layar detail */
+.detail-top{display:flex;align-items:center;padding-top:4px}
+
+/* kolom jawaban inline */
+.balas-list{margin-top:14px;border-top:1.5px solid var(--garis);padding-top:4px}
+.balas-row{display:flex;gap:10px;padding:11px 0;border-bottom:1.5px solid var(--garis);animation:masuk .3s cubic-bezier(.2,.9,.3,1)}
+.balas-row:last-child{border-bottom:0}
+.balas-row .bulat{width:34px;height:34px;border-radius:12px;font-size:12px}
+.balas-row b{font-size:13.5px}
+.balas-row p{margin:3px 0 0;font-size:14px;font-weight:500;line-height:1.45;color:var(--abu)}
+.balas-form{display:flex;gap:8px;margin-top:12px}
+.balas-form input{flex:1;border:1.5px solid var(--garis);border-radius:999px;background:var(--bg);color:var(--ink);
+  font:inherit;font-size:14px;font-weight:600;padding:11px 16px;outline:none}
+.balas-form input:focus{border-color:var(--ink)}
+.balas-form button{border:0;background:var(--ink);color:var(--aksen);font:inherit;font-size:13.5px;font-weight:800;
+  padding:0 18px;border-radius:999px;cursor:pointer}
+.t-dark .balas-form button{background:var(--aksen);color:#0A0A0A}
+.kosong{padding:26px 0;text-align:center;color:var(--abu);font-size:15px;font-weight:600;line-height:1.5}
+
+/* ================= INPUT BAWAH ================= */
+.tanya{display:flex;align-items:center;gap:12px;background:var(--surface);border:var(--tepi);border-radius:var(--r);
+  padding:10px 10px 10px 20px;margin-top:18px}
+.tanya input{flex:1;min-width:0;border:0;background:none;font:inherit;font-size:var(--body);font-weight:600;color:var(--ink);outline:none;padding:10px 0}
+.tanya input::placeholder{color:var(--abu)}
+.mic{width:48px;height:48px;border-radius:17px;background:var(--aksen);color:#0A0A0A;display:grid;place-items:center;
+  font-size:21px;flex:none;border:0;cursor:pointer;transition:transform .12s}
+.mic:active{transform:scale(.9)}
+.mic.tambah{width:auto;padding:0 22px;border-radius:999px;font-size:14px;font-weight:800}
+
+/* ================= NAV BAWAH ================= */
+.nbar{flex:0 0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:var(--surface);
+  border-top:var(--tepi);padding:10px 14px 18px;box-shadow:0 -8px 24px rgba(10,10,10,.06)}
+.t-mono .nbar,.t-dark .nbar{border-top:1.5px solid var(--garis)}
+.nb{border:0;background:none;font:inherit;display:flex;flex-direction:column;align-items:center;gap:4px;
+  font-size:11.5px;font-weight:700;color:var(--abu);padding:7px 0;border-radius:16px;cursor:pointer}
+.nb svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nb.on{color:var(--ink);background:var(--bg)}
+.t-dark .nb.on{color:var(--aksen)}
+</style>
+</head>
+<body>
+
+<div class="switch" role="tablist" aria-label="Pilih tema">
+  <button data-theme="t-mono" class="on">Mono</button>
+  <button data-theme="t-bold">Tebal</button>
+  <button data-theme="t-dark">Gelap</button>
+</div>
+<div class="note" id="cap">Data tersimpan di HP (localStorage). Tutup lalu buka lagi — isinya tetap.</div>
+
+<div class="phone t-mono" id="app">
+  <div class="notch"></div>
+  <div class="sb"><span id="jam">09:41</span><span class="sync">● Tersimpan</span></div>
+
+  <div class="vp" id="vp">
+    <div class="layar on" id="layarUtama">
+
+      <!-- Segmented tab: Mang AI vs Komunitas -->
+      <div class="seg" id="seg">
+        <button data-tab="ai" class="on">🤖 Mang AI</button>
+        <button data-tab="komunitas">👥 Komunitas</button>
+      </div>
+
+      <!-- ======= MANG AI ======= -->
+      <div id="pane-ai">
+        <div class="head">
+          <div class="ava">MW</div>
+          <div><p class="p-h1">Mang Warung</p><p class="p-sub">Tanya apa aja soal warung</p></div>
+        </div>
+        <div id="chatLog"></div>
+        <div class="saran" id="saran"></div>
+      </div>
+
+      <!-- ======= KOMUNITAS ======= -->
+      <div id="pane-komunitas" hidden>
+        <div class="head">
+          <div class="ava kom">👥</div>
+          <div><p class="p-h1">Komunitas Juragan</p><p class="p-sub">Nanya & berbagi sama sesama pemilik warung</p></div>
+        </div>
+        <div class="tabs" id="tabs"></div>
+        <div class="posts" id="posts"></div>
+      </div>
+
+      <div class="tabs" id="topikPilih" hidden></div>
+      <form class="tanya" id="formTanya">
+        <input id="inputTanya" type="text" autocomplete="off" placeholder="Tulis pertanyaan…">
+        <button class="mic" id="micChat" type="submit" aria-label="Kirim">🎤</button>
+      </form>
+
+    </div>
+
+    <!-- ======= DETAIL POSTINGAN ======= -->
+    <div class="layar" id="layarDetail">
+      <div class="detail-top">
+        <button class="tab" id="detailBack" type="button">← Kembali</button>
+      </div>
+      <div id="detailBody"></div>
+    </div>
+  </div>
+
+  <nav class="nbar">
+    <button class="nb"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 20z"/></svg>Beranda</button>
+    <button class="nb"><svg viewBox="0 0 24 24"><rect x="3.5" y="6" width="17" height="13" rx="2"/><path d="M3.5 10h17M8 15h4"/></svg>Kasir</button>
+    <button class="nb on"><svg viewBox="0 0 24 24"><path d="M4 5.8h16v10.4h-8.6L7 20v-3.8H4z"/></svg>Tanya</button>
+    <button class="nb"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>Lainnya</button>
+  </nav>
+</div>
+
+<script>
+/* =========================================================
+   HELPER
+========================================================= */
+const $=s=>document.querySelector(s);
+const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e};
+const esc=s=>s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+/* =========================================================
+   STATE (localStorage)
+========================================================= */
+const KUNCI='wp-tanya-v1';
+const awal={
+  tema:'t-mono',
+  tab:'ai',
+  chat:[{from:'bot',text:'Pagi, Juragan! Ada yang mau ditanya soal warung?'}],
+  suka:{},   // id post -> true kalau sudah disukai
+  balas:{},  // id post -> [{nama,teks}]
+  postingKu:[] // pertanyaan yang dikirim pengguna
+};
+let S;
+try{ S=Object.assign({},awal,JSON.parse(localStorage.getItem(KUNCI)||'{}')); }
+catch(e){ S={...awal}; }
+function simpan(){ try{localStorage.setItem(KUNCI,JSON.stringify(S))}catch(e){} }
+
+/* =========================================================
+   DATA CONTOH KOMUNITAS
+========================================================= */
+const POSTS=[
+  {id:'p1',inisial:'BS',nama:'Bu Sari',warung:'Warung Sari Rasa',waktu:'20 mnt lalu',tag:'Supplier',hot:true,
+   tanya:'Harga telur di agen naik terus. Pada beli di mana yang masih miring? Daerah Ciledug & sekitarnya.',
+   jawab:14,suka:32,penyuka:['Pak Dedi','Rina','Jajang'],
+   balasan:[{nama:'Pak Dedi',teks:'Coba ke agen Pasar Cipulir, kemarin masih 27rb/keranjang.'},
+            {nama:'Rina',teks:'Langganan sama satu agen, biasanya dikasih harga tetap seminggu.'}]},
+  {id:'p2',inisial:'PD',nama:'Pak Dedi',warung:'Kios Berkah',waktu:'1 jam lalu',tag:'Kasbon',hot:true,
+   tanya:'Gimana cara nolak kasbon pelanggan yang udah kebanyakan tapi tetap enak dibacanya? 😅',
+   jawab:27,suka:58,penyuka:['Bu Sari','Rina','Jajang'],
+   balasan:[{nama:'Bu Sari',teks:'Aku bilang “barangnya abis, bayar dulu nanti aku beliin” — ampuh 😂'}]},
+  {id:'p3',inisial:'RA',nama:'Rina',warung:'Warung Pagi',waktu:'3 jam lalu',tag:'Dagangan',
+   tanya:'Es kristal cepat cair kalau stok sore. Ada trik cooler box yang awet tanpa beli mahal?',
+   jawab:9,suka:11,penyuka:['Bu Sari','Pak Dedi'],balasan:[]},
+  {id:'p4',inisial:'JH',nama:'Jajang',warung:'Warung Kelontong JH',waktu:'5 jam lalu',tag:'Dagangan',
+   tanya:'Barang apa yang laris kalian jual pas tanggal tua? Di warung saya rokok & pulsa tetap jalan.',
+   jawab:21,suka:19,penyuka:['Bu Sari','Rina'],
+   balasan:[{nama:'Rina',teks:'Gorengan pagi tetap juara di sini.'}]},
+];
+const FILTERS=['Terbaru','Ramai','Dagangan','Kasbon','Supplier'];
+const TOPIK=['Dagangan','Kasbon','Supplier','Lainnya'];
+
+/* =========================================================
+   MANG AI — jawaban contoh
+========================================================= */
+const jawaban={
+  'Kenapa untungku turun minggu ini?':()=>'Minggu ini untung turun 8%. Penyebab utamanya: harga cabai naik tapi harga jual belum disesuaikan. Mau Mang hitung harga jual baru?',
+  'Stok apa yang mau habis?':()=>'Yang tinggal sedikit:<br>• Minyak 1L — sisa 2<br>• Gula pasir — sisa 3 kg<br>• Kopi sachet — sisa 1 renteng<br><br>Enaknya kulakan sebelum Jumat.',
+  'Siapa yang kasbon paling banyak?':()=>'1. Bang Udin — Rp 185.000<br>2. Bu Yanti — Rp 92.000<br>3. Mas Riko — Rp 47.500<br><br>Total kasbon beredar Rp 324.500.',
+};
+function jawabanBebas(q){
+  const t=q.toLowerCase();
+  if(t.includes('omzet')||t.includes('omset')) return 'Kemarin omzetnya Rp 1.240.000 dari 38 transaksi. Naik 12% dari hari sebelumnya, mantap! 🔥';
+  if(t.includes('untung')||t.includes('profit')) return jawaban['Kenapa untungku turun minggu ini?']();
+  if(t.includes('stok')||t.includes('habis')) return jawaban['Stok apa yang mau habis?']();
+  if(t.includes('kasbon')||t.includes('utang')||t.includes('ngutang')) return jawaban['Siapa yang kasbon paling banyak?']();
+  return 'Oke, Mang catat dulu ya. Coba tanya yang lebih spesifik soal omzet, stok, atau kasbon — di situ Mang paling jago. 💪';
+}
+
+const chatLog=$('#chatLog'), saran=$('#saran');
+function bubble(kelas,html){
+  const b=el('div','bubble '+kelas,html);
+  chatLog.appendChild(b);
+  $('#vp').scrollTop=$('#vp').scrollHeight;
+  return b;
+}
+let ngetik=null;
+function balas(teks){
+  if(!ngetik){ ngetik=el('div','bubble bot typing','<i></i><i></i><i></i>'); chatLog.appendChild(ngetik); $('#vp').scrollTop=$('#vp').scrollHeight; }
+  setTimeout(()=>{ ngetik.replaceWith(el('div','bubble bot',teks)); ngetik=null; $('#vp').scrollTop=$('#vp').scrollHeight; },750);
+}
+function renderChat(){
+  chatLog.innerHTML=''; ngetik=null;
+  S.chat.forEach(c=>chatLog.appendChild(el('div','bubble '+(c.from==='me'?'me':'bot'),c.text)));
+  saran.innerHTML='';
+  Object.keys(jawaban).forEach(q=>{
+    const b=el('button',null,q);
+    b.onclick=()=>{ kirimAI(q,jawaban[q]()); };
+    saran.appendChild(b);
+  });
+}
+function kirimAI(q,jwb){
+  S.chat.push({from:'me',text:esc(q)});
+  bubble('me',esc(q)); simpan();
+  balas(jwb||jawabanBebas(q));
+  S.chat.push({from:'bot',text:jwb||jawabanBebas(q)}); simpan();
+}
+
+/* =========================================================
+   KOMUNITAS
+========================================================= */
+const tabs=$('#tabs'), postsEl=$('#posts');
+let filterAktif='Terbaru';
+let daftarAktif=[];   // id-id post, urutannya dibekukan sampai filter ganti / ada post baru
+let detailId=null;    // id post yang lagi dibuka detailnya
+
+function daftarSemua(){
+  const milikKu=S.postingKu.map((p,i)=>({
+    id:p.id||('ku-'+i),inisial:'GW',nama:'Kamu',warung:'Warung sendiri',waktu:'baru aja',
+    tag:p.tag,tanya:p.teks,jawab:0,suka:0,penyuka:[],balasan:[]}));
+  return [...milikKu,...POSTS];
+}
+function cariPost(id){ return daftarSemua().find(p=>p.id===id); }
+
+// hitung ULANG urutan — cuma dipanggil saat ganti filter / ada postingan baru,
+// bukan tiap kali di-like/dijawab, biar topiknya nggak lompat-lompat sendiri.
+function hitungUrutan(){
+  let semua=daftarSemua();
+  if(filterAktif==='Ramai'){
+    const skor=p=>p.jawab+(S.balas[p.id]||[]).length+p.suka+(S.suka[p.id]?1:0);
+    semua=[...semua].sort((a,b)=>skor(b)-skor(a));
+  } else if(filterAktif!=='Terbaru'){
+    semua=semua.filter(p=>p.tag===filterAktif);
+  }
+  daftarAktif=semua.map(p=>p.id);
+}
+
+function toggleSuka(id){
+  S.suka[id]=!S.suka[id]; simpan();
+  renderPosts();
+  if(detailId===id) renderDetail();
+}
+
+function renderTabs(){
+  tabs.innerHTML='';
+  FILTERS.forEach(f=>{
+    const b=el('button','tab'+(f===filterAktif?' act':''),f);
+    b.onclick=()=>{ filterAktif=f; renderTabs(); hitungUrutan(); renderPosts(); };
+    tabs.appendChild(b);
+  });
+}
+
+function renderPosts(){
+  postsEl.innerHTML='';
+  if(!daftarAktif.length){
+    postsEl.appendChild(el('div','kosong','Belum ada bahasan soal ini.<br>Jadi yang pertama nanya, yuk!'));
+    return;
+  }
+  daftarAktif.forEach(id=>{
+    const p=cariPost(id); if(!p) return;
+    const kartu=el('article','post');
+    kartu.onclick=()=>bukaDetail(p.id);
+
+    // kepala kartu
+    const head=el('div','post-head');
+    head.appendChild(el('div','bulat',p.inisial));
+    head.appendChild(el('div','post-id',`<b>${esc(p.nama)}</b><span>${esc(p.warung)} · ${p.waktu}</span>`));
+    head.appendChild(el('span','tag'+(p.hot?' hot':''),p.tag));
+    kartu.appendChild(head);
+
+    kartu.appendChild(el('p','post-q',esc(p.tanya)));
+
+    // meta: jawaban + suka + lihat detail
+    const meta=el('div','post-meta');
+    const nBalas=(S.balas[p.id]||[]).length;
+    meta.appendChild(el('span',null,`💬 ${p.jawab+nBalas} jawaban`));
+
+    const bSuka=el('button','aksi'+(S.suka[p.id]?' suka-on':''),`👍 ${p.suka+(S.suka[p.id]?1:0)}`);
+    bSuka.onclick=(e)=>{ e.stopPropagation(); toggleSuka(p.id); };
+    meta.appendChild(bSuka);
+    meta.appendChild(el('span','lihat','Lihat detail →'));
+    kartu.appendChild(meta);
+
+    postsEl.appendChild(kartu);
+  });
+}
+
+/* ---- layar DETAIL: komentar lengkap + badge siapa aja yang suka ---- */
+const layarUtama=$('#layarUtama'), layarDetail=$('#layarDetail'), detailBody=$('#detailBody');
+
+function bukaDetail(id){
+  detailId=id;
+  renderDetail();
+  layarUtama.classList.remove('on');
+  layarDetail.classList.add('on');
+  $('#vp').scrollTop=0;
+}
+function tutupDetail(){
+  detailId=null;
+  layarDetail.classList.remove('on');
+  layarUtama.classList.add('on');
+}
+$('#detailBack').onclick=tutupDetail;
+
+function renderDetail(){
+  const p=cariPost(detailId);
+  detailBody.innerHTML='';
+  if(!p){ tutupDetail(); return; }
+
+  const head=el('div','post-head');
+  head.appendChild(el('div','bulat',p.inisial));
+  head.appendChild(el('div','post-id',`<b>${esc(p.nama)}</b><span>${esc(p.warung)} · ${p.waktu}</span>`));
+  head.appendChild(el('span','tag'+(p.hot?' hot':''),p.tag));
+  detailBody.appendChild(head);
+
+  detailBody.appendChild(el('p','post-q',esc(p.tanya)));
+
+  // baris "disukai oleh…" ala Facebook — badge avatar + tombol suka
+  const totalSuka=p.suka+(S.suka[p.id]?1:0);
+  let namaSuka=[...(p.penyuka||[])];
+  if(S.suka[p.id]) namaSuka=['Kamu',...namaSuka];
+  const tampil=namaSuka.slice(0,3);
+  const sisa=totalSuka-tampil.length;
+  const sukaRow=el('div','suka-row');
+  const badges=el('div','suka-badges');
+  tampil.forEach(n=>badges.appendChild(el('div','suka-avatar',esc(n.slice(0,1).toUpperCase()))));
+  sukaRow.appendChild(badges);
+  sukaRow.appendChild(el('span','suka-teks',
+    totalSuka? `Disukai ${tampil.map(esc).join(', ')}${sisa>0?` dan ${sisa} lainnya`:''}` : 'Belum ada yang suka, jadi yang pertama yuk!'));
+  const bSuka=el('button','aksi'+(S.suka[p.id]?' suka-on':''),`👍 ${totalSuka}`);
+  bSuka.onclick=()=>toggleSuka(p.id);
+  sukaRow.appendChild(bSuka);
+  detailBody.appendChild(sukaRow);
+
+  // semua komentar
+  const gabungan=[...(p.balasan||[]),...(S.balas[p.id]||[])];
+  const list=el('div','balas-list');
+  if(gabungan.length){
+    gabungan.forEach(r=>{
+      const row=el('div','balas-row');
+      row.appendChild(el('div','bulat',esc(r.nama.slice(0,2).toUpperCase())));
+      row.appendChild(el('div',null,`<b>${esc(r.nama)}</b><p>${esc(r.teks)}</p>`));
+      list.appendChild(row);
+    });
+  } else {
+    list.appendChild(el('div','kosong','Belum ada komentar.<br>Jadi yang pertama jawab, yuk!'));
+  }
+  detailBody.appendChild(list);
+
+  const form=el('form','balas-form');
+  const inp=el('input'); inp.type='text'; inp.placeholder='Tulis jawaban…'; inp.autocomplete='off';
+  const kirim=el('button',null,'Kirim'); kirim.type='submit';
+  form.append(inp,kirim);
+  form.onsubmit=e=>{
+    e.preventDefault();
+    const teks=inp.value.trim(); if(!teks) return;
+    (S.balas[p.id]=S.balas[p.id]||[]).push({nama:'Kamu',teks});
+    simpan(); renderDetail(); renderPosts();
+  };
+  detailBody.appendChild(form);
+}
+
+/* =========================================================
+   SEGMENTED TAB + FORM BAWAH
+========================================================= */
+const paneAI=$('#pane-ai'), paneKom=$('#pane-komunitas');
+const inputTanya=$('#inputTanya'), micChat=$('#micChat');
+
+// pilihan topik (kasbon, supplier, dagangan, ...) buat postingan baru
+const topikEl=$('#topikPilih');
+let topikPilih=TOPIK[0];
+function renderTopik(){
+  topikEl.innerHTML='';
+  TOPIK.forEach(t=>{
+    const b=el('button','tab'+(t===topikPilih?' act':''),t);
+    b.type='button';
+    b.onclick=()=>{ topikPilih=t; renderTopik(); };
+    topikEl.appendChild(b);
+  });
+}
+renderTopik();
+
+function ke(tab){
+  S.tab=tab; simpan();
+  document.querySelectorAll('#seg [data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
+  paneAI.hidden=tab!=='ai';
+  paneKom.hidden=tab!=='komunitas';
+  topikEl.hidden=tab!=='komunitas';
+  inputTanya.placeholder=tab==='ai'?'Tulis pertanyaan…':'Nanya ke sesama juragan…';
+  micChat.classList.toggle('tambah',tab==='komunitas');
+  micChat.textContent=tab==='ai'?'🎤':'Kirim';
+  tutupDetail();
+  $('#vp').scrollTop=0;
+}
+document.querySelectorAll('#seg [data-tab]').forEach(b=>b.onclick=()=>ke(b.dataset.tab));
+
+$('#formTanya').onsubmit=e=>{
+  e.preventDefault();
+  const q=inputTanya.value.trim(); if(!q) return;
+  inputTanya.value='';
+  if(S.tab==='ai'){ kirimAI(q); }
+  else{
+    S.postingKu.unshift({id:'ku-'+Date.now(),teks:q,tag:topikPilih});
+    simpan(); filterAktif='Terbaru'; renderTabs(); hitungUrutan(); renderPosts();
+    $('#vp').scrollTop=0;
+  }
+};
+
+/* =========================================================
+   TEMA + JAM
+========================================================= */
+const caps={
+  't-mono':'Data tersimpan di HP (localStorage). Tutup lalu buka lagi — isinya tetap.',
+  't-bold':'Outline tebal, huruf lebih besar. Aman buat mata dan tangan basah.',
+  't-dark':'Layar gelap, aksen kuning. Nyaman dipakai subuh sebelum warung buka.'
+};
+function terapkanTema(t){
+  $('#app').className='phone '+t;
+  document.querySelectorAll('[data-theme]').forEach(x=>x.classList.toggle('on',x.dataset.theme===t));
+  $('#cap').textContent=caps[t]; S.tema=t; simpan();
+}
+document.querySelectorAll('[data-theme]').forEach(b=>b.onclick=()=>terapkanTema(b.dataset.theme));
+
+setInterval(()=>{const d=new Date();
+  $('#jam').textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');},1000);
+
+/* =========================================================
+   BOOT
+========================================================= */
+terapkanTema(S.tema||'t-mono');
+renderChat();
+renderTabs();
+hitungUrutan();
+renderPosts();
+ke(S.tab||'ai');
+</script>
+</body>
+</html>

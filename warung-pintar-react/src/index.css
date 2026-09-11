@@ -1,0 +1,700 @@
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+
+#root{display:flex;height:100vh;height:100dvh}
+
+/* ================= TEMA ================= */
+.t-mono{
+  --ink:#0A0A0A; --bg:#F2F1EE; --surface:#FFFFFF; --abu:#7A7A75; --garis:#E4E3DE;
+  --aksen:#FFD400; --aksen-fg:#0A0A0A;
+  --r:26px; --rbig:34px; --rbtn:22px;
+  --f-head:'Bricolage Grotesque'; --h1:34px; --big:52px; --body:18px; --small:15px;
+  --frame:#111; --frame2:#2A2A2A; --tepi:none;
+}
+.t-bold{
+  --ink:#141414; --bg:#FFFDF7; --surface:#FFFFFF; --abu:#4B4B4B; --garis:#141414;
+  --aksen:#FFD400; --aksen-fg:#141414;
+  --r:20px; --rbig:24px; --rbtn:18px;
+  --f-head:'Bricolage Grotesque'; --h1:36px; --big:54px; --body:19px; --small:16px;
+  --frame:#141414; --frame2:#141414; --tepi:3px solid #141414;
+}
+.t-dark{
+  --ink:#F2F4F8; --bg:#0E1116; --surface:#171B22; --abu:#8B93A3; --garis:#242A33;
+  --aksen:#FFD400; --aksen-fg:#0A0A0A;
+  --r:24px; --rbig:30px; --rbtn:20px;
+  --f-head:'Bricolage Grotesque'; --h1:34px; --big:52px; --body:18px; --small:15px;
+  --frame:#000; --frame2:#333; --tepi:none;
+}
+
+/* ================= APP SHELL ================= */
+.phone{width:100%;height:100vh;height:100dvh;background:var(--bg);color:var(--ink);position:relative;overflow:hidden;
+  display:flex;flex-direction:column;transition:background .25s,color .25s}
+.layout{flex:1;min-height:0;display:flex;width:100%}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}
+.sidebar{display:none}
+
+.vp{flex:1;overflow-y:auto;scrollbar-width:none;scroll-behavior:smooth;width:100%;max-width:640px;margin:0 auto}
+.vp::-webkit-scrollbar{display:none}
+.screen{display:none;padding:20px 18px calc(140px + env(safe-area-inset-bottom))}
+.screen.on{display:block;animation:slidein .28s cubic-bezier(.2,.7,.3,1)}
+@keyframes slidein{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.screen.on{animation:none}}
+
+/* ================= TIPOGRAFI ================= */
+.p-h1{font-family:var(--f-head),sans-serif;font-size:var(--h1);font-weight:800;letter-spacing:-.035em;line-height:1.05;margin:0}
+.p-sub{margin:8px 0 0;color:var(--abu);font-size:var(--sub);font-weight:600}
+.p-sec{font-family:var(--f-head),sans-serif;margin:28px 0 12px;font-size:var(--sec);font-weight:700;letter-spacing:-.02em}
+.p-num{font-family:var(--f-head),sans-serif;font-weight:800;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.nama{font-weight:700;font-size:var(--body);line-height:1.25}
+.tgl{font-size:var(--small);color:var(--abu);font-weight:600;margin-top:4px}
+.ic-inline{display:inline-flex;vertical-align:-2px;width:13px;height:13px}
+.ic-inline svg{width:100%;height:100%;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.emo{font-size:26px;line-height:1;filter:grayscale(1) contrast(1.1);flex:none}
+.t-dark .emo{filter:grayscale(1) brightness(1.6)}
+.emo.picon{width:26px;height:26px;font-size:0;filter:none;display:inline-flex;align-items:center;justify-content:center;color:var(--ink)}
+.emo.picon svg{width:100%;height:100%;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+.card{background:var(--surface);border-radius:var(--r);padding:20px;margin-top:14px;border:var(--tepi)}
+.card.tap{cursor:pointer;transition:transform .12s}
+.card.tap:active{transform:scale(.985)}
+.row{display:flex;align-items:center;gap:14px;min-width:0}
+.between{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.head{display:flex;align-items:flex-start;gap:10px;padding-top:12px}
+.head-info{min-width:0;flex:1}
+.jamcuaca{margin-left:auto;flex:none;text-align:right;padding-top:2px;max-width:38%}
+.jc-jam{display:block;font-family:var(--f-head),sans-serif;font-weight:800;font-size:15px;color:var(--ink);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.jc-cuaca{display:inline-flex;align-items:center;gap:4px;margin-top:5px;font-size:13px;font-weight:700;color:var(--abu);max-width:100%}
+.jc-cuaca .jc-ic{width:16px;height:16px;display:inline-flex;flex:none}
+.jc-cuaca .jc-ic svg{width:100%;height:100%;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.jc-cuaca.offline{opacity:.7}
+.jc-teks{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ava{width:54px;height:54px;border-radius:18px;background:var(--ink);color:var(--aksen);display:grid;place-items:center;
+  font-family:var(--f-head),sans-serif;font-weight:800;font-size:19px;flex:none;overflow:hidden}
+.ava img{width:100%;height:100%;object-fit:cover}
+.ava svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.t-dark .ava{background:var(--aksen);color:#0A0A0A}
+
+.hero-card{margin-top:20px;background:var(--aksen);color:var(--aksen-fg);border-radius:var(--rbig);padding:28px 24px 24px;position:relative;overflow:hidden;border:var(--tepi)}
+.hero-card .lbl{margin:0;font-size:16px;font-weight:700;opacity:.62}
+.hero-card .big{margin:10px 0 0;font-size:var(--big);line-height:.95}
+.hero-card .delta{margin-top:18px;display:inline-block;background:#0A0A0A;color:var(--aksen);padding:11px 16px;border-radius:999px;font-size:14.5px;font-weight:700}
+.hero-card .blob{position:absolute;right:-34px;top:-34px;width:140px;height:140px;border-radius:50%;background:rgba(10,10,10,.07)}
+.pop{animation:pop .45s cubic-bezier(.2,1.5,.4,1)}
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.05)}100%{transform:scale(1)}}
+
+.bento{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.tile{background:var(--surface);border-radius:var(--r);padding:20px;border:var(--tepi)}
+.tile.ink{background:var(--ink);color:var(--bg)}
+.tile .k{margin:12px 0 6px;font-size:var(--small);font-weight:600;color:var(--abu)}
+.tile.ink .k{opacity:.65}
+.tile .v{margin:0;font-size:26px}
+.tile.ink .emo{filter:grayscale(1) invert(1) brightness(2)}
+.t-dark .tile.ink{background:var(--aksen);color:#0A0A0A}
+.t-dark .tile.ink .k{color:rgba(10,10,10,.6)}
+.t-dark .tile.ink .emo{filter:grayscale(1) contrast(1.1)}
+
+.item{display:flex;align-items:center;gap:14px;padding:16px 0;border-bottom:1.5px solid var(--garis);min-height:60px}
+.item:last-child{border-bottom:0}
+.item.tap{cursor:pointer;transition:opacity .15s}
+.item.tap:active{opacity:.55}
+.item.masuk{animation:masuk .3s cubic-bezier(.2,.9,.3,1)}
+@keyframes masuk{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:none}}
+@keyframes bubbleMasuk{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
+/* Transisi geser kartu hero Laporan (grafik batang <-> pie untung/modal) - digerakin PENUH lewat JS
+   (transform + transisi inline, lihat sentuhMulai/sentuhGerak/sentuhSelesai di Laporan.jsx), bukan
+   CSS keyframe - kontennya perlu BENERAN ngikutin jari real-time selagi drag, itu nggak bisa
+   dicapai murni CSS keyframe (keyframe cuma animasiin dari titik A ke B otomatis, nggak bisa
+   "berhenti di tengah jalan" ngikutin posisi jari yang berubah-ubah tiap frame sentuhan). */
+.bulat{width:48px;height:48px;border-radius:16px;background:var(--bg);display:grid;place-items:center;overflow:hidden;
+  font-family:var(--f-head),sans-serif;font-weight:800;font-size:16px;flex:none;border:var(--tepi)}
+.bulat img{width:100%;height:100%;object-fit:cover}
+.kanan{margin-left:auto;text-align:right}
+.kanan .p-num{font-size:19px}
+.sisa-kritis{margin-left:auto;font-size:var(--small);font-weight:700;color:#e5484d;flex:none}
+.utang-teks{margin-left:auto;font-size:var(--small);font-weight:700;color:#e5484d;flex:none}
+.utang-teks.lunas{color:var(--abu)}
+.tag{display:inline-block;padding:8px 14px;border-radius:999px;font-size:14px;font-weight:700;background:var(--bg);color:var(--ink);white-space:nowrap;flex:none}
+.tag.hot{background:var(--frame);color:var(--aksen)}
+.tag.aman{background:var(--aksen);color:#0A0A0A}
+.lunas{background:var(--aksen)!important;color:#0A0A0A!important}
+
+.btn{border:var(--tepi);border-radius:var(--rbtn);padding:20px;font:inherit;font-size:var(--body);font-weight:700;cursor:pointer;
+  background:var(--surface);color:var(--ink);transition:transform .12s,opacity .15s;min-height:56px}
+.t-mono .btn,.t-dark .btn{box-shadow:inset 0 0 0 1.5px var(--garis)}
+.btn.utama{background:var(--ink);color:var(--aksen);box-shadow:none}
+.t-dark .btn.utama{background:var(--aksen);color:#0A0A0A}
+.btn:active{transform:scale(.97)}
+.btn[disabled]{opacity:.32;pointer-events:none}
+.btn.kecil{padding:14px 18px;font-size:var(--small);min-height:48px;border-radius:999px}
+.actions{display:flex;gap:12px;margin-top:22px}
+.actions .btn{flex:1}.actions .btn.utama{flex:1.7}
+.linkkecil{display:block;width:100%;margin:26px 0 0;background:none;border:0;color:var(--abu);font:inherit;
+  font-size:14px;font-weight:600;text-decoration:underline;cursor:pointer;padding:12px}
+
+.total{margin-top:16px;background:var(--ink);color:var(--bg);border-radius:var(--rbig);padding:24px;border:var(--tepi)}
+.total .t{margin:0;font-size:16px;font-weight:600;opacity:.6}
+.total .n{margin:10px 0 0;font-size:44px;color:var(--aksen)}
+.t-dark .total{background:var(--surface);color:var(--ink)}
+.qty{display:flex;align-items:center;gap:12px;margin-left:auto}
+.qty .p-num{font-size:20px;min-width:18px;text-align:center}
+.qbtn{width:48px;height:48px;border-radius:16px;border:var(--tepi);background:var(--bg);color:var(--ink);font-size:22px;font-weight:700;cursor:pointer;transition:transform .12s}
+.qbtn:active{transform:scale(.88)}
+
+/* input utama voice/kamera */
+/* 4 kolom (mic-big + 3 kotak-btn: foto/wajah/cari manual) - min-width:0 WAJIB di sini, tanpa itu
+   grid track 1fr nggak mau nyusut di bawah lebar konten mic-big (padding+ikon+teks), bikin
+   .ai-row jadi lebih lebar dari layar & tombol terakhir kepotong di layar sempit. */
+.ai-row{display:grid;grid-template-columns:1fr auto auto auto;gap:10px;margin-top:18px}
+.mic-big{background:var(--aksen);color:#0A0A0A;border:var(--tepi);border-radius:var(--rbig);padding:22px 14px;
+  display:flex;align-items:center;justify-content:center;gap:10px;font:inherit;font-size:var(--body);font-weight:800;
+  cursor:pointer;transition:transform .12s;min-height:76px;min-width:0;user-select:none}
+.mic-big:active{transform:scale(.97)}
+.mic-big .ic{font-size:28px;flex:none}
+.kotak-btn{width:66px;min-height:76px;border-radius:var(--rbig);border:var(--tepi);background:var(--surface);color:var(--ink);
+  font-size:26px;cursor:pointer;display:grid;place-items:center;transition:transform .12s}
+.t-mono .kotak-btn,.t-dark .kotak-btn{box-shadow:inset 0 0 0 1.5px var(--garis)}
+.kotak-btn:active{transform:scale(.94)}
+.kotak-btn small{display:block;font-size:10.5px;font-weight:700;margin-top:3px;color:var(--abu)}
+
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}
+.chip{background:var(--surface);border:var(--tepi);border-radius:var(--r);padding:16px 6px;text-align:center;font-size:var(--small);font-weight:700;
+  cursor:pointer;transition:transform .12s,background .15s;font-family:inherit;color:var(--ink);width:100%;min-height:88px}
+.chip .emo{display:block;margin:0 auto 8px;font-size:26px}
+.chip:active{transform:scale(.94)}
+.chip.flash{background:var(--aksen);color:#0A0A0A}
+.kosong{padding:24px 0;text-align:center;color:var(--abu);font-size:16px;font-weight:600;line-height:1.5}
+
+.scan-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.scan-grid .scan{margin-top:0;flex-direction:column;align-items:flex-start;text-align:left;gap:12px}
+.scan{margin-top:14px;background:var(--ink);color:var(--bg);border-radius:var(--rbig);padding:20px;display:flex;align-items:center;gap:16px;cursor:pointer;transition:transform .12s;border:var(--tepi)}
+.scan.alt{background:var(--surface);color:var(--ink)}
+.t-mono .scan.alt,.t-dark .scan.alt{box-shadow:inset 0 0 0 1.5px var(--garis)}
+.t-dark .scan{background:var(--surface);color:var(--ink)}
+.scan:active{transform:scale(.98)}
+.scan .kotak{width:54px;height:54px;border-radius:18px;background:var(--aksen);color:#0A0A0A;display:grid;place-items:center;font-size:26px;flex:none}
+.scan b{display:block;font-size:var(--body);font-weight:700}
+.scan span{font-size:var(--small);opacity:.62;font-weight:600}
+.cari{margin-top:12px;background:var(--surface);border:var(--tepi);border-radius:var(--r);padding:18px;color:var(--abu);font-weight:600;font-size:17px;display:flex;gap:12px}
+.cari input{flex:1;min-width:0;border:0;background:none;outline:none;padding:0;font:inherit;color:var(--ink)}
+.cari input::placeholder{color:var(--abu);font-weight:600}
+.cari-clear{flex:none;width:24px;height:24px;border:0;border-radius:50%;background:var(--bg);color:var(--abu);cursor:pointer;display:grid;place-items:center;padding:0}
+.cari-clear svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round}
+.tabs{display:flex;gap:8px;margin-top:16px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{white-space:nowrap;padding:13px 18px;border-radius:999px;border:var(--tepi);background:var(--surface);color:var(--abu);
+  font:inherit;font-size:var(--small);font-weight:700;cursor:pointer;transition:background .18s,color .18s;min-height:48px}
+.tab.act{background:var(--ink);color:var(--aksen)}
+.t-dark .tab.act{background:var(--aksen);color:#0A0A0A}
+.bar{height:9px;border-radius:99px;background:var(--bg);overflow:hidden;margin-top:14px}
+.bar i{display:block;height:100%;border-radius:99px;background:var(--ink);transition:width .6s cubic-bezier(.2,.7,.3,1)}
+.bar i.kun{background:var(--aksen)}
+.t-dark .bar{background:#0E1116}
+.t-dark .bar i{background:#6B7280}
+
+.chart{display:flex;align-items:flex-end;gap:8px;height:140px;margin-top:20px}
+.col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:9px;height:100%;cursor:pointer}
+.col i{display:block;width:100%;border-radius:9px 9px 4px 4px;background:rgba(10,10,10,.14);height:0;transition:height .7s cubic-bezier(.2,.7,.3,1)}
+.col.sel i{background:#0A0A0A}
+.col span{font-size:13px;font-weight:700;opacity:.5}
+.col.sel span{opacity:1}
+.rk{width:32px;height:32px;border-radius:11px;background:var(--aksen);color:#0A0A0A;display:grid;place-items:center;
+  font-family:var(--f-head),sans-serif;font-weight:800;font-size:15px;flex:none}
+.rk.dim{background:var(--bg);color:var(--abu)}
+
+.bubble{max-width:82%;padding:17px 19px;border-radius:var(--rbig);font-size:17px;line-height:1.55;font-weight:500;margin-top:12px;
+  animation:bubbleMasuk .55s cubic-bezier(.16,.9,.2,1);border:var(--tepi)}
+.bot{background:var(--surface);border-bottom-left-radius:10px}
+.me{margin-left:auto;background:var(--ink);color:var(--bg);border-bottom-right-radius:10px;font-weight:600}
+.t-dark .me{background:var(--aksen);color:#0A0A0A}
+.typing{display:flex;gap:6px;align-items:center;width:70px;justify-content:center}
+.typing i{width:9px;height:9px;border-radius:50%;background:var(--abu);animation:dot 1.2s infinite}
+.typing i:nth-child(2){animation-delay:.16s}.typing i:nth-child(3){animation-delay:.32s}
+@keyframes dot{0%,100%{opacity:.25;transform:translateY(0)}50%{opacity:1;transform:translateY(-4px)}}
+/* bubble foto nota yang dikirim user (lihat kirimFotoNota di Chat.jsx) - padding-nya dilepas
+   (beda dari .bubble teks biasa) biar fotonya pas ngisi penuh bentuk bubble-nya, bukan ngambang
+   di tengah kotak putih dengan jarak di sekeliling. */
+.bubble-foto{padding:6px;max-width:70%}
+.bubble-foto img{display:block;width:100%;border-radius:calc(var(--rbig) - 6px)}
+/* bubble ringkasan hasil baca nota dari Mang AI (BubbleNotaHasil) - lebih lebar dari bubble teks
+   biasa (82%) soalnya isinya daftar barang + tombol, bukan cuma sebaris-dua kalimat. */
+.bubble-nota{max-width:92%;width:92%}
+.nota-judul{margin:0 0 8px;font-weight:700}
+.nota-list{list-style:none;margin:0;padding:0}
+.nota-list li{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--garis);font-size:15px}
+.nota-list li:last-child{border-bottom:0}
+.nota-list li span:first-child{font-weight:600}
+.nota-list li span:last-child{color:var(--abu);font-weight:600;flex:none}
+.nota-total{display:flex;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1.5px solid var(--garis);font-weight:700}
+/* .nota-aksi numpang di atas .actions (lihat definisinya di dekat .btn) buat rasio flex tombol
+   Batal/Terapkan-nya (1 : 1.7) - margin-top-nya dikecilin di sini karena konteksnya di dalam
+   bubble chat yang udah sempit, bukan di panel penuh kayak .actions biasanya dipakai. */
+.nota-aksi{margin-top:14px}
+.nota-status{margin:14px 0 0;text-align:center;font-weight:700;color:var(--abu)}
+/* Komunitas (feed biasa) ikut alur scroll halaman punya .vp/.screen (sama kayak Beranda/Stok dkk) -
+   .chat-page dasar nggak butuh padding sendiri, jarak buat nav udah diurus padding-bottom bawaan
+   .screen di atas (sudah termasuk env(safe-area-inset-bottom) buat HP ber-notch). Tapi Mang AI beda
+   kebutuhan: chat butuh kotak input nempel FIXED di bawah layar, jadi tetap pakai panel tinggi-penuh
+   + scroll internal sendiri (chat-log scroll sendiri, .chat-tail nempel di bawah) lewat
+   .chat-page--ai — header tetap di atas, log scroll sendiri, input nempel di bawah, konsisten di
+   mobile & desktop. (Bug ketutup yang sempat kejadian di sini bukan dari pola panelnya, tapi dari
+   target scroll-otomatis yang salah - sudah dibenerin di useEffect TanyaAI, lihat Chat.jsx.) */
+.vp:has(.chat-page--ai){overflow:hidden}
+.screen.on:has(.chat-page--ai){display:flex;flex-direction:column;height:100%;padding:0}
+.chat-page--ai{flex:1;min-height:0;display:flex;flex-direction:column;padding:20px 18px calc(132px + env(safe-area-inset-bottom))}
+.chat-log{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column}
+.chat-log::-webkit-scrollbar{display:none}
+.chat-tail{flex:none}
+/* switcher "Tanya" (Mang AI vs Komunitas) - beda dari .seg di Lainnya.jsx (switcher tema, gaya
+   netral/soft): ini versi solid/kontras kayak di warung-pintar-tanya.html, background gelap +
+   teks kuning pas lagi aktif, jadi dikasih nama kelas beda (.seg-tanya) biar nggak numpuk gaya. */
+.seg-tanya{display:flex;gap:6px;background:var(--surface);border:var(--tepi);padding:6px;border-radius:999px;margin-top:12px}
+.t-mono .seg-tanya,.t-dark .seg-tanya{box-shadow:inset 0 0 0 1.5px var(--garis)}
+.seg-tanya button{flex:1;border:0;background:none;font:inherit;font-size:var(--small);font-weight:700;color:var(--abu);
+  padding:12px 10px;border-radius:999px;cursor:pointer;transition:background .2s,color .2s;min-height:48px}
+.seg-tanya button.on{background:var(--ink);color:var(--aksen)}
+.t-dark .seg-tanya button.on{background:var(--aksen);color:#0A0A0A}
+/* komunitas: feed lintas-warung di dalam menu Tanya (sharing panel .chat-page yang sama) - gaya
+   kartu papan diskusi: header avatar+nama+waktu, isi post, baris aksi (suka/jawab), lalu daftar
+   balasan + form balas nempel di kartu yang sama pas lagi dibuka (lihat warung-pintar-tanya.html).
+   .komunitas-feed sendiri bukan scroll-box (beda dari .chat-log punya Mang AI) - ikut alur scroll
+   halaman biasa punya .vp, jadi nggak nyisain gap kosong pas postingannya dikit (lihat komentar di
+   .chat-page). Class-nya dibiarin nempel di div-nya di Chat.jsx buat hook styling ke depannya. */
+.ava.kom{background:var(--aksen);color:#0A0A0A;font-size:25px}
+.t-dark .ava.kom{background:var(--ink);color:var(--aksen)}
+
+.posts{display:flex;flex-direction:column;gap:12px;margin-top:16px}
+.post{background:var(--surface);border:var(--tepi);border-radius:var(--r);padding:18px;cursor:pointer;
+  animation:masuk .3s cubic-bezier(.2,.9,.3,1);transition:transform .12s}
+.post:active{transform:scale(.985)}
+.t-mono .post,.t-dark .post{box-shadow:inset 0 0 0 1.5px var(--garis)}
+.post-head{display:flex;align-items:center;gap:12px}
+.post-head .bulat{width:44px;height:44px;font-size:15px}
+.post-id{min-width:0;flex:1}
+.post-id b{display:block;font-size:var(--small);line-height:1.2}
+.post-id span{display:block;font-size:13px;color:var(--abu);font-weight:600;margin-top:3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.post-q{margin:13px 0 0;font-size:var(--body);font-weight:600;line-height:1.5}
+.post-meta{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13.5px;font-weight:700;color:var(--abu)}
+.post-meta>span{display:flex;align-items:center;gap:6px}
+.aksi{border:0;background:none;font:inherit;font-size:13.5px;font-weight:700;color:var(--abu);
+  padding:9px 12px;border-radius:999px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .15s,color .15s}
+.aksi:active{transform:scale(.94)}
+.aksi.suka-on{color:var(--ink);background:var(--aksen)}
+.t-dark .aksi.suka-on{color:#0A0A0A}
+.lihat{margin-left:auto;font-size:13px;color:var(--abu);font-weight:700}
+/* baris "disukai oleh…" ala Facebook (avatar bertumpuk + nama) - cuma dipakai di sheet detail */
+.suka-row{display:flex;align-items:center;gap:4px;margin-top:16px}
+.suka-badges{display:flex}
+.suka-avatar{width:26px;height:26px;border-radius:50%;background:var(--ink);color:var(--aksen);display:grid;place-items:center;
+  font-size:10px;font-weight:800;border:2px solid var(--surface);margin-left:-8px;flex:none}
+.suka-avatar:first-child{margin-left:0}
+.t-dark .suka-avatar{background:var(--aksen);color:#0A0A0A}
+.suka-teks{flex:1;margin-left:10px;font-size:13px;color:var(--abu);font-weight:600}
+
+/* --garis nyaris nggak keliatan di tema terang (dekat putih di atas background putih) - dipakai
+   biasanya buat garis tepi kartu doang, bukan pembatas antar-baris yang PERLU jelas kebaca (komentar
+   satu ke komentar lain di thread Komunitas). Sengaja dipakai --abu di sini (bukan --garis), lebih
+   pekat & kontras jelas di kedua tema, walau lebih tipis (1px, bukan 1.5px) biar nggak berat. */
+.balas-list{margin-top:14px;border-top:1px solid var(--abu);padding-top:4px}
+.balas-row{display:flex;align-items:flex-start;gap:10px;padding:11px 0;border-bottom:1px solid var(--abu);
+  animation:masuk .3s cubic-bezier(.2,.9,.3,1)}
+.balas-row:last-child{border-bottom:0}
+.balas-row .bulat{width:34px;height:34px;border-radius:12px;font-size:12px;flex:none}
+.balas-row b{font-size:13.5px}
+.balas-row p{margin:3px 0 0;font-size:14px;font-weight:500;line-height:1.45;color:var(--abu)}
+.balas-form{display:flex;gap:8px;margin-top:12px}
+.balas-form input{flex:1;min-width:0;border:1.5px solid var(--garis);border-radius:999px;background:var(--bg);color:var(--ink);
+  font:inherit;font-size:14px;font-weight:600;padding:11px 16px;outline:none}
+.balas-form input:focus{border-color:var(--ink)}
+.balas-form button{border:0;background:var(--ink);color:var(--aksen);font:inherit;font-size:13.5px;font-weight:800;
+  padding:0 18px;border-radius:999px;cursor:pointer}
+.t-dark .balas-form button{background:var(--aksen);color:#0A0A0A}
+.hapus-mini{background:none;border:none;color:var(--abu);cursor:pointer;padding:4px;flex:none;font-size:18px;line-height:1}
+.balas-row .hapus-mini{margin-left:auto}
+@media (min-width:860px){
+  /* sidebar sudah gantiin nav bawah, jadi ga perlu jarak buat nav mengambang */
+  .chat-page{padding:40px 0}
+}
+.tanya{display:flex;align-items:center;gap:14px;background:var(--surface);border:var(--tepi);border-radius:var(--r);padding:16px 16px 16px 22px;margin-top:20px;color:var(--abu);font-weight:600;font-size:17px;box-shadow:0 8px 20px -10px rgba(20,20,25,.3)}
+.tanya input{flex:1;min-width:0;border:0;background:none;outline:none;padding:0;font:inherit;color:var(--ink)}
+.tanya input::placeholder{color:var(--abu);font-weight:600}
+.mic{margin-left:auto;width:48px;height:48px;border-radius:17px;background:var(--aksen);color:#0A0A0A;display:grid;place-items:center;font-size:22px;flex:none;border:0;cursor:pointer;transition:background .15s,color .15s}
+.mic svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+/* belum ada teks diketik (atau lagi nunggu balasan) - abu-abuin & matiin klik-nya, biar jelas
+   belum bisa dikirim, baru nyala begitu ada teks */
+.mic:disabled{background:var(--bg);color:var(--abu);cursor:not-allowed}
+
+/* form */
+.field{margin-top:14px}
+.field label{display:block;font-size:var(--small);font-weight:700;color:var(--abu);margin-bottom:8px}
+.field input,.field select{width:100%;padding:18px;border-radius:var(--rbtn);border:1.5px solid var(--garis);background:var(--surface);
+  color:var(--ink);font:inherit;font-size:var(--body);font-weight:600;min-height:56px}
+/* Dropdown saran custom (misal daftar grup yang udah ada) - BUKAN <datalist> bawaan browser,
+   itu perilakunya nggak konsisten/kadang nggak nongol sama sekali tergantung browser. Butuh
+   `.field{position:relative}` di parent-nya biar absolute positioning-nya ngacu ke situ. */
+.dropdown-saran{position:absolute;left:0;right:0;top:100%;margin-top:4px;background:var(--surface);
+  border:var(--tepi);border-radius:14px;box-shadow:0 10px 24px -10px rgba(20,20,25,.4);z-index:5;
+  max-height:180px;overflow-y:auto}
+.t-mono .dropdown-saran,.t-dark .dropdown-saran{box-shadow:inset 0 0 0 1.5px var(--garis),0 10px 24px -10px rgba(20,20,25,.4)}
+.dropdown-saran button{display:block;width:100%;text-align:left;padding:12px 16px;border:0;border-bottom:1px solid var(--garis);
+  background:none;font:inherit;font-size:15px;font-weight:600;color:var(--ink);cursor:pointer}
+.dropdown-saran button:last-child{border-bottom:0}
+.dropdown-saran button:active{background:var(--bg)}
+/* field password + tombol mata (show/hide) - tombolnya ngambang di dalem input, kanan tengah.
+   Dipatok dari BAWAH (bottom:0) setinggi input (56px, samain sama .field input min-height),
+   bukan top:50% - soalnya .field-pass itu bungkus label+input jadi kalau di-center ke tengah
+   KOTAK GABUNGANNYA, ikonnya kegeser ke atas (nggak pas ke tengah inputnya sendiri). */
+.field-pass{position:relative}
+.field-pass input{padding-right:52px}
+.field-pass .mata{position:absolute;right:6px;bottom:0;width:40px;height:56px;
+  display:flex;align-items:center;justify-content:center;background:transparent;border:none;color:var(--abu);
+  cursor:pointer;border-radius:10px}
+.field-pass .mata:active{background:var(--bg)}
+.t-bold .field input,.t-bold .field select{border:3px solid var(--garis)}
+
+/* nav */
+.nav{position:absolute;left:16px;right:16px;bottom:18px;height:88px;background:var(--ink);border-radius:var(--rbig);
+  display:flex;align-items:center;padding:0 8px;z-index:8;border:var(--tepi)}
+.t-dark .nav{background:var(--surface);border:1px solid var(--garis)}
+.nb{flex:1;background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:5px;font:inherit;
+  font-size:12.5px;font-weight:700;color:rgba(255,255,255,.45);padding:8px 0;cursor:pointer;position:relative}
+.nb .emo{font-size:23px;filter:grayscale(1) invert(1) brightness(1.6);opacity:.55;transition:transform .2s}
+.nb.on{color:var(--aksen)}
+.nb.on .emo{opacity:1;filter:none;transform:translateY(-2px)}
+.fab{width:66px;height:66px;border-radius:24px;background:var(--aksen);border:0;color:#0A0A0A;cursor:pointer;
+  display:grid;place-items:center;font-size:30px;font-weight:700;flex:none;margin:0 6px;transition:transform .15s;position:relative}
+.fab:active{transform:scale(.92)}
+.badge{position:absolute;top:-6px;right:-6px;min-width:24px;height:24px;padding:0 6px;border-radius:12px;background:var(--ink);
+  color:var(--aksen);font-size:12.5px;font-weight:800;display:none;place-items:center;border:2px solid var(--aksen)}
+.badge.show{display:grid;animation:pop .35s}
+
+/* overlay */
+.sheet{position:absolute;inset:0;background:rgba(10,10,10,.6);backdrop-filter:blur(3px);display:none;align-items:flex-end;justify-content:center;z-index:20;padding:18px}
+.sheet.tengah{align-items:center;padding:26px}
+.sheet.show{display:flex;animation:fade .2s}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.panel{background:var(--surface);border:var(--tepi);border-radius:var(--rbig);padding:26px 22px;width:100%;max-width:440px;
+  max-height:92%;overflow-y:auto;scrollbar-width:none;animation:up .3s cubic-bezier(.2,.9,.3,1)}
+.panel::-webkit-scrollbar{display:none}
+.panel.mid{text-align:center}
+@keyframes up{from{transform:translateY(28px);opacity:0}to{transform:none;opacity:1}}
+.panel h3{font-family:var(--f-head),sans-serif;font-size:26px;font-weight:800;letter-spacing:-.03em;margin:0}
+.panel p{margin:12px 0 0;font-size:17px;color:var(--abu);font-weight:600;line-height:1.5}
+.ok{width:84px;height:84px;border-radius:30px;background:var(--aksen);color:#0A0A0A;display:grid;place-items:center;font-size:40px;margin:0 auto 18px}
+.viewfinder{width:100%;aspect-ratio:1;border-radius:var(--r);background:#141414;position:relative;overflow:hidden;margin-bottom:18px}
+.viewfinder::after{content:"";position:absolute;left:10%;right:10%;height:3px;background:var(--aksen);top:12%;
+  box-shadow:0 0 24px var(--aksen);animation:scan 1.3s ease-in-out infinite alternate}
+@keyframes scan{to{top:86%}}
+.viewfinder.diam::after{content:none} /* udah selesai motret/nemu hasil — garis animasi scan-nya dimatiin */
+.viewfinder .frame{position:absolute;inset:16%;border:3px solid rgba(255,255,255,.35);border-radius:20px}
+.viewfinder .isi{position:absolute;inset:0;display:grid;place-items:center;color:#fff}
+.viewfinder .isi svg{width:72px;height:72px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.viewfinder .isi img{width:100%;height:100%;object-fit:cover}
+.toast{position:absolute;left:20px;right:20px;bottom:122px;background:var(--ink);color:var(--bg);border-radius:var(--r);padding:17px 20px;
+  font-size:16px;font-weight:600;z-index:19;opacity:0;transform:translateY(14px);transition:opacity .25s,transform .25s;pointer-events:none;border:var(--tepi)}
+.t-dark .toast{background:var(--surface);color:var(--ink);border:1px solid var(--garis)}
+.toast.show{opacity:1;transform:none}
+.toast b{color:var(--aksen)}
+
+/* Badge status sinkronisasi cache lokal (offline-first) - fixed di pojok atas, di atas `.phone`
+   yang position:relative, jadi keliatan di semua layar (mobile & desktop) tanpa nabrak header
+   masing-masing screen yang beda-beda layoutnya. */
+.badge-sync{position:absolute;top:14px;right:14px;z-index:21;background:var(--ink);color:var(--bg);
+  padding:7px 13px;border-radius:999px;font-size:12.5px;font-weight:700;box-shadow:0 6px 16px -6px rgba(20,20,25,.4);
+  max-width:min(78%,260px);text-align:center;line-height:1.3}
+.t-dark .badge-sync{background:var(--surface);color:var(--ink);border:1px solid var(--garis)}
+.badge-sync.offline{background:#8A6D00;color:#fff}
+.t-dark .badge-sync.offline{background:#4a3c00;color:#fff;border-color:#6b5700}
+
+/* voice */
+.wave{display:flex;gap:7px;align-items:center;justify-content:center;height:90px;margin-bottom:6px}
+.wave i{width:9px;border-radius:99px;background:var(--aksen);height:20px;transform-origin:center;
+  animation:w 1.6s ease-in-out infinite alternate;opacity:.45;transform:scaleY(1);transition:opacity .18s,transform .18s}
+.wave i:nth-child(2){animation-delay:.1s}.wave i:nth-child(3){animation-delay:.2s}
+.wave i:nth-child(4){animation-delay:.3s}.wave i:nth-child(5){animation-delay:.4s}
+.wave i:nth-child(6){animation-delay:.5s}.wave i:nth-child(7){animation-delay:.15s}
+@keyframes w{to{height:30px}}
+/* pas SpeechRecognition beneran deteksi ada suara (onspeechstart), batangnya "membesar" lewat
+   transform+opacity yang di-transition — animasi height di atas (keyframe w) TETAP jalan terus
+   tanpa pernah diganti nama/durasinya, soalnya ganti animation-name/duration bikin animasinya
+   restart dari awal (kelihatan nyentak/patah tiap kali toggle). Transform ini cuma numpang di
+   atas animasi yang jalan, jadi transisinya mulus. */
+.wave.ngomong i{opacity:1;transform:scaleY(1.8)}
+.hasil{display:flex;align-items:center;gap:14px;padding:16px;border-radius:var(--r);background:var(--bg);margin-top:12px;
+  cursor:pointer;border:var(--tepi);text-align:left;width:100%;font:inherit;color:var(--ink)}
+.hasil:active{opacity:.6}
+.mirip{margin-left:auto;font-size:14px;font-weight:800;color:var(--abu)}
+
+/* login penjaga */
+.login{position:absolute;inset:0;background:var(--bg);z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:34px}
+.login.hide{display:none}
+.login>*{width:100%}
+.login>*:not(.sheet){max-width:420px}
+.penjaga{display:flex;align-items:center;gap:16px;padding:20px;border-radius:var(--r);background:var(--surface);border:var(--tepi);
+  margin-top:12px;cursor:pointer;font:inherit;color:var(--ink);width:100%;text-align:left;transition:transform .12s}
+.t-mono .penjaga,.t-dark .penjaga{box-shadow:inset 0 0 0 1.5px var(--garis)}
+.penjaga:active{transform:scale(.98)}
+.penjaga b{font-size:21px;font-weight:800;font-family:var(--f-head),sans-serif;letter-spacing:-.02em}
+.penjaga .kecil{display:block;font-size:14px;color:var(--abu);font-weight:600;margin-top:3px}
+
+/* ================= REVISI 2026 · iOS DNA ================= */
+.phone{--brand:#ffc001;--f-body:'Inter';font-family:var(--f-body),-apple-system,'SF Pro Text',system-ui,sans-serif}
+.t-mono{--ink:#232326;--bg:#F1F1EF;--surface:#FFFFFF;--abu:#8A8A8E;--garis:#ECECE9;
+  --aksen:var(--brand);--aksen-fg:#151517;--r:24px;--rbig:30px;--rbtn:20px;--tepi:none;
+  --f-head:var(--f-body);--h1:32px;--big:48px;--body:17px;--small:15px;--frame:#151517;--frame2:#2A2A2C}
+.t-dark{--ink:#F2F3F5;--bg:#111114;--surface:#1B1B1F;--abu:#8C8C93;--garis:#2A2A30;
+  --aksen:var(--brand);--aksen-fg:#151517;--r:24px;--rbig:30px;--rbtn:20px;--tepi:none;
+  --f-head:var(--f-body);--h1:32px;--big:48px;--body:17px;--small:15px;--frame:#000;--frame2:#2A2A2C}
+body{background:#E9E9E6}
+.p-h1,.p-sec,.p-num,.panel h3,.penjaga b,.ava,.bulat,.rk{font-family:var(--f-head),-apple-system,system-ui,sans-serif}
+.p-h1{letter-spacing:-.03em}
+.card,.tile{box-shadow:0 1px 2px rgba(20,20,25,.04),0 8px 24px -18px rgba(20,20,25,.35)}
+.t-dark .card,.t-dark .tile{box-shadow:none;border:1px solid var(--garis)}
+
+/* hero jadi kartu gelap tegas (kurangi bidang kuning) */
+.hero-card{background:var(--ink);color:#FFFFFF;box-shadow:0 20px 44px -22px rgba(20,20,25,.65)}
+.t-dark .hero-card{background:var(--surface);border:1px solid var(--garis)}
+.hero-card .lbl{opacity:.6;color:#fff}
+.t-dark .hero-card .lbl{color:var(--ink)}
+.hero-card .big{color:var(--aksen)}
+.hero-card .delta{background:rgba(255,255,255,.13);color:#fff}
+.hero-card .blob{background:rgba(255,255,255,.05)}
+.hero-card .col i{background:rgba(255,255,255,.38)}
+.hero-card .col.sel i{background:var(--aksen)}
+.hero-card .col span{color:rgba(255,255,255,.55)}
+.t-dark .hero-card .col span{color:var(--abu)}
+.hero-card .col.sel span{color:#fff}
+
+/* tile & scan & list minimal ala kartu putih */
+.tile.ink,.t-dark .tile.ink{background:var(--surface);color:var(--ink)}
+.tile.ink .k,.t-dark .tile.ink .k{color:var(--abu);opacity:1}
+.tile.ink .emo,.t-dark .tile.ink .emo{filter:grayscale(1) contrast(1.1)}
+.scan,.t-dark .scan{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(20,20,25,.04),0 8px 24px -18px rgba(20,20,25,.35)}
+.t-mono .scan,.t-mono .scan.alt,.t-dark .scan,.t-dark .scan.alt{box-shadow:0 1px 2px rgba(20,20,25,.04),0 8px 24px -18px rgba(20,20,25,.35)}
+.t-dark .scan,.t-dark .scan.alt{box-shadow:none;border:1px solid var(--garis)}
+.scan .kotak{background:var(--bg);color:var(--ink);border-radius:16px;font-size:22px}
+.scan .kotak.aksen{background:var(--aksen);color:#151517}
+.bulat{background:var(--bg);border:0;border-radius:15px}
+.tag.aman,.lunas{background:var(--aksen)!important;color:#151517!important}
+.tag.hot{background:var(--frame);color:var(--aksen)}
+.btn.utama{background:var(--ink);color:#fff}
+.btn.utama.brand{background:var(--aksen);color:#151517}
+.t-dark .btn.utama{background:var(--aksen);color:#151517}
+.mic-big{border-radius:26px}
+.col.sel i{background:var(--aksen)}
+
+/* ================= NAV FLOATING (iOS liquid glass) ================= */
+.nav{left:14px;right:14px;bottom:calc(16px + env(safe-area-inset-bottom));height:72px;border-radius:36px;padding:0 8px;overflow:visible;
+  background:color-mix(in oklab,var(--surface) 80%,transparent);
+  -webkit-backdrop-filter:blur(26px) saturate(180%);backdrop-filter:blur(26px) saturate(180%);
+  border:1px solid rgba(255,255,255,.6);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 8px 20px -6px rgba(20,20,25,.18),0 26px 44px -24px rgba(20,20,25,.55)}
+.t-dark .nav{background:color-mix(in oklab,var(--surface) 82%,transparent);border:1px solid rgba(255,255,255,.08);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 20px 40px -20px #000}
+.nb{color:var(--abu);gap:4px;font-size:11px;font-weight:600;padding:6px 0}
+.nb svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;
+  transition:transform .32s cubic-bezier(.32,.72,0,1)}
+.nb.on{color:var(--ink);font-weight:700}
+.nb.on svg{transform:translateY(-1px) scale(1.06)}
+.nb.on svg .fillme{fill:currentColor;stroke:currentColor}
+.fab{width:62px;height:62px;border-radius:50%;background:var(--aksen);color:#151517;margin:0 4px;
+  transform:translateY(-16px);transition:transform .28s cubic-bezier(.32,.72,0,1);
+  box-shadow:0 10px 24px -6px color-mix(in oklab,var(--aksen) 65%,transparent),0 6px 14px rgba(20,20,25,.18),inset 0 1px 0 rgba(255,255,255,.5)}
+.fab svg{width:27px;height:27px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.fab:active{transform:translateY(-16px) scale(.92)}
+.badge{background:var(--ink);color:#fff;border:2px solid var(--surface)}
+
+/* ================= LAINNYA / PENGATURAN ================= */
+.menu{background:var(--surface);border-radius:var(--r);margin-top:14px;overflow:hidden;
+  box-shadow:0 1px 2px rgba(20,20,25,.04),0 8px 24px -18px rgba(20,20,25,.35)}
+.t-dark .menu{box-shadow:none;border:1px solid var(--garis)}
+.mrow{display:flex;align-items:center;gap:14px;width:100%;background:none;border:0;font:inherit;color:var(--ink);
+  padding:16px 18px;cursor:pointer;text-align:left;min-height:66px;border-bottom:1px solid var(--garis);transition:background .15s}
+.mrow:last-child{border-bottom:0}
+.mrow:active{background:var(--bg)}
+.mrow .ic{width:44px;height:44px;border-radius:14px;background:var(--bg);display:grid;place-items:center;flex:none}
+.mrow .ic svg{width:21px;height:21px;stroke:var(--ink);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.mrow .ic.aksen{background:var(--aksen)}
+.mrow .ic.aksen svg{stroke:#151517}
+.mrow .tx b{display:block;font-size:var(--body);font-weight:700}
+.mrow .tx span{display:block;font-size:13.5px;color:var(--abu);font-weight:600;margin-top:2px}
+.mrow .ar{margin-left:auto;color:var(--abu);font-size:22px;font-weight:600}
+.mrow .ar.panah{transition:transform .25s ease;display:inline-block}
+.mrow .ar.panah.buka{transform:rotate(90deg)}
+/* accordion smooth via max-height transition - lebih kepake luas dukungan browsernya
+   dibanding animasi grid-template-rows. Angka 600px cuma batas atas aman (kontennya nggak
+   akan setinggi itu), BUKAN tinggi asli - jadi animasinya tetap keliatan mulus. */
+.geser-akordeon{max-height:0;overflow:hidden;opacity:0;transition:max-height .32s ease,opacity .22s ease}
+.geser-akordeon.buka{max-height:600px;opacity:1;transition:max-height .32s ease,opacity .22s ease .05s}
+.warna-grid{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px}
+.sw{width:52px;height:52px;border-radius:18px;border:0;cursor:pointer;position:relative;
+  transition:transform .25s cubic-bezier(.32,.72,0,1);box-shadow:0 4px 12px -4px rgba(20,20,25,.3)}
+.sw:active{transform:scale(.9)}
+.sw.on{transform:scale(1.06)}
+.sw.on::after{content:"✓";position:absolute;inset:0;display:grid;place-items:center;color:#151517;font-size:22px;font-weight:800}
+.sw.on{outline:2.5px solid var(--ink);outline-offset:3px}
+.fontlist{display:grid;gap:10px;margin-top:14px}
+.fbtn{display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1.5px solid var(--garis);
+  border-radius:var(--rbtn);padding:16px 18px;font-size:18px;font-weight:600;color:var(--ink);cursor:pointer;min-height:60px;
+  transition:border-color .2s,transform .12s}
+.fbtn:active{transform:scale(.985)}
+.fbtn.on{border-color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--ink)}
+.fbtn .cek{color:var(--abu);font-size:20px}
+.fbtn.on .cek{color:var(--ink)}
+.seg{display:flex;gap:4px;background:var(--bg);padding:4px;border-radius:999px;margin-top:14px}
+.seg button{flex:1;border:0;background:none;font:inherit;font-size:15px;font-weight:700;color:var(--abu);
+  padding:12px;border-radius:999px;cursor:pointer;transition:background .25s cubic-bezier(.32,.72,0,1),color .2s}
+.seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 2px 8px -2px rgba(20,20,25,.25)}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* ================= REVISI 4 ================= */
+.scan .kotak svg,.cari svg,.kotak-btn svg,.mic-big .ic svg{stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.scan .kotak svg{width:25px;height:25px}
+.cari{align-items:center}
+.cari svg{width:21px;height:21px;color:var(--abu);flex:none}
+.kotak-btn svg{width:27px;height:27px}
+.mic-big .ic{display:grid;place-items:center}
+.mic-big .ic svg{width:27px;height:27px}
+.mrow.hi{background:var(--aksen);color:#151517}
+.mrow.hi .tx span{color:rgba(21,21,23,.68)}
+.mrow.hi .ic{background:rgba(21,21,23,.13)}
+.mrow.hi .ic svg{stroke:#151517}
+.mrow.hi .ar{color:rgba(21,21,23,.6)}
+.tile.tap{cursor:pointer;transition:transform .12s}
+.tile.tap:active{transform:scale(.97)}
+.card.tapx{cursor:pointer;transition:transform .12s}
+.card.tapx:active{transform:scale(.985)}
+.linkrow{display:flex;gap:10px;margin-top:14px}
+.linkrow a{flex:1;text-decoration:none;text-align:center;background:var(--surface);border-radius:var(--rbtn);padding:17px 10px;font-weight:700;font-size:15px;color:var(--ink);
+  box-shadow:0 1px 2px rgba(20,20,25,.04),0 8px 24px -18px rgba(20,20,25,.35)}
+.t-dark .linkrow a{border:1px solid var(--garis);box-shadow:none}
+.struk{background:var(--bg);border-radius:var(--r);padding:18px;margin-top:16px;font-family:ui-monospace,Menlo,monospace;font-size:13.5px;line-height:1.75;color:var(--ink);text-align:left}
+.struk .b{display:flex;justify-content:space-between;gap:10px}
+.struk .j{font-weight:800;font-size:15px}
+.struk hr{border:0;border-top:1px dashed var(--garis);margin:10px 0}
+.pinbox{display:flex;gap:12px;justify-content:center;margin-top:20px}
+.pinbox i{width:15px;height:15px;border-radius:50%;background:var(--garis);display:block;transition:background .2s}
+.pinbox i.on{background:var(--aksen)}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:20px}
+.keypad button{min-height:58px;border:0;border-radius:20px;background:var(--bg);font:inherit;font-size:22px;font-weight:700;color:var(--ink);cursor:pointer;transition:transform .12s}
+.keypad button:active{transform:scale(.94)}
+.opn{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.opn>div{background:var(--bg);border-radius:18px;padding:14px}
+.opn .k{font-size:12.5px;color:var(--abu);font-weight:700}
+.opn .v{font-size:19px;font-weight:800;margin-top:4px;font-family:var(--f-head),sans-serif;letter-spacing:-.03em}
+.ringkas{display:flex;justify-content:space-between;gap:10px;background:var(--bg);border-radius:18px;padding:14px 16px;margin-top:12px;font-weight:700}
+.ringkas span{color:var(--abu);font-weight:600}
+.metode{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+.metode button{border:1.5px solid var(--garis);background:var(--surface);border-radius:var(--rbtn);padding:20px 12px;font:inherit;font-weight:700;font-size:16px;color:var(--ink);cursor:pointer;min-height:96px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;transition:transform .12s,border-color .2s}
+.metode button:active{transform:scale(.96)}
+.metode button svg{width:28px;height:28px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.pilih{display:flex;align-items:center;gap:14px;width:100%;background:var(--bg);border:0;border-radius:18px;padding:14px 16px;margin-top:10px;font:inherit;color:var(--ink);text-align:left;cursor:pointer;transition:transform .12s}
+.pilih:active{transform:scale(.98)}
+/* daftar panjang (mis. pilih pelanggan buat kasbon) di-scroll SENDIRI dalam tinggi terbatas,
+   biar nggak numpuk dorong input/tombol di bawahnya makin jauh pas pelanggannya udah banyak */
+.daftar-geser{max-height:280px;overflow-y:auto;margin:0 -6px;padding:0 6px}
+.segkecil{display:flex;gap:4px;background:var(--bg);padding:4px;border-radius:999px;margin-top:14px}
+.segkecil button{flex:1;border:0;background:none;font:inherit;font-size:14px;font-weight:700;color:var(--abu);padding:11px;border-radius:999px;cursor:pointer}
+.segkecil button.on{background:var(--surface);color:var(--ink);box-shadow:0 2px 8px -2px rgba(20,20,25,.25)}
+.rangebar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
+.rangebar button{width:46px;height:46px;border-radius:16px;border:0;background:var(--surface);color:var(--ink);font-size:20px;font-weight:700;cursor:pointer;
+  box-shadow:0 1px 2px rgba(20,20,25,.05),0 8px 24px -18px rgba(20,20,25,.35)}
+.t-dark .rangebar button{border:1px solid var(--garis);box-shadow:none}
+.rangebar b{font-size:15.5px;font-weight:700}
+
+/* ==== revisi v5 (dari warung-pintar-v5.html): opname 3-kolom, rekomendasi harga, struk kertas ==== */
+.opn.tiga{grid-template-columns:1fr 1fr 1fr;gap:8px}
+.opn.tiga>div{padding:12px 10px}
+.opn.tiga .v{font-size:15.5px}
+.opnhint{font-size:13.5px;color:var(--abu);margin-top:8px;line-height:1.5}
+.opnhint b{color:var(--ink)}
+.reko{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.reko button{flex:1;min-width:96px;border:1.5px solid var(--garis);background:var(--surface);border-radius:18px;padding:12px 8px;font:inherit;cursor:pointer;text-align:center;color:var(--ink)}
+.reko button.pas{border-color:var(--aksen);background:color-mix(in oklab,var(--aksen) 16%,var(--surface))}
+.reko .pct{font-size:12.5px;font-weight:800;color:var(--abu)}
+.reko button.pas .pct{color:var(--ink)}
+.reko .hrg{font-size:16px;font-weight:800;letter-spacing:-.02em;margin-top:2px;font-family:var(--f-head),sans-serif}
+
+/* struk kertas kasir — ganti tampilan .struk lama (kotak biasa) jadi model kertas bergerigi */
+.strukwrap{margin-top:16px;filter:drop-shadow(0 10px 24px rgba(20,20,25,.14))}
+.struk{position:relative;background:#fffdf8;color:#1d1d1f;border-radius:2px;padding:24px 20px 26px;margin:0;
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:13px;line-height:1.7;text-align:left;
+  --gigi:radial-gradient(circle at 6px 0,transparent 0 6px,#fffdf8 6.5px)}
+.struk::before,.struk::after{content:"";position:absolute;left:0;right:0;height:8px;background-image:var(--gigi);background-size:12px 8px;background-repeat:repeat-x}
+.struk::before{top:-7px;transform:scaleY(-1)}
+.struk::after{bottom:-7px}
+.t-dark .struk{background:#f7f5ef;--gigi:radial-gradient(circle at 6px 0,transparent 0 6px,#f7f5ef 6.5px)}
+.struk .kop{text-align:center;line-height:1.5}
+.struk .kop .nm{font-size:17px;font-weight:800;letter-spacing:.16em}
+.struk .kop .al{font-size:11.5px;color:#6b6b70}
+.struk .meta{display:flex;justify-content:space-between;font-size:11.5px;color:#6b6b70}
+.struk .b span:last-child{white-space:nowrap}
+.struk .it .q{font-size:11.5px;color:#6b6b70;padding-left:2px}
+.struk .j{font-size:16px;letter-spacing:-.01em;margin-top:2px}
+.struk hr{border-top:1px dashed #c9c5ba}
+.struk .tks{text-align:center;margin-top:12px;font-size:11.5px;color:#6b6b70;line-height:1.6}
+.struk .bar{margin-top:12px;height:34px;background:repeating-linear-gradient(90deg,#1d1d1f 0 2px,transparent 2px 4px,#1d1d1f 4px 5px,transparent 5px 9px);opacity:.8}
+.struk .kode{text-align:center;font-size:11px;letter-spacing:.28em;color:#6b6b70;margin-top:6px}
+
+/* ================= DESKTOP: dashboard fullscreen dengan sidebar ================= */
+.fab-label{display:none}
+@media (min-width:640px) and (max-width:859.98px){
+  .vp{max-width:760px;padding:0 24px}
+  .screen{padding:44px 24px 140px}
+
+  /* nav & toast jadi pil mengambang yang center, tidak melebar penuh layar */
+  .nav{left:0;right:0;width:460px;max-width:calc(100% - 32px);margin:0 auto}
+  .toast{left:0;right:0;width:460px;max-width:calc(100% - 40px);margin:0 auto}
+}
+
+@media (min-width:860px){
+  /* nav bawah ala HP diganti sidebar permanen */
+  .nav{display:none}
+  .toast{left:0;right:0;width:460px;max-width:calc(100% - 40px);margin:0 auto}
+
+  .sidebar{
+    display:flex;flex-direction:column;flex:none;width:272px;padding:26px 16px;gap:4px;
+    background:var(--surface);border-right:1px solid var(--garis);overflow-y:auto;scrollbar-width:none;
+  }
+  .sidebar::-webkit-scrollbar{display:none}
+  .sidebar-brand{display:flex;align-items:center;gap:12px;padding:6px 10px 22px}
+  .sidebar-logo{width:44px;height:44px;border-radius:14px;background:var(--aksen);color:#151517;display:grid;place-items:center;flex:none}
+  .sidebar-logo svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .sidebar-brand b{display:block;font-family:var(--f-head),sans-serif;font-size:16.5px;font-weight:800;letter-spacing:-.02em}
+  .sidebar-brand span{display:block;font-size:12.5px;color:var(--abu);font-weight:600;margin-top:1px}
+
+  .sidenav{display:flex;flex-direction:column;gap:3px}
+  .sn{display:flex;align-items:center;gap:13px;padding:12px 14px;border-radius:14px;border:0;background:none;
+    font:inherit;font-size:15px;font-weight:700;color:var(--abu);cursor:pointer;text-align:left;transition:background .15s,color .15s}
+  .sn svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+  .sn:hover{background:var(--bg);color:var(--ink)}
+  .sn.on{background:var(--ink);color:var(--aksen)}
+  .t-dark .sn.on{background:var(--aksen);color:#151517}
+  .sn.on svg .fillme{fill:currentColor;stroke:currentColor}
+
+  .sn-catat{display:flex;align-items:center;gap:11px;padding:15px 16px;border-radius:16px;border:0;margin:2px 0 14px;
+    background:var(--aksen);color:#151517;font:inherit;font-size:15px;font-weight:800;cursor:pointer;position:relative;
+    transition:transform .12s}
+  .sn-catat:active{transform:scale(.98)}
+  .sn-catat svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  .sn-catat .badge{position:absolute;top:-6px;right:-6px}
+
+  .main{overflow:hidden}
+  .vp{max-width:none;width:100%;margin:0;padding:0 48px}
+  .screen{padding:40px 0 64px}
+
+  /* auto-fit: kolom nyesuaiin jumlah item, sisa lebar dibagi rata ke item yang ada — ga nyisain rongga kosong */
+  .grid3{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+  .bento{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+}
+
+@media (min-width:1280px){
+  .vp{padding:0 64px}
+}
+
+/* ================= UKURAN TEKS (dipilih user di Pengaturan) ================= */
+.sz-kecil{--h1:24px;--big:42px;--body:15px;--small:13px;--sec:18px;--sub:14px}
+.sz-sedang{--h1:28px;--big:48px;--body:17px;--small:15px;--sec:21px;--sub:16px}
+.sz-besar{--h1:32px;--big:54px;--body:19px;--small:17px;--sec:23px;--sub:18px}

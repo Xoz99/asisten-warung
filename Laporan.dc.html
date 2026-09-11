@@ -1,0 +1,148 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    a { color: oklch(56% 0.14 45); }
+    a:hover { color: oklch(46% 0.14 45); }
+
+    .back-btn { transition: opacity 140ms ease; }
+    .back-btn:active { opacity: 0.6; }
+
+    .seg-btn { transition: opacity 140ms ease; cursor: pointer; }
+    .seg-btn:active { opacity: 0.7; }
+
+    .scroll-area { scrollbar-width: none; }
+    .scroll-area::-webkit-scrollbar { display: none; }
+  </style>
+</helmet>
+
+<div style="width:390px; height:844px; background:oklch(97% 0.006 85); font-family:'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color:oklch(12% 0.005 60); display:flex; flex-direction:column; overflow:hidden; position:relative;">
+
+  <!-- Header -->
+  <div style="display:flex; align-items:center; padding:32px 22px 18px 22px;">
+    <div class="back-btn" style="width:38px; height:38px; border-radius:999px; background:#fff; border:1.75px solid oklch(88% 0.006 80); display:flex; align-items:center; justify-content:center; cursor:pointer;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="oklch(20% 0.005 60)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M15 5 8 12l7 7"></path>
+      </svg>
+    </div>
+    <div style="flex:1; text-align:center; font-size:16px; font-weight:800; margin-right:38px;">Laporan</div>
+  </div>
+
+  <div class="scroll-area" style="flex:1; overflow-y:auto; padding:6px 22px 30px 22px; display:flex; flex-direction:column; gap:26px;">
+
+    <!-- Total + toggle -->
+    <div style="display:flex; flex-direction:column; gap:16px;">
+      <div style="display:flex; flex-direction:column; gap:4px;">
+        <div style="font-size:30px; font-weight:800; font-variant-numeric:tabular-nums;">Rp 6.170.000</div>
+        <div style="font-size:12.5px; font-weight:600; color:oklch(45% 0.01 60);">30 Agu &ndash; 5 Sep 2026</div>
+      </div>
+
+      <div style="display:flex; padding:4px; background:oklch(92% 0.006 80); border-radius:999px;">
+        <sc-for list="{{periods}}" as="p" hint-placeholder-count="3">
+          <div class="seg-btn" onClick="{{p.select}}" style="flex:1; text-align:center; padding:9px 0; border-radius:999px; background:{{p.bg}}; color:{{p.color}}; font-size:12.5px; font-weight:700;">{{p.label}}</div>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- Line chart -->
+    <div style="display:flex; flex-direction:column; gap:10px; padding:20px 18px; background:#fff; border:1.75px solid oklch(82% 0.01 80); border-radius:20px; box-shadow:0 4px 14px oklch(0% 0 0 / 0.05);">
+      <svg width="100%" height="128" viewBox="0 0 334 128" style="overflow:visible;">
+        <!-- tooltip -->
+        <g>
+          <rect x="228" y="-16" width="94" height="26" rx="13" fill="oklch(14% 0.008 60)"></rect>
+          <text x="275" y="1.5" text-anchor="middle" font-size="11" font-weight="700" fill="white" font-family="'Plus Jakarta Sans', sans-serif">Rp 1.150.000</text>
+        </g>
+
+        <!-- dashed guide -->
+        <line x1="270" y1="14" x2="270" y2="92" stroke="oklch(80% 0.01 80)" stroke-width="1.5" stroke-dasharray="3 3"></line>
+
+        <!-- trend line -->
+        <polyline points="10,49.3 62,44.6 114,53.8 166,37.2 218,40.6 270,28 322,50.4" fill="none" stroke="oklch(56% 0.14 45)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>
+
+        <!-- points -->
+        <circle cx="10" cy="49.3" r="3" fill="oklch(56% 0.14 45)"></circle>
+        <circle cx="62" cy="44.6" r="3" fill="oklch(56% 0.14 45)"></circle>
+        <circle cx="114" cy="53.8" r="3" fill="oklch(56% 0.14 45)"></circle>
+        <circle cx="166" cy="37.2" r="3" fill="oklch(56% 0.14 45)"></circle>
+        <circle cx="218" cy="40.6" r="3" fill="oklch(56% 0.14 45)"></circle>
+        <circle cx="270" cy="28" r="5.5" fill="white" stroke="oklch(56% 0.14 45)" stroke-width="3"></circle>
+        <circle cx="322" cy="50.4" r="3" fill="oklch(56% 0.14 45)"></circle>
+
+        <!-- axis labels -->
+        <text x="10" y="112" text-anchor="middle" font-size="11" font-weight="500" fill="oklch(45% 0.01 60)" font-family="'Plus Jakarta Sans', sans-serif">Sen</text>
+        <text x="62" y="112" text-anchor="middle" font-size="11" font-weight="500" fill="oklch(45% 0.01 60)" font-family="'Plus Jakarta Sans', sans-serif">Sel</text>
+        <text x="114" y="112" text-anchor="middle" font-size="11" font-weight="500" fill="oklch(45% 0.01 60)" font-family="'Plus Jakarta Sans', sans-serif">Rab</text>
+        <text x="166" y="112" text-anchor="middle" font-size="11" font-weight="500" fill="oklch(45% 0.01 60)" font-family="'Plus Jakarta Sans', sans-serif">Kam</text>
+        <text x="218" y="112" text-anchor="middle" font-size="11" font-weight="500" fill="oklch(45% 0.01 60)" font-family="'Plus Jakarta Sans', sans-serif">Jum</text>
+        <text x="270" y="112" text-anchor="middle" font-size="11" font-weight="800" fill="oklch(12% 0.005 60)" font-family="'Plus Jakarta Sans', sans-serif">Sab</text>
+        <text x="322" y="112" text-anchor="middle" font-size="11" font-weight="500" fill="oklch(45% 0.01 60)" font-family="'Plus Jakarta Sans', sans-serif">Min</text>
+      </svg>
+    </div>
+
+    <!-- Barang Terlaris -->
+    <div style="display:flex; flex-direction:column; gap:2px;">
+      <div style="font-size:15px; font-weight:800; margin-bottom:6px;">Barang Terlaris</div>
+
+      <sc-for list="{{bestSellers}}" as="item" hint-placeholder-count="4">
+        <div style="display:flex; align-items:center; gap:12px; padding:11px 0; border-top:1.5px solid oklch(90% 0.006 80);">
+          <div style="width:42px; height:42px; border-radius:999px; background:oklch(93% 0.035 45); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="oklch(50% 0.13 45)" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 8a2 2 0 0 1 2-2h1.2a1 1 0 0 0 .87-.5l.7-1.2A1 1 0 0 1 9.6 4h4.8a1 1 0 0 1 .87.5l.7 1.2a1 1 0 0 0 .87.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z"></path>
+              <circle cx="12" cy="13" r="3.2"></circle>
+            </svg>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:2px; min-width:0; flex:1;">
+            <div style="font-size:13px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{item.name}}</div>
+            <div style="font-size:11.5px; font-weight:600; color:oklch(45% 0.01 60);">{{item.qty}} pcs terjual</div>
+          </div>
+          <div style="font-size:14px; font-weight:800; white-space:nowrap;">#{{item.rank}}</div>
+        </div>
+      </sc-for>
+    </div>
+
+  </div>
+
+</div>
+</x-dc>
+
+<script data-dc-script>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { period: 'mingguan' };
+  }
+  renderVals() {
+    const dark = 'oklch(14% 0.008 60)';
+    const muted = 'oklch(45% 0.01 60)';
+    const sel = this.state.period;
+    const periods = [
+      { id: 'harian', label: 'Harian' },
+      { id: 'mingguan', label: 'Mingguan' },
+      { id: 'bulanan', label: 'Bulanan' },
+    ].map((p) => ({
+      ...p,
+      bg: sel === p.id ? dark : 'transparent',
+      color: sel === p.id ? 'white' : muted,
+      select: () => this.setState({ period: p.id }),
+    }));
+    const bestSellers = [
+      { name: 'Indomie Goreng', qty: 42, rank: 1 },
+      { name: 'Minyak Goreng 1L', qty: 27, rank: 2 },
+      { name: 'Kopi Kapal Api', qty: 19, rank: 3 },
+      { name: 'Telur Ayam', qty: 14, rank: 4 },
+    ];
+    return { periods, bestSellers };
+  }
+}
+</script>
+</body>
+</html>

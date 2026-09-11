@@ -1,0 +1,37 @@
+# Dependency - diinstal ulang dari package-lock.json, JANGAN pernah di-commit.
+# (Pernah kejadian node_modules dikirim lewat WhatsApp antar-mesin: binary native-nya
+# ikut kebawa dan salah platform, aplikasinya nggak mau jalan sama sekali.)
+node_modules/
+
+# Hasil build - dibikin ulang tiap deploy
+dist/
+dist-ssr/
+build/
+*.local
+
+# RAHASIA. Polanya .env* (bukan cuma ".env") supaya varian kayak .env.production,
+# .env.backup, .env.bak ikut keblokir - itu yang paling gampang kelewat & kebawa
+# ke repo publik. .env.example sengaja DIKECUALIIN: isinya cuma nama variabel,
+# nggak ada nilainya, dan itu yang jadi panduan waktu setup di server baru.
+.env*
+!.env.example
+
+# Log
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Berkas sampah sistem & editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# Upload/berkas sementara runtime
+uploads/
+tmp/
