@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Ikon } from '../lib/icons.jsx';
 import { useApp } from '../state/AppContext.jsx';
 import { WARNA, FONTS, UKURAN } from '../lib/data';
@@ -241,6 +241,21 @@ export default function Lainnya() {
 function SectionLangganan() {
   const { lisensi, mulaiCheckout, toast } = useApp();
   const [buka, setBuka] = useState(false); // baris status di-tap dulu baru pilihan plan-nya kebuka
+  // Tinggi isi akordeon DIUKUR, nggak dipatok angka. Dulu CSS-nya nahan max-height:600px dengan
+  // catatan "kontennya nggak akan setinggi itu" - dan itu basi begitu isinya nambah: tombol
+  // bayarnya kepotong separuh di HP. ResizeObserver dipakai karena tingginya BERUBAH walau lagi
+  // kebuka (daftar manfaat beda panjang tiap paket dipilih), jadi ngukur sekali aja nggak cukup.
+  const isiRef = useRef(null);
+  const [tinggiIsi, setTinggiIsi] = useState(0);
+  useEffect(() => {
+    const el = isiRef.current;
+    if (!el) return;
+    const ukur = () => setTinggiIsi(el.scrollHeight);
+    ukur();
+    const ro = new ResizeObserver(ukur);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const [pilih, setPilih] = useState('bulanan');
   const [loading, setLoading] = useState(false);
 
@@ -324,8 +339,8 @@ function SectionLangganan() {
 
       {/* kontennya TETAP di-render pas ketutup (bukan {buka && ...} yang langsung ilang), biar
           transisi CSS-nya (grid-template-rows + fade) sempet jalan mulus - bukan lompat instan */}
-      <div className={'geser-akordeon' + (buka ? ' buka' : '')}>
-        <div>
+      <div className={'geser-akordeon' + (buka ? ' buka' : '')} style={{ maxHeight: buka ? tinggiIsi : 0 }}>
+        <div ref={isiRef}>
           {/* Daftar manfaat ikut PAKET YANG DIPILIH, bukan satu daftar buat semua - jadi bedanya
               kelihatan waktu user nge-tap kartu yang lain. Isinya datang dari backend, dan SENGAJA
               cuma nyebut yang beneran beda: di aplikasi ini nggak ada fitur yang dikunci per paket

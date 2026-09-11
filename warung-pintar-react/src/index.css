@@ -528,10 +528,14 @@ body{background:#E9E9E6}
 .mrow .ar.panah{transition:transform .25s ease;display:inline-block}
 .mrow .ar.panah.buka{transform:rotate(90deg)}
 /* accordion smooth via max-height transition - lebih kepake luas dukungan browsernya
-   dibanding animasi grid-template-rows. Angka 600px cuma batas atas aman (kontennya nggak
-   akan setinggi itu), BUKAN tinggi asli - jadi animasinya tetap keliatan mulus. */
+   dibanding animasi grid-template-rows. NILAI max-height pas kebuka diset dari JS (lihat Lainnya.jsx), bukan angka
+     tetap di sini. Dulu dipatok 600px dengan catatan "kontennya nggak akan setinggi itu" -
+     anggapan itu basi begitu isinya nambah: layar langganan sekarang punya daftar manfaat +
+     4 kartu paket yang di HP nyusun 2 kolom, jauh lebih tinggi dari 600px, dan tombol
+     bayarnya KEPOTONG separuh. Tingginya juga berubah-ubah walau lagi kebuka (daftar manfaat
+     beda panjang tiap paket), jadi angka tetap apa pun bakal salah lagi. */
 .geser-akordeon{max-height:0;overflow:hidden;opacity:0;transition:max-height .32s ease,opacity .22s ease}
-.geser-akordeon.buka{max-height:600px;opacity:1;transition:max-height .32s ease,opacity .22s ease .05s}
+.geser-akordeon.buka{opacity:1;transition:max-height .32s ease,opacity .22s ease .05s}
 .warna-grid{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px}
 .sw{width:52px;height:52px;border-radius:18px;border:0;cursor:pointer;position:relative;
   transition:transform .25s cubic-bezier(.32,.72,0,1);box-shadow:0 4px 12px -4px rgba(20,20,25,.3)}
