@@ -32,7 +32,11 @@ const TIMEOUT_MS = 12000;
 // OpenRouter/OpenAI-style API, isinya token beneran kepake - bukan estimasi kita sendiri).
 async function panggilOpenRouter(messages, { maxTokens = 500, jsonMode = false, warungId } = {}) {
   const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) throw Object.assign(new Error('OPENROUTER_API_KEY belum diisi di .env'), { status: 500 });
+  // OpenRouter itu CADANGAN OPSIONAL - nggak diisi itu keadaan normal, bukan kerusakan.
+  // `internal: true` bikin errorHandler nggak nampilin pesannya ke user (lihat errorHandler.js):
+  // dulu pesan ini bocor ke layar sebagai "OPENROUTER_API_KEY belum diisi di .env" waktu pemilik
+  // warung nekan "Cari referensi" - dia nggak ngerti itu apa, dan itu bukan urusan dia.
+  if (!apiKey) throw Object.assign(new Error('OPENROUTER_API_KEY belum diisi di .env'), { status: 500, internal: true });
 
   if (warungId) {
     const jatah = await cekJatahAi(warungId);
@@ -359,11 +363,16 @@ MUNGKIN dimaksud (maks 5). Buat tiap varian, isi:
 - satuan: satuan jual satuan KECIL/eceran yang paling umum dipakai orang beli di warung (contoh: "bungkus" buat rokok yang dijual utuh, "botol" buat minuman, "pcs" buat snack)
 - isiKemasan: kalau satuan kecilnya sendiri berisi beberapa unit lebih kecil lagi yang biasa dijual ketengan (contoh: 1 bungkus rokok isi 12/16/20 batang), isi jumlahnya di sini. Kalau nggak ada pemecahan lebih lanjut yang lazim, isi 1.
 - namaKemasan: nama satuan yang lebih kecil itu (contoh: "batang" buat rokok). Isi null kalau isiKemasan cuma 1.
-- hargaPerkiraan: KISARAN harga jual eceran di warung dalam Rupiah (angka bulat, perkiraan pasaran umum - BUKAN harga pasti, ini cuma buat starting point yang gampang diedit user)
+- hargaModal: perkiraan harga KULAKAN/grosir per satuan jual di atas, dalam Rupiah (angka bulat).
+  Ini yang dibayar pemilik warung ke agen, BUKAN harga jual ke pembeli.
+- hargaPasaran: perkiraan harga JUAL ECERAN yang UMUM dipasang warung kelontong lain, dalam Rupiah.
+
+hargaPasaran HARUS lebih besar dari hargaModal, selisihnya wajar buat kelontong: rokok & sembako
+pokok TIPIS (5%-12% dari harga jual), snack/minuman/sabun LEBIH TEBAL (20%-35%). Jangan pukul rata.
 
 Kalau nama yang diketik nggak cukup jelas/nggak kamu kenal produknya sama sekali, balikin array
 kosong - JANGAN ngarang varian yang kamu nggak yakin beneran ada.
-Balas SATU objek JSON PERSIS: {"hasil": [{"nama":"...", "satuan":"...", "isiKemasan":1, "namaKemasan":null, "hargaPerkiraan":0}, ...]} - JANGAN ada teks lain di luar JSON.`;
+Balas SATU objek JSON PERSIS: {"hasil": [{"nama":"...", "satuan":"...", "isiKemasan":1, "namaKemasan":null, "hargaModal":0, "hargaPasaran":0}, ...]} - JANGAN ada teks lain di luar JSON.`;
 
   const teks = await panggilOpenRouter([{ role: 'user', content: prompt }], { maxTokens: 800, jsonMode: true, warungId });
   const hasil = parseJson(teks, 'OpenRouter balikin format JSON tidak valid');
@@ -377,6 +386,11 @@ Balas SATU objek JSON PERSIS: {"hasil": [{"nama":"...", "satuan":"...", "isiKema
       satuan: String(h.satuan).trim() || 'pcs',
       isiKemasan: Math.max(1, +h.isiKemasan || 1),
       namaKemasan: h.namaKemasan ? String(h.namaKemasan).trim() : null,
-      hargaPerkiraan: Math.max(0, +h.hargaPerkiraan || 0),
+      hargaModal: Math.max(0, +h.hargaModal || 0),
+      hargaPasaran: Math.max(0, +h.hargaPasaran || 0),
+      // Disamain bentuknya sama jalur Gemini (lihat cariReferensiProdukGemini) - dua jalur ini
+      // dipakai bergantian oleh route yang SAMA, jadi bentuk keluarannya nggak boleh beda. Dulu
+      // beda & akibatnya diam-diam: pas Gemini gagal, opsiHarga balik kosong tanpa error apa pun.
+      hargaPerkiraan: Math.max(0, +h.hargaPasaran || 0),
     }));
 }

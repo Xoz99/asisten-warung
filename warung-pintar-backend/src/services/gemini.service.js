@@ -577,7 +577,17 @@ MUNGKIN dimaksud (maks 5). Buat tiap varian, isi:
 - satuan: satuan jual satuan KECIL/eceran yang paling umum dipakai orang beli di warung (contoh: "bungkus" buat rokok yang dijual utuh, "botol" buat minuman, "pcs" buat snack)
 - isiKemasan: kalau satuan kecilnya sendiri berisi beberapa unit lebih kecil lagi yang biasa dijual ketengan (contoh: 1 bungkus rokok isi 12/16/20 batang), isi jumlahnya di sini. Kalau nggak ada pemecahan lebih lanjut yang lazim, isi 1.
 - namaKemasan: nama satuan yang lebih kecil itu (contoh: "batang" buat rokok). Isi null kalau isiKemasan cuma 1.
-- hargaPerkiraan: KISARAN harga jual eceran di warung dalam Rupiah (angka bulat, perkiraan pasaran umum - BUKAN harga pasti, ini cuma buat starting point yang gampang diedit user)
+- hargaModal: perkiraan harga KULAKAN/grosir per satuan jual di atas, dalam Rupiah (angka bulat).
+  Ini yang dibayar pemilik warung ke agen/grosir, BUKAN harga jual ke pembeli.
+- hargaPasaran: perkiraan harga JUAL ECERAN yang UMUM dipasang warung kelontong lain buat barang
+  ini, dalam Rupiah (angka bulat). Ini patokan pasar - harga yang bikin pembeli nggak kaget.
+
+PENTING soal dua angka itu: hargaPasaran HARUS lebih besar dari hargaModal (warung nggak jualan
+rugi), dan selisihnya wajar buat barang kelontong - biasanya 10%-30% dari harga jual, tergantung
+jenis barang. Rokok & sembako pokok marginnya TIPIS (sekitar 5%-12%); snack, minuman, sabun,
+kosmetik marginnya LEBIH TEBAL (20%-35%). Jangan pukul rata.
+
+Dua-duanya PERKIRAAN pasaran umum, bukan harga pasti - user bakal ngedit sendiri sesuai agen dia.
 
 Kalau nama yang diketik nggak cukup jelas/nggak kamu kenal produknya sama sekali, balikin array
 kosong - JANGAN ngarang varian yang kamu nggak yakin beneran ada.`;
@@ -598,9 +608,10 @@ kosong - JANGAN ngarang varian yang kamu nggak yakin beneran ada.`;
               satuan: { type: 'STRING' },
               isiKemasan: { type: 'INTEGER' },
               namaKemasan: { type: 'STRING' },
-              hargaPerkiraan: { type: 'INTEGER' },
+              hargaModal: { type: 'INTEGER' },
+              hargaPasaran: { type: 'INTEGER' },
             },
-            required: ['nama', 'satuan', 'isiKemasan', 'hargaPerkiraan'],
+            required: ['nama', 'satuan', 'isiKemasan', 'hargaModal', 'hargaPasaran'],
           },
         },
       },
@@ -623,6 +634,10 @@ kosong - JANGAN ngarang varian yang kamu nggak yakin beneran ada.`;
       satuan: String(h.satuan).trim() || 'pcs',
       isiKemasan: Math.max(1, +h.isiKemasan || 1),
       namaKemasan: h.namaKemasan ? String(h.namaKemasan).trim() : null,
-      hargaPerkiraan: Math.max(0, +h.hargaPerkiraan || 0),
+      hargaModal: Math.max(0, +h.hargaModal || 0),
+      hargaPasaran: Math.max(0, +h.hargaPasaran || 0),
+      // Dipertahankan supaya sisi frontend yang belum ikut berubah nggak langsung pecah -
+      // isinya sama sama hargaPasaran (harga jual, bukan modal).
+      hargaPerkiraan: Math.max(0, +h.hargaPasaran || 0),
     }));
 }

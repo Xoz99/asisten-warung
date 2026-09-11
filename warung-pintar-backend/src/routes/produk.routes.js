@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { opsiHargaJual } from '../utils/hargaJual.js';
 import { query } from '../db.js';
 import { produkSetelahMasuk } from '../services/voice.service.js';
 import { cariReferensiProdukGemini } from '../services/gemini.service.js';
@@ -20,9 +21,26 @@ router.post('/cari-referensi', async (req, res, next) => {
       () => cariReferensiProdukOpenRouter(q, req.warungId),
       'produk/cari-referensi'
     );
-    res.json(hasil);
+    // Tiga pilihan harga jual dihitung DI SINI dari perkiraan modal & pasaran yang dikasih AI -
+    // bukan minta AI ngarang tiga angka sendiri. Alasannya: aturan dagangnya (jangan di bawah
+    // lantai untung, dibulatkan ke angka yang enak diucapkan, ketiganya harus beda) itu logika
+    // pasti yang nggak boleh diserahkan ke tebakan model.
+    res.json(hasil.map((h) => ({ ...h, opsiHarga: opsiHargaJual(h.hargaModal, h.hargaPasaran) })));
   } catch (e) {
-    next(e);
+    // Pesan mentah dari penyedia AI ("API key not valid", "quota exceeded", "timeout") itu bahasa
+    // developer - pemilik warung nggak ngerti & nggak bisa berbuat apa-apa soal itu. Yang dia
+    // butuh cuma tau fiturnya lagi nggak bisa DAN ada jalan lain (isi manual). Sebab aslinya tetap
+    // kecatat di log lewat cobaGeminiLaluOpenRouter.
+    //
+    // 402 (jatah AI habis) DILEWATI - itu pesan yang emang ditujukan ke user & ada tindak
+    // lanjutnya (nunggu reset besok / upgrade paket), jadi jangan ditimpa.
+    if (e.status === 402) return next(e);
+    console.warn('[produk/cari-referensi] semua jalur AI gagal:', e.message);
+    return next(
+      Object.assign(new Error('Lagi nggak bisa nyari referensi barang. Isi manual dulu aja ya, nanti bisa diubah lagi.'), {
+        status: 503,
+      })
+    );
   }
 });
 
