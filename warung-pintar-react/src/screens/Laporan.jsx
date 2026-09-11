@@ -6,17 +6,27 @@ import { api } from '../lib/api';
 
 // Lengkapin deret harian dari backend (yang cuma balikin hari-hari yang ADA transaksinya)
 // jadi n-hari penuh berturut-turut, biar grafik batangnya rata kayak semula.
-function deretPenuh(n, offset, sparse) {
+function deretPenuh(n, offset, sparse, targetSparse = []) {
   const akhir = new Date();
   akhir.setHours(0, 0, 0, 0);
   akhir.setDate(akhir.getDate() - offset * n);
   const byTgl = new Map(sparse.map((r) => [new Date(r.hari).toDateString(), r]));
+  // Target dikunci pakai toDateString() yang sama kayak deret transaksi - kolom `tanggal` di
+  // database bertipe DATE (tanpa jam), jadi aman dibanding per-hari tanpa urusan zona waktu.
+  const byTarget = new Map(targetSparse.map((r) => [new Date(r.tanggal).toDateString(), Number(r.jumlah)]));
   const arr = [];
   for (let i = n - 1; i >= 0; i--) {
     const d = new Date(akhir);
     d.setDate(akhir.getDate() - i);
     const match = byTgl.get(d.toDateString());
-    arr.push({ d, v: match ? Number(match.untung) : 0 });
+    arr.push({
+      d,
+      v: match ? Number(match.untung) : 0,
+      omzet: match ? Number(match.omzet) : 0,
+      // 0 berarti "hari itu nggak pasang target" - dibedain dari target yang beneran diisi,
+      // supaya grafiknya nggak nampilin garis target di hari yang emang nggak ditargetin.
+      target: byTarget.get(d.toDateString()) || 0,
+    });
   }
   return arr;
 }
@@ -31,10 +41,20 @@ function keMingguan(data) {
   for (let akhir = data.length; akhir > 0; akhir -= 7) {
     const awal = Math.max(0, akhir - 7);
     const chunk = data.slice(awal, akhir);
-    minggu.unshift({ awal: chunk[0].d, akhir: chunk[chunk.length - 1].d, v: chunk.reduce((a, x) => a + x.v, 0) });
+    minggu.unshift({
+      awal: chunk[0].d,
+      akhir: chunk[chunk.length - 1].d,
+      v: chunk.reduce((a, x) => a + x.v, 0),
+      omzet: chunk.reduce((a, x) => a + x.omzet, 0),
+      target: chunk.reduce((a, x) => a + x.target, 0),
+    });
   }
   return minggu;
 }
+
+// Urutan kartu yang digeser di hero. Ditaruh di satu tempat biar nambah/ngurangin tampilan nggak
+// perlu nyisir beberapa titik (tombol titik, arah animasi, dan urutan geser) yang gampang kelewat.
+const URUT_HERO = ['bar', 'pie', 'target'];
 
 export default function Laporan() {
   const { S } = useApp();
@@ -43,7 +63,7 @@ export default function Laporan() {
   const [selDay, setSelDay] = useState(null); // index terpilih di grafik
   const [kasJenis, setKasJenis] = useState(null); // null | 'masuk' | 'modal'
   const [ringkasan, setRingkasan] = useState(null);
-  const [heroView, setHeroView] = useState('bar'); // 'bar' | 'pie' - digeser (swipe) di kartu hero, bukan 2 kartu kepisah
+  const [heroView, setHeroView] = useState('bar'); // 'bar' | 'pie' | 'target' - digeser (swipe) di kartu hero, bukan kartu kepisah
   const [dragX, setDragX] = useState(0); // offset geser transform (px) - JS penuh yang ngatur, bukan CSS keyframe
   const [transisi, setTransisi] = useState(false); // true = transform translateX pakai transisi CSS mulus, false = "teleport" instan (dipakai sesaat pas ganti konten - lihat sentuhSelesai)
   const touchXRef = useRef(null);
@@ -56,7 +76,10 @@ export default function Laporan() {
     };
   }, [rngN, rngOffset]);
 
-  const data = useMemo(() => (ringkasan ? deretPenuh(rngN, rngOffset, ringkasan.deret) : []), [ringkasan, rngN, rngOffset]);
+  const data = useMemo(
+    () => (ringkasan ? deretPenuh(rngN, rngOffset, ringkasan.deret, ringkasan.target || []) : []),
+    [ringkasan, rngN, rngOffset]
+  );
   const tot = data.reduce((a, x) => a + x.v, 0);
 
   // "1 bulan terakhir" ditampilin per MINGGU (~5 batang), bukan 30 batang harian sempit - jauh
@@ -98,7 +121,7 @@ export default function Laporan() {
     const kanan = delta < 0; // geser ke kiri (delta negatif) = maju, animasinya keluar ke kiri
     setDragX(kanan ? -LEBAR_GESER : LEBAR_GESER); // nerusin keluar layar ke arah geser
     setTimeout(() => {
-      setHeroView((v) => (v === 'bar' ? 'pie' : 'bar'));
+      setHeroView((v) => URUT_HERO[(URUT_HERO.indexOf(v) + 1) % URUT_HERO.length]);
       setTransisi(false);
       setDragX(kanan ? LEBAR_GESER : -LEBAR_GESER); // "teleport" ke sisi seberang, konten baru masuk dari situ
       requestAnimationFrame(() => {
@@ -113,7 +136,7 @@ export default function Laporan() {
   // dari yang lagi aktif jalanin transisi yang sama, tap dot yang UDAH aktif nggak ngapa-ngapain.
   const pindahLewatDot = (v) => {
     if (v === heroView) return;
-    const kanan = ['bar', 'pie'].indexOf(v) > ['bar', 'pie'].indexOf(heroView);
+    const kanan = URUT_HERO.indexOf(v) > URUT_HERO.indexOf(heroView);
     setTransisi(true);
     setDragX(kanan ? -LEBAR_GESER : LEBAR_GESER);
     setTimeout(() => {
@@ -139,6 +162,16 @@ export default function Laporan() {
         ? 'Untung 7 hari ini'
         : 'Untung 1 bulan terakhir';
   const chartVal = selDay !== null ? chartRows[selDay].v : tot;
+
+  // Skala grafik target: dipatok ke nilai TERBESAR antara omzet & target di rentang itu - kalau
+  // cuma dipatok ke omzet, garis target yang lebih tinggi dari omzet bakal nongol di luar kartu.
+  const maxTarget = Math.max(1, ...chartRows.map((x) => Math.max(x.omzet || 0, x.target || 0)));
+  const targetTercapai = useMemo(() => {
+    const baris = selDay !== null ? [chartRows[selDay]] : chartRows;
+    const omzet = baris.reduce((a, x) => a + (x.omzet || 0), 0);
+    const target = baris.reduce((a, x) => a + (x.target || 0), 0);
+    return { omzet, target, adaTarget: target > 0, persen: target > 0 ? Math.round((omzet / target) * 100) : 0 };
+  }, [chartRows, selDay]);
 
   // Rentang tanggal buat daftar "Transaksi" di bawah - NGIKUTIN batang yang lagi ditap di grafik
   // (dulu selalu hardcode "hari ini" doang, nggak peduli batang mana yang ditap - tap tanggal 6
@@ -281,6 +314,66 @@ export default function Laporan() {
               {rngN === 30 ? 'Tap batangnya untuk lihat per minggu' : 'Tap batangnya untuk lihat per hari'}
             </p>
           </>
+        ) : heroView === 'target' ? (
+          // Target vs jualan beneran. Batangnya OMZET (bukan untung) - targetnya emang target
+          // setoran/isi laci, jadi yang adil dibandingin ya duit yang masuk, bukan labanya.
+          //
+          // Garis target digambar sebagai marker di dalam batang, bukan batang kedua di sebelahnya:
+          // di HP, 7 pasang batang berdesakan jadi terlalu sempit buat kebaca. Marker di dalam
+          // batang bikin "kekejar / nggak" langsung kelihatan sekali lihat.
+          <>
+            <p className="lbl">Target vs jualan {chartLbl}</p>
+            <p className="big p-num" style={{ fontSize: 44 }}>
+              {rupiah(targetTercapai.omzet)}
+            </p>
+            {/* marginTop 2px, bukan -6: angka besarnya 44px & ekor huruf "p" di "Rp" turun cukup
+                jauh - ditarik ke atas bikin subjudulnya nabrak. */}
+            <p className="lbl" style={{ marginTop: 2 }}>
+              {targetTercapai.adaTarget
+                ? `dari target ${rupiah(targetTercapai.target)} · ${targetTercapai.persen}% tercapai`
+                : 'Belum ada target dipasang di rentang ini'}
+            </p>
+            <div className="chart">
+              {chartRows.map((h, i) => {
+                const isSel = selDay === null ? i === chartRows.length - 1 : i === selDay;
+                const lbl =
+                  rngN === 7
+                    ? ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'][h.d ? h.d.getDay() : h.awal.getDay()]
+                    : String(h.awal.getDate());
+                const tinggiOmzet = (h.omzet / maxTarget) * 100;
+                const tinggiTarget = (h.target / maxTarget) * 100;
+                const tercapai = h.target > 0 && h.omzet >= h.target;
+                return (
+                  <div key={i} className={'col' + (isSel ? ' sel' : '')} onClick={() => setSelDay(i)} style={{ position: 'relative' }}>
+                    <i
+                      style={{
+                        height: tinggiOmzet + '%',
+                        background: tercapai ? '#4ade80' : undefined,
+                      }}
+                    />
+                    {h.target > 0 && (
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          right: 0,
+                          bottom: `calc(${tinggiTarget}% + 22px)`,
+                          height: 0,
+                          borderTop: '2px dashed rgba(255,255,255,.75)',
+                          pointerEvents: 'none',
+                        }}
+                      />
+                    )}
+                    <span>{lbl}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="lbl" style={{ marginTop: 14, fontSize: 14 }}>
+              Garis putus-putus = target. Batang hijau = target kekejar.
+            </p>
+          </>
         ) : (
           // Pie untung vs modal keluar - digambar conic-gradient CSS polos (DIY tanpa library
           // chart, konsisten sama grafik batang di sebelah). Untung NEGATIF (rugi) nggak bisa
@@ -353,11 +446,11 @@ export default function Laporan() {
 
         {/* Dot indikator 2 tampilan - tap juga bisa, nggak wajib geser */}
         <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 16 }}>
-          {['bar', 'pie'].map((v) => (
+          {URUT_HERO.map((v) => (
             <button
               key={v}
               type="button"
-              aria-label={v === 'bar' ? 'Lihat grafik batang' : 'Lihat pie untung vs modal'}
+              aria-label={v === 'bar' ? 'Lihat grafik untung' : v === 'pie' ? 'Lihat pie untung vs modal' : 'Lihat grafik target vs jualan'}
               onClick={() => pindahLewatDot(v)}
               style={{
                 width: heroView === v ? 18 : 7,

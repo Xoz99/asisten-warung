@@ -185,11 +185,22 @@ export function AppProvider({ children }) {
   // paling perlu dikonfirmasi jelas ke pemilik warung (dia baru ngeluarin duit) - toast kecil yang
   // ilang sendiri gampang kelewat, dan kalau kelewat dia bakal ngira pembayarannya gagal.
   const [upgradeSukses, setUpgradeSukses] = useState(null); // {plan, berlakuSampai} | null
-  // Target setoran buat layar Catat jualan (lihat blok "total" di Catat.jsx). Ditaruh di context,
-  // BUKAN state lokal layar itu, supaya bisa dipasang dari CHAT juga ("catat penjualan hari ini
-  // 900rb" -> Mang AI ngusulin, user setuju, langsung kebawa ke layar catat dengan target keisi).
-  // Nilainya sementara & nggak disimpen ke server: ini alat bantu nyocokin isi laci, bukan setelan.
-  const [targetSetoran, setTargetSetoran] = useState(0);
+  // Target setoran HARIAN. Ditaruh di context (bukan state lokal layar Catat) supaya bisa dipasang
+  // dari dua arah: tombol di layar itu sendiri, ATAU lewat chat Mang AI ("catat penjualan hari ini
+  // 900rb").
+  //
+  // Dulu cuma angka di memori & ilang tiap reload. Sekarang DISIMPAN KE SERVER per tanggal, karena
+  // dia dipakai juga sebagai pembanding di grafik Laporan - tanpa riwayat, grafiknya nggak ada
+  // yang mau dibandingin. Efek sampingnya bagus: target yang dipasang pagi tetap kelihatan walau
+  // aplikasinya ditutup, atau dibuka dari HP lain yang login akun sama.
+  const [targetSetoran, setTargetSetoranLokal] = useState(0);
+  const setTargetSetoran = useCallback((n) => {
+    const angka = Math.max(0, Number(n) || 0);
+    setTargetSetoranLokal(angka); // tampilan diperbarui DULU biar kerasa instan
+    // Sengaja nggak di-await & kegagalannya ditelan: target gagal kesimpen cuma bikin dia ilang
+    // pas reload berikutnya, bukan alasan buat nge-block pemilik warung yang lagi ngitung laci.
+    api.laporan.pasangTarget(angka).catch(() => {});
+  }, []);
 
   // Status sinkronisasi cache lokal - dipakai buat badge di PhoneShell.jsx. 'online' = data
   // barusan berhasil disinkron ke server. 'offline' = lagi pakai data cache (fetch terakhir
@@ -435,6 +446,21 @@ export function AppProvider({ children }) {
       /* nggak bisa nyimpen penanda - efeknya cuma kebersihan berlebih di login berikutnya */
     }
   }, []);
+
+  // Tarik target hari ini tiap kali warung yang login berganti (termasuk saat pertama masuk).
+  useEffect(() => {
+    if (!authed) return;
+    let batal = false;
+    api.laporan
+      .targetHariIni()
+      .then((t) => {
+        if (!batal) setTargetSetoranLokal(Number(t?.jumlah) || 0);
+      })
+      .catch(() => {});
+    return () => {
+      batal = true;
+    };
+  }, [authed, authWarung?.id]);
 
   // Muat keranjang milik warung yang lagi login, dan simpan tiap kali berubah.
   const cartKey = authWarung?.id ? `warungpintar_cart_${authWarung.id}` : null;

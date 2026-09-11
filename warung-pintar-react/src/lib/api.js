@@ -175,6 +175,10 @@ export const api = {
     // Duit yang disetor pemilik ke warung. Sengaja beda dari masuk_log (itu duit dari JUALAN) -
     // kalau dicampur, laporan untung jadi ngaco karena setoran modal kebaca sebagai omzet.
     catatModal: (jumlah, keterangan) => post('/api/laporan/kas/modal', { jumlah, keterangan }),
+    // Target setoran harian. jumlah 0 = hapus target hari ini (lihat laporan.routes.js) - bukan
+    // nyimpen angka nol, karena di grafik "nggak pasang target" beda arti dari "targetnya nol".
+    targetHariIni: () => get('/api/laporan/target'),
+    pasangTarget: (jumlah) => put('/api/laporan/target', { jumlah }),
   },
 
   nota: {

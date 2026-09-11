@@ -185,7 +185,6 @@ export default function Catat() {
       const laba = items.reduce((a, { id, qty }) => a + produkById[id].untung * qty, 0);
       const pembeli = pelangganTerpilih ? pelangganTerpilih.nama : null;
       dispatch({ type: 'SELESAI_BAYAR', items, total: totalCart, laba, metode, pembeli, pembeliId: pelangganTerpilih?.id });
-      setTarget(0); // target itu alat bantu buat SATU sesi pencocokan - jangan kebawa ke transaksi berikutnya
       setStrukData({ waktu: new Date().toISOString(), total: totalCart, items: itemsTxt(items), pembeli, metode, oleh: S.penjagaAktif || '—' });
       kosongkanCart();
       setPelangganTerpilih(null);
@@ -266,7 +265,14 @@ export default function Catat() {
       <div className="total">
         <p className="t">
           {target > 0 ? 'Sudah terkumpul' : 'Total belanja pembeli'}
-          <button className="linkkecil" style={{ width: 'auto', flex: '0 0 auto' }} onClick={() => setTargetOpen(true)}>
+          {/* marginTop DIMATIKAN: .linkkecil defaultnya punya margin-top 26px (buat link yang berdiri
+              sendiri di bawah form). Di sini dia nempel di baris judul, jadi margin itu bikin
+              tombolnya turun & kelihatan nggak sebaris sama "Total belanja pembeli". */}
+          <button
+            className="linkkecil"
+            style={{ width: 'auto', flex: '0 0 auto', margin: 0 }}
+            onClick={() => setTargetOpen(true)}
+          >
             {target > 0 ? 'ubah target' : 'pasang target'}
           </button>
         </p>
@@ -1466,8 +1472,9 @@ function SheetTarget({ awal, onSimpan, onClose }) {
       <div className="panel">
         <h3>Target setoran</h3>
         <p>
-          Buat nyocokin isi laci sama barang yang kejual. Ceklis barangnya sampai totalnya pas —
-          stok sama untungnya tetap kehitung bener, beda sama kalau cuma dicatat gelondongan.
+          Target jualan buat hari ini. Dipakai buat nyocokin isi laci sama barang yang kejual, dan
+          ikut kegambar di grafik Laporan biar kelihatan hari mana yang kekejar dan mana yang nggak.
+          Tersimpan otomatis — nggak ilang walau aplikasinya ditutup.
         </p>
         <div className="field">
           <label>Target (Rp)</label>

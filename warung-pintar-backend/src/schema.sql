@@ -371,3 +371,19 @@ ALTER TABLE pembayaran ADD COLUMN IF NOT EXISTS payment_type TEXT;
 -- Diisi pas pembayaran diaktifkan (webhook / sinkron), dihitung dari MDR metode yang BENERAN
 -- dipakai pelanggan - bukan asumsi di depan, karena metodenya baru ketahuan setelah dia bayar.
 ALTER TABLE pembayaran ADD COLUMN IF NOT EXISTS jumlah_bersih NUMERIC;
+
+-- Target setoran HARIAN yang dipasang pemilik warung (lihat layar Catat jualan + grafik di
+-- Laporan). Dulu cuma angka sementara di memori buat bantu nyocokin isi laci; begitu dipakai
+-- sebagai pembanding di laporan, dia harus nempel ke TANGGAL & kesimpen - kalau nggak, grafiknya
+-- nggak punya riwayat buat dibandingin.
+--
+-- Primary key gabungan (warung_id, tanggal): satu warung punya PALING BANYAK satu target per hari.
+-- Pasang ulang di hari yang sama = menimpa, bukan bikin baris baru (lihat ON CONFLICT di
+-- laporan.routes.js) - biar riwayatnya bersih & grafiknya nggak dobel batang.
+CREATE TABLE IF NOT EXISTS target_harian (
+  warung_id UUID NOT NULL REFERENCES warung(id) ON DELETE CASCADE,
+  tanggal DATE NOT NULL,
+  jumlah NUMERIC NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (warung_id, tanggal)
+);
