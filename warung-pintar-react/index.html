@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
     <meta name="theme-color" content="#0A0A0A" />
     <title>Warung Pintar</title>
+    <!-- Ikon Mang Warung. Sebelumnya index.html NGGAK punya link ikon sama sekali - browser
+         otomatis nyari /favicon.ico yang emang nggak ada, jadi tab-nya nampilin ikon bola dunia
+         bawaan Chrome. favicon.svg di public/ juga nggak kepakai karena nggak pernah ditunjuk.
+         PNG-nya hasil konversi langsung dari src/assets/mangwarung.webp (aset asli, bukan gambar
+         ulang) - lihat perintah sips di catatan commit. -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/mangwarung-32.png" />
+    <!-- Dipakai waktu pemilik warung "Add to Home Screen" di HP - ini yang paling sering kejadian,
+         karena app-nya dipakai sambil jaga warung, bukan dibuka lewat tab browser tiap kali. -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/mangwarung-180.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
