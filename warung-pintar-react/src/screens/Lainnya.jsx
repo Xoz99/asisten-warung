@@ -3,6 +3,8 @@ import { Ikon } from '../lib/icons.jsx';
 import { useApp } from '../state/AppContext.jsx';
 import { WARNA, FONTS, UKURAN } from '../lib/data';
 import { escapeHtml, tampilNoHp, rupiah } from '../lib/format';
+import { pesanIzinMedia } from '../lib/mic';
+import { terpasangSebagaiApp } from '../lib/pwa';
 import { api } from '../lib/api.js';
 import KartuPaket from '../components/KartuPaket.jsx';
 import mangWarungImg from '../assets/mangwarung.webp';
@@ -71,6 +73,7 @@ export default function Lainnya() {
 
       <p className="p-sec">Aplikasi</p>
       <BarisPasangApp />
+      <BarisIzinMedia />
 
       <p className="p-sec">Langganan</p>
       <SectionLangganan />
@@ -697,6 +700,142 @@ function SheetNoHp({ onClose }) {
   );
 }
 
+// Penanda LOKAL "izin kamera+mic udah pernah dikasih di HP ini". BUKAN sumber kebenaran - user
+// bisa nyabut izinnya lewat setelan browser kapan aja tanpa aplikasi ini tau. Gunanya cuma biar
+// barisnya berhenti ngajak-ngajak di HP yang emang udah beres, khususnya di Safari yang nggak
+// punya Permissions API buat kamera/mikrofon (lihat cekIzin di bawah).
+const KUNCI_IZIN_MEDIA = 'warungpintar_izin_media_v1';
+
+// "Siapkan izin kamera & mikrofon" - minta izinnya SEKALI di waktu senggang, bukan pas lagi
+// dipakai.
+//
+// Kenapa ada: izin kamera/mic itu kepakai di tengah-tengah kerjaan yang lagi buru-buru - scan
+// barcode pas pembeli ngantre, "Sebut barang" pas tangan penuh. Kalau dialog izinnya baru nongol
+// DI SITU, alurnya putus: pemilik warung nge-tap "Blokir" karena kaget/buru-buru, dan sekali
+// diblokir, dialognya NGGAK BAKAL nongol lagi - fiturnya kelihatan rusak selamanya padahal cuma
+// salah tap sekali.
+//
+// getUserMedia-nya minta video + audio BARENGAN dalam satu panggilan, bukan dua panggilan
+// terpisah: Chrome nampilin SATU dialog buat dua-duanya kalau dimintanya sekaligus. Dua panggilan
+// = dua dialog beruntun, dan yang kedua paling sering keburu ditutup.
+function BarisIzinMedia() {
+  const { toast } = useApp();
+  const [status, setStatus] = useState(() => {
+    try {
+      return localStorage.getItem(KUNCI_IZIN_MEDIA) === 'ya' ? 'siap' : 'belum';
+    } catch {
+      return 'belum'; // mode privat / storage diblokir - anggap belum, paling-paling nawarin ulang
+    }
+  });
+  const [lagiMinta, setLagiMinta] = useState(false);
+
+  // Status ASLI dari browser kalau dia mau ngasih tau. Chrome/Edge bisa; Safari nolak query buat
+  // 'camera'/'microphone' (dilempar sebagai error), makanya dibungkus try - kalau gagal, penanda
+  // lokal di atas yang dipakai apa adanya.
+  useEffect(() => {
+    let batal = false;
+    (async () => {
+      if (!navigator.permissions?.query) return;
+      try {
+        const hasil = await Promise.all([
+          navigator.permissions.query({ name: 'camera' }),
+          navigator.permissions.query({ name: 'microphone' }),
+        ]);
+        if (batal) return;
+        const keadaan = hasil.map((h) => h.state);
+        if (keadaan.includes('denied')) setStatus('ditolak');
+        else if (keadaan.every((k) => k === 'granted')) setStatus('siap');
+        else setStatus('belum');
+      } catch {
+        /* Safari & kawan-kawan - biarin pakai penanda lokal */
+      }
+    })();
+    return () => {
+      batal = true;
+    };
+  }, []);
+
+  const tap = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      toast('Browser ini nggak bisa buka kamera/mikrofon');
+      return;
+    }
+    setLagiMinta(true);
+    try {
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: true });
+      } catch (e) {
+        // Perangkat yang cuma punya salah satunya (mis. laptop tanpa kamera) bikin permintaan
+        // gabungan GAGAL TOTAL - nggak ada izin yang kekasih sama sekali, padahal yang satunya
+        // sebenernya bisa. Jadi dicoba satu-satu, biar yang ada tetep kepegang izinnya.
+        if (e.name !== 'NotFoundError' && e.name !== 'OverconstrainedError') throw e;
+        const satuan = await Promise.allSettled([
+          navigator.mediaDevices.getUserMedia({ video: true }),
+          navigator.mediaDevices.getUserMedia({ audio: true }),
+        ]);
+        satuan.forEach((h) => h.status === 'fulfilled' && h.value.getTracks().forEach((t) => t.stop()));
+        if (satuan.every((h) => h.status === 'rejected')) throw satuan[0].reason;
+        try {
+          localStorage.setItem(KUNCI_IZIN_MEDIA, 'ya');
+        } catch {
+          /* nggak kesimpen - nggak apa-apa, izinnya sendiri tetep kepegang browser */
+        }
+        setStatus('siap');
+        toast('Izin kesimpen. Yang nggak kedeteksi di HP ini dilewatin ya.');
+        return;
+      }
+      // Track-nya LANGSUNG dimatiin - tujuannya cuma minta izin, bukan mulai ngerekam. Kalau
+      // dibiarin hidup, lampu kamera HP nyala terus & indikator mic-nya nongol padahal nggak
+      // lagi dipakai apa-apa - itu justru bikin pemilik warung curiga terus nyabut izinnya.
+      stream.getTracks().forEach((t) => t.stop());
+      try {
+        localStorage.setItem(KUNCI_IZIN_MEDIA, 'ya');
+      } catch {
+        /* abaikan */
+      }
+      setStatus('siap');
+      toast('Beres. Scan barang & sebut barang nggak bakal nanya izin lagi.');
+    } catch (e) {
+      if (e.name === 'NotAllowedError' || e.name === 'SecurityError') {
+        setStatus('ditolak');
+        toast(pesanIzinMedia());
+      } else if (e.name === 'NotFoundError') {
+        toast('Kamera/mikrofonnya nggak kedeteksi di perangkat ini');
+      } else {
+        toast('Gagal minta izin. Coba lagi sebentar lagi ya.');
+      }
+    } finally {
+      setLagiMinta(false);
+    }
+  };
+
+  const keterangan =
+    status === 'siap' ? 'Kamera & mikrofon udah diizinkan'
+    : status === 'ditolak' ? 'Diblokir - buka setelan browser buat ngizinin lagi'
+    : lagiMinta ? 'Nunggu jawaban kamu...'
+    : 'Biar nggak ditanya pas lagi ngelayanin pembeli';
+
+  return (
+    <div className="menu">
+      <button className="mrow" onClick={status === 'siap' || lagiMinta ? undefined : tap} disabled={status === 'siap' || lagiMinta}>
+        <span className={status === 'siap' ? 'ic' : 'ic aksen'}>
+          <svg viewBox="0 0 24 24">
+            {/* kamera + titik mic kecil - satu ikon buat dua izin yang diminta barengan */}
+            <path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h2L9 4h6l1.5 2h2A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z" />
+            <circle cx="12" cy="13" r="3.2" />
+          </svg>
+        </span>
+        <span className="tx">
+          <b>{status === 'siap' ? 'Izin kamera & mikrofon aktif' : 'Siapkan izin kamera & mikrofon'}</b>
+          <span>{keterangan}</span>
+        </span>
+        {status !== 'siap' && <span className="ar">›</span>}
+      </button>
+    </div>
+  );
+}
+
 // Tombol "Pasang aplikasi" - biar Warung Pintar nongol sebagai ikon di layar HP, kebuka tanpa
 // address bar browser, persis kayak aplikasi biasa.
 //
@@ -715,11 +854,9 @@ function BarisPasangApp() {
   const [promptPasang, setPromptPasang] = useState(null);
   const [sheetIos, setSheetIos] = useState(false);
 
-  // Udah kebuka SEBAGAI aplikasi terpasang? Dua cara deteksinya beda: standar web pakai
-  // display-mode, Safari iOS pakai properti non-standar navigator.standalone.
-  const terpasang =
-    (typeof window !== 'undefined' && window.matchMedia?.('(display-mode: standalone)')?.matches) ||
-    (typeof navigator !== 'undefined' && navigator.standalone === true);
+  // Udah kebuka SEBAGAI aplikasi terpasang? Pengecekannya pindah ke lib/pwa.js - dulu di sini,
+  // dan cuma nyari 'standalone', jadi langsung salah begitu manifest-nya dipindah ke fullscreen.
+  const terpasang = terpasangSebagaiApp();
 
   // iPad generasi baru ngaku-ngaku Macintosh di userAgent, makanya dicek juga lewat maxTouchPoints -
   // Mac beneran nggak punya layar sentuh.

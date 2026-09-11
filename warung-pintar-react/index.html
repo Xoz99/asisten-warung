@@ -20,7 +20,15 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- "black" (bukan "black-translucent"). black-translucent bikin isi aplikasi NAIK KE BELAKANG
+         status bar iPhone - dan karena nggak ada satu pun padding env(safe-area-inset-top) di CSS,
+         judul layar & tombol paling atas ketiban jam/baterai di HP ber-notch. Masalah keduanya:
+         black-translucent MAKSA tulisan status bar jadi putih, sementara tema bawaan aplikasi ini
+         terang (--bg #F2F1EE) - putih di atas krem = jam & baterainya ilang.
+         "black" nyelesein dua-duanya sekaligus: strip hitam solid, tulisan putih (kebaca di tema
+         terang MAUPUN gelap), dan isi aplikasi mulai TEPAT di bawahnya. Warnanya juga udah
+         nyambung sama theme_color #0A0A0A yang dipakai Android. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="Warung Pintar" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
