@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { ProductIcon, CameraIcon, Ikon } from '../lib/icons.jsx';
 import { parseUcapan } from '../lib/voice';
+import { pesanIzinMikrofon, perangkatIOS } from '../lib/mic';
 import { rupiah, inisial, escapeHtml } from '../lib/format';
 import { api } from '../lib/api';
 import { bukaKamera, tutupKamera, jepretFrame, keWebp } from '../lib/kamera';
@@ -18,17 +19,6 @@ import SheetStruk from '../components/SheetStruk.jsx';
 // error "recognition already started" — dan tanpa penanganan, error itu ke-swallow diem-diem,
 // bikin sheet kebuka tapi speech-nya nggak pernah beneran jalan.
 let recAktifSaatIni = null;
-
-// Semua browser di iOS/iPadOS (Safari, Chrome, dst) WAJIB pakai mesin WebKit-nya Apple (kebijakan
-// App Store) — jadi bug/keterbatasan WebKit soal ini kena ke SEMUANYA, bukan cuma Safari doang.
-// Dipakai buat nampilin catatan kecil di bawah, biar user iOS gak ngira aplikasinya diam-diam
-// masih ngerekam pas titik oranye status-bar-nya nyala sesaat lebih lama dari harusnya.
-function perangkatIOS() {
-  if (typeof navigator === 'undefined') return false;
-  if (/iPad|iPhone|iPod/.test(navigator.userAgent)) return true;
-  // iPadOS 13+ nyamar jadi "Mac" di user-agent, dibedain dari Mac beneran lewat touch support.
-  return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
-}
 
 // Matiin sesi SpeechRecognition SETEGAS mungkin — dipanggil di SEMUA titik "user/sistem beneran
 // udah selesai" (Batal, Masukkan ke keranjang, pilih varian, timeout, error). .stop() dipanggil
@@ -586,26 +576,10 @@ function SheetVoice({ rec, onClose }) {
       clearTimeout(timeoutTimer);
       matikanMic(rec);
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-        // Pesannya dibedain per platform, karena PENYEBAB & CARA BENERINNYA beda jauh - dan
-        // pesan generik "izinkan lewat pengaturan browser" nggak nolong sama sekali di iPhone,
-        // di mana menunya bahkan nggak ada di tempat yang orang cari.
-        //
-        // Kasus paling sering di iPhone: aplikasi dibuka dari ikon HOME SCREEN (mode standalone).
-        // Di situ Safari nggak nampilin dialog izin mikrofon sama sekali - langsung ditolak,
-        // tanpa pernah nanya. Satu-satunya jalan: buka lewat Safari biasa.
-        const standalone =
-          window.matchMedia?.('(display-mode: standalone)')?.matches || navigator.standalone === true;
-        const iOS =
-          /iphone|ipad|ipod/i.test(navigator.userAgent) ||
-          (/macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
-
-        if (iOS && standalone) {
-          toast('Di iPhone, "Sebut barang" belum bisa dipakai dari ikon layar HP. Buka lewat Safari, atau ketik manual.');
-        } else if (iOS) {
-          toast('Mikrofon ditolak. Cek Pengaturan &gt; Safari &gt; Mikrofon, dan pastikan Siri &amp; Dikte aktif.');
-        } else {
-          toast('Akses mikrofon ditolak. Tap ikon gembok di address bar &gt; izinkan Mikrofon.');
-        }
+        // Pesannya dibedain per platform (iPhone dari ikon layar HP vs Safari biasa vs Android/
+        // desktop) - alasan lengkapnya ada di pesanIzinMikrofon(), lib/mic.js. Dipindah ke sana
+        // waktu dikte suara di chat Mang AI butuh pesan yang persis sama.
+        toast(pesanIzinMikrofon('"Sebut barang"'));
         // Dialihkan ke ketik manual, JANGAN cuma ditutup - pembelinya lagi nunggu di depan,
         // jangan sampai pemilik warung mentok tanpa jalan lain gara-gara mic bermasalah.
         setStep('teks');

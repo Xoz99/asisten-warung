@@ -330,6 +330,70 @@ body{font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased
    belum bisa dikirim, baru nyala begitu ada teks */
 .mic:disabled{background:var(--bg);color:var(--abu);cursor:not-allowed}
 
+/* --- kotak ketik Mang AI (.tanya--ai) - lihat TanyaAI di Chat.jsx ---------------------------
+   Beda dari .tanya polos yang dipakai komposer Komunitas: di sini ada 3 hal berebut tempat di
+   satu baris (kamera, kotak ketik, kirim/mic) - di layar 360px itu sempit banget, jadi padding
+   kiri gede bawaan .tanya (22px, buat kotak ketik yang mulai langsung dari pinggir) dikecilin
+   dan tombolnya dibikin agak lebih kecil. */
+.tanya--ai{padding:10px 10px 10px 12px;gap:8px}
+/* 17px bawaan .tanya kepanjangan buat sisa ruang di sini: di 360px, setelah kamera + tombol
+   kanan + jarak-jaraknya, kotak ketiknya tinggal ~200px - teks contekannya kepotong di tengah
+   kata. Yang diketik user sendiri tetap kebaca jelas, ini cuma nurunin 1 tingkat. */
+.tanya--ai input{padding:0 2px;font-size:16px}
+/* Tombol sekunder (kamera). Dulu ikut pakai .mic - jadi KUNING persis kayak tombol kirim, dua
+   tombol kuning gede ngapit kotak ketik, dan yang kiri malah keliatan paling "penting" padahal
+   cuma jalan pintas ke foto. Sekarang netral: aksi utamanya cuma satu, yang kanan. */
+.tanya-samping{width:44px;height:44px;border-radius:14px;background:var(--bg);border:0;color:var(--abu);
+  display:grid;place-items:center;flex:none;cursor:pointer;transition:background .15s,color .15s}
+.t-bold .tanya-samping{border:var(--tepi)}
+.tanya-samping:active{background:var(--garis)}
+.tanya-samping:disabled{opacity:.45;cursor:not-allowed}
+.tanya--ai .mic{width:44px;height:44px;border-radius:14px}
+/* Mic lagi nyala. Merah (bukan kuning aksen) DENGAN denyut - warung sering dipakai sambil
+   ngelayanin pembeli, mic yang nyala diem-diem itu bikin was-was; ini bikin jelas "masih
+   ngerekam". Denyutnya pakai box-shadow, bukan transform scale, biar nggak nggeser posisi
+   tombol sebelahnya. */
+.mic.dengar{background:#E5484D;color:#fff;animation:micDenyut 1.15s ease-in-out infinite}
+@keyframes micDenyut{0%,100%{box-shadow:0 0 0 0 rgba(229,72,77,.5)}60%{box-shadow:0 0 0 9px rgba(229,72,77,0)}}
+.dengar-nota{display:flex;align-items:center;gap:8px;padding:6px 4px 10px;font-size:14px;font-weight:600;color:#E5484D}
+.dengar-nota i{width:8px;height:8px;border-radius:50%;background:#E5484D;flex:none;animation:dot 1.2s infinite}
+
+/* Chip contoh pertanyaan. Ditaruh NEMPEL DI ATAS kotak ketik, bukan di bawah sapaan Mang AI:
+   pas obrolan masih kosong, bagian tengah layar emang lagi bolong (nggak ada yang ketutupan),
+   sementara area bawah itu yang paling gampang dijangkau jempol di HP. Alasan adanya: pemilik
+   warung yang baru pertama buka Mang AI rata-rata bengong nggak tau harus nanya apa - layarnya
+   cuma sapaan + kotak kosong. Ini contoh yang sekali tap langsung kekirim, sekalian nunjukin
+   Mang AI bisa dipake NYATAT (penjualan/modal), bukan cuma jawab pertanyaan. */
+.chip-tanya{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 0 10px}
+/* Layar sambutan - dipakai selama obrolannya BENER-BENER masih kosong (baru sapaan Mang AI).
+   Sebelumnya layar ini isinya cuma satu gelembung sapaan nempel di pojok kiri atas terus bolong
+   sampai ke bawah - kelihatan kayak aplikasinya lagi nggak ngapa-ngapain, bukan kayak lagi nunggu
+   ditanya. Sekarang isinya ditaruh di tengah sebagai satu blok kenalan + contoh pertanyaan, jadi
+   ruang kosongnya jadi bagian dari tata letaknya. Begitu ada pesan pertama, blok ini ilang dan
+   balik ke tampilan chat biasa (header di atas, gelembung numpuk dari atas). */
+.sambutan{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:10px 4px 16px}
+.sambutan>img{width:88px;height:88px;object-fit:contain}
+.sambutan h2{font-family:var(--f-head),sans-serif;font-size:26px;font-weight:800;margin:10px 0 0}
+.sambutan .p-sub{margin:6px 0 0;max-width:290px}
+/* Di sini chip-nya DIBIKIN TURUN KE BAWAH (wrap) & di tengah, bukan barisan yang digeser samping
+   kayak versi di atas kotak ketik - lagi ada ruang lega, jadi semua contohnya bisa kelihatan
+   sekaligus tanpa ada yang kepotong di pinggir. */
+.sambutan .chip-tanya{flex-wrap:wrap;justify-content:center;overflow:visible;margin-top:20px;padding:0}
+.chip-tanya::-webkit-scrollbar{display:none}
+.chip-tanya button{flex:none;border:var(--tepi);background:var(--surface);color:var(--ink);font:inherit;font-size:14px;
+  font-weight:600;padding:11px 15px;border-radius:999px;cursor:pointer;min-height:42px;white-space:nowrap;
+  box-shadow:0 4px 12px -8px rgba(20,20,25,.4)}
+.chip-tanya button:active{transform:scale(.97)}
+.chip-tanya button:disabled{opacity:.5}
+
+/* Pesan beruntun dari pengirim yang SAMA didempetin (12px -> 4px) dan sudut "ekor"-nya
+   diluruskan, jadi kebaca sebagai satu giliran ngomong - bukan bubble-bubble lepas yang
+   jaraknya sama semua. */
+.bubble.rapat{margin-top:4px}
+.bubble.bot.rapat{border-top-left-radius:10px}
+.bubble.me.rapat{border-top-right-radius:10px}
+
 /* form */
 .field{margin-top:14px}
 .field label{display:block;font-size:var(--small);font-weight:700;color:var(--abu);margin-bottom:8px}
@@ -436,6 +500,15 @@ body{font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased
   cursor:pointer;border:var(--tepi);text-align:left;width:100%;font:inherit;color:var(--ink)}
 .hasil:active{opacity:.6}
 .mirip{margin-left:auto;font-size:14px;font-weight:800;color:var(--abu)}
+/* Pilihan harga jual dari "Cari referensi" (lihat opsiHargaJual di backend) - 3 baris: Murah /
+   Normal / Untung tebal. Yang tengah dikasih tanda, soalnya itu harga pasaran - patokan paling
+   aman buat yang bingung, bukan berarti dua sisanya salah. */
+.opsi-harga{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.opsi-harga .hasil{margin-top:0;align-items:flex-start}
+.opsi-harga .hasil.utama{background:var(--surface);box-shadow:inset 0 0 0 2px var(--aksen)}
+.opsi-harga .nominal{margin-left:auto;flex:none;text-align:right}
+.opsi-harga .nominal b{display:block;font-size:17px;font-family:var(--f-head),sans-serif}
+.opsi-harga .nominal span{display:block;font-size:13px;font-weight:700;color:var(--abu);margin-top:2px}
 
 /* login penjaga */
 .login{position:absolute;inset:0;background:var(--bg);z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:34px}

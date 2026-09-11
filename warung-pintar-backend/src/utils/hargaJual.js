@@ -45,10 +45,13 @@ export function opsiHargaJual(modal, pasaran) {
   // nampilin DUA pilihan yang jujur daripada tiga yang satunya bikin warung rugi.
   if (m && murah < lantai) murah = normal;
 
+  // Keterangan tiap pilihan sengaja dipendekin (2-3 kata): di HP 360px, kartunya ngebagi baris
+  // sama nominal harga di sebelah kanan - kalimat panjang bikin kartunya jadi 3 baris & nominalnya
+  // kedesek, padahal nominal itu yang paling dicari mata.
   const kandidat = [
-    { id: 'murah', label: 'Murah', sub: 'Laku cepat, saingin warung sebelah', harga: murah },
+    { id: 'murah', label: 'Murah', sub: 'Biar laku cepat', harga: murah },
     { id: 'normal', label: 'Normal', sub: 'Ikut harga pasaran', harga: normal },
-    { id: 'tebal', label: 'Untung tebal', sub: 'Buat barang yang nggak ada di warung lain', harga: tebal },
+    { id: 'tebal', label: 'Untung tebal', sub: 'Kalau nggak ada saingan', harga: tebal },
   ];
 
   return kandidat

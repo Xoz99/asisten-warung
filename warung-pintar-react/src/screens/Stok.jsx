@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { ProductIcon, CameraIcon } from '../lib/icons.jsx';
 import { kritisQ, hppRata } from '../lib/voice';
-import { rupiah, escapeHtml } from '../lib/format';
+import { rupiah, escapeHtml, angkaRingkas } from '../lib/format';
 import { MARGIN_REKOMENDASI, hargaDariMargin } from '../lib/harga';
 import { api } from '../lib/api';
 import { bukaKamera, tutupKamera, jepretFrame, keWebp } from '../lib/kamera';
@@ -40,7 +40,7 @@ function BarisProduk({ p, onTap }) {
           <div>
             <div className="nama">{p.nama}</div>
             <div className="tgl">
-              {rupiah(p.harga)} · laku {p.laku}/hari ·{' '}
+              {rupiah(p.harga)} · laku {angkaRingkas(p.laku)}/hari ·{' '}
               <span className="ic-inline">
                 <svg viewBox="0 0 24 24">
                   <rect x="5.5" y="11" width="13" height="9" rx="2.5" />
@@ -366,6 +366,20 @@ function SheetBarcode({ mode, onClose, onKelola }) {
   const [carianReferensi, setCarianReferensi] = useState('');
   const [hasilReferensi, setHasilReferensi] = useState(null); // null = belum dicari, [] = dicari tapi kosong
   const [cariReferensiLoading, setCariReferensiLoading] = useState(false);
+  // Barang yang BARUSAN dipilih dari hasil "Cari referensi" tapi harganya belum dipilih - lihat
+  // alur 3 pilihan harga di bawah. null = lagi nampilin daftar hasil biasa.
+  const [refTerpilih, setRefTerpilih] = useState(null);
+  const opsiHargaRef = useRef(null);
+
+  // Sheet "barang belum terdaftar" itu panjang (foto barang segede layar di atas), jadi 3 pilihan
+  // harga yang baru muncul itu posisinya di BAWAH lipatan - kalau nggak digeser sendiri, dari
+  // sudut pandang user tap-nya kayak nggak ngefek apa-apa: daftar hasilnya ilang, ganti sesuatu
+  // yang nggak kelihatan.
+  useEffect(() => {
+    if (refTerpilih && opsiHargaRef.current) {
+      opsiHargaRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [refTerpilih]);
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -701,28 +715,36 @@ function SheetBarcode({ mode, onClose, onKelola }) {
     try {
       const hasil = await api.produk.cariReferensi(q);
       setHasilReferensi(hasil);
+      setRefTerpilih(null);
       if (!hasil.length) toast('AI nggak kenal produk ini - isi manual aja di bawah');
     } catch (e) {
       tanganiErrorAi(e);
       setHasilReferensi([]);
+      setRefTerpilih(null);
     } finally {
       setCariReferensiLoading(false);
     }
   };
 
-  const pakaiReferensi = (r) => {
+  // `hargaPilihan` = angka yang dipilih user dari 3 opsi (murah/normal/untung tebal). Kalau nggak
+  // dikasih, balik ke perilaku lama: pakai perkiraan harga pasaran dari AI.
+  const pakaiReferensi = (r, hargaPilihan) => {
     setNamaBaru(r.nama);
     setSatuanBaru(r.satuan);
     setIsiKemasanBaru(r.isiKemasan);
     if (r.namaKemasan) setNamaKemasanBaru(r.namaKemasan);
-    setHargaBaru(r.hargaPerkiraan);
+    setHargaBaru(hargaPilihan ?? r.hargaPerkiraan);
     // modal (HPP/harga beli) SENGAJA nggak ikut diisiin - itu tergantung dapetnya dari agen/grosir
-    // mana, AI nggak bisa nebak itu, user yang lebih tau harga belinya sendiri.
+    // mana, AI nggak bisa nebak itu, user yang lebih tau harga belinya sendiri. Perkiraan modal
+    // dari AI cuma DIPAKAI BUAT NGITUNG 3 opsi harga di atas & ditampilin sebagai ancer-ancer,
+    // nggak pernah masuk ke kolom Modal - kalau masuk, angka tebakan itu bakal kebawa ke laporan
+    // untung seolah-olah itu harga beli beneran.
     if (!grupBaru.trim()) {
       const saran = grupOtomatis(r.nama, S.produk);
       if (saran) setGrupBaru(saran);
     }
     setHasilReferensi(null);
+    setRefTerpilih(null);
     toast('Form keisi dari saran AI - cek lagi & sesuaikan sebelum simpan ya, ini cuma perkiraan');
   };
 
@@ -1011,23 +1033,87 @@ function SheetBarcode({ mode, onClose, onKelola }) {
                   {cariReferensiLoading ? 'Nyari…' : 'Cari'}
                 </button>
               </div>
-              {hasilReferensi?.length > 0 && (
-                <div style={{ marginTop: 10 }}>
-                  <p className="p-sub" style={{ marginBottom: 8 }}>
-                    Perkiraan AI, bukan harga pasti - tap buat isi form, tetap dicek dulu ya:
+              {/* Langkah 2: barangnya udah dipilih, tinggal MAU DIJUAL BERAPA. Dulu tap hasil
+                  langsung ngisi form pakai satu angka tebakan AI - dan itu yang bikin harganya
+                  sering kejauhan: satu angka nggak bisa bener buat semua warung sekaligus (di
+                  perumahan beda sama di pasar, sebelahan sama Indomaret beda sama yang sendirian
+                  di gang). Sekarang patokannya harga PASARAN, terus dikasih 3 pilihan di sekitar
+                  situ - pemiliknya yang paling tau warungnya diapit siapa. Untungnya cuma
+                  ancer-ancer (modal dari tebakan AI, bukan harga beli asli), makanya ditulis
+                  "kira-kira". */}
+              {refTerpilih ? (
+                <div style={{ marginTop: 10 }} ref={opsiHargaRef}>
+                  <p className="p-sub" style={{ marginBottom: 2 }}>
+                    <b style={{ color: 'var(--ink)' }}>{refTerpilih.nama}</b> - mau dijual berapa?
                   </p>
-                  {hasilReferensi.map((r, i) => (
-                    <button key={i} type="button" className="hasil" style={{ marginTop: 6 }} onClick={() => pakaiReferensi(r)}>
-                      <div>
-                        <div className="nama">{r.nama}</div>
-                        <div className="tgl">
-                          {rupiah(r.hargaPerkiraan)}/{r.satuan}
-                          {r.isiKemasan > 1 ? ` · isi ${r.isiKemasan} ${r.namaKemasan || ''}` : ''}
+                  {refTerpilih.hargaModal > 0 && (
+                    <p className="p-sub" style={{ marginBottom: 0, fontSize: 13 }}>
+                      Kira-kira kulakannya {rupiah(refTerpilih.hargaModal)}, warung lain jual sekitar{' '}
+                      {rupiah(refTerpilih.hargaPasaran)}.
+                    </p>
+                  )}
+                  <div className="opsi-harga">
+                    {refTerpilih.opsiHarga.map((o) => (
+                      <button
+                        key={o.id}
+                        type="button"
+                        className={'hasil' + (o.id === 'normal' ? ' utama' : '')}
+                        onClick={() => pakaiReferensi(refTerpilih, o.harga)}
+                      >
+                        <div style={{ minWidth: 0 }}>
+                          <div className="nama">{o.label}</div>
+                          <div className="tgl">{o.sub}</div>
                         </div>
-                      </div>
-                    </button>
-                  ))}
+                        <div className="nominal">
+                          <b>{rupiah(o.harga)}</b>
+                          {o.untung != null && (
+                            <span>
+                              untung ~{rupiah(o.untung)}
+                              {o.persen != null ? ` (${o.persen}%)` : ''}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn kecil"
+                    style={{ marginTop: 10 }}
+                    onClick={() => setRefTerpilih(null)}
+                  >
+                    Balik ke daftar
+                  </button>
                 </div>
+              ) : (
+                hasilReferensi?.length > 0 && (
+                  <div style={{ marginTop: 10 }}>
+                    <p className="p-sub" style={{ marginBottom: 8 }}>
+                      Perkiraan AI, bukan harga pasti - tap buat isi form, tetap dicek dulu ya:
+                    </p>
+                    {hasilReferensi.map((r, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        className="hasil"
+                        style={{ marginTop: 6 }}
+                        // Kalau opsi harganya nggak kekirim (AI-nya nggak yakin harga pasarannya,
+                        // atau marginnya kelewat tipis sampai cuma nyisa 1 pilihan), langsung isi
+                        // form pakai perkiraan - jangan nampilin layar "pilih harga" yang isinya
+                        // cuma satu tombol.
+                        onClick={() => (r.opsiHarga?.length > 1 ? setRefTerpilih(r) : pakaiReferensi(r))}
+                      >
+                        <div>
+                          <div className="nama">{r.nama}</div>
+                          <div className="tgl">
+                            {rupiah(r.hargaPerkiraan)}/{r.satuan}
+                            {r.isiKemasan > 1 ? ` · isi ${r.isiKemasan} ${r.namaKemasan || ''}` : ''}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )
               )}
             </div>
 

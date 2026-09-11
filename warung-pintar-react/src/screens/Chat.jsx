@@ -6,6 +6,7 @@ import { hargaDariMargin, modalDariHarga, MARGIN_DEFAULT } from '../lib/harga';
 import { Sheet } from '../components/SharedSheets.jsx';
 import { CameraIcon, Ikon } from '../lib/icons.jsx';
 import { bukaKamera, tutupKamera, jepretFrame, keWebp } from '../lib/kamera';
+import { pesanIzinMikrofon } from '../lib/mic';
 import mangWarungImg from '../assets/mangwarung.webp';
 
 // Balasan Gemini kadang ngandung markdown ringan (**tebal**, baris baru buat paragraf) - di-escape
@@ -36,6 +37,19 @@ let idCounter = 0;
 const idBaru = () => `${Date.now()}-${idCounter++}`;
 
 const SAPAAN_AWAL = () => ({ id: idBaru(), who: 'bot', html: 'Pagi. Ada yang mau ditanya soal warung?' });
+
+// Contoh pertanyaan yang muncul sebagai chip di atas kotak ketik selama obrolannya masih baru
+// (lihat .chip-tanya di index.css buat alasan penempatannya). Urutannya disengaja: 2 pertanyaan
+// dulu (paling gampang dipercaya buat coba-coba pertama), baru 2 PERINTAH CATAT - soalnya yang
+// terakhir ini justru fitur yang paling nggak ketebak: nggak ada di layar mana pun kalau nggak
+// dicontohin, orang nyangkanya Mang AI cuma bisa jawab-jawab doang.
+const CONTOH_TANYA = [
+  'Untung hari ini berapa?',
+  'Stok apa yang mau habis?',
+  'Barang paling laris apa?',
+  'Catat penjualan hari ini 900rb',
+  'Catat modal belanja 250rb',
+];
 
 // Ketik salah satu dari ini (persis, nggak perlu embel-embel) buat bersihin riwayat obrolan Mang AI
 // - ditangani LOKAL di client (lihat tanya() di TanyaAI), nggak lewat API sama sekali.
@@ -151,6 +165,103 @@ function TanyaAI() {
   const logRef = useRef(null);
   const inputFotoRef = useRef(null);
 
+  // --- Dikte suara di kotak ketik ------------------------------------------------------------
+  // SENGAJA jauh lebih sederhana dari mic "Sebut barang" di Catat.jsx (sheet + gelombang suara +
+  // parse nama barang & jumlah): di sini hasil dengarnya CUMA jadi teks di kotak ketik, belum
+  // kekirim - user masih bisa baca ulang & koreksi dulu. Alasannya beda taruhan: salah dengar di
+  // Catat langsung nambahin barang ke keranjang pas ada pembeli nunggu, salah dengar di sini
+  // paling cuma salah ketik yang keliatan jelas sebelum tap kirim.
+  const [dengar, setDengar] = useState(false);
+  const recRef = useRef(null);
+  const dasarRef = useRef(''); // teks yang UDAH ada di kotak ketik pas mic dinyalain
+  const finalRef = useRef(''); // potongan hasil dengar yang udah final (bukan tebakan sementara)
+
+  const matikanDikte = () => {
+    const r = recRef.current;
+    recRef.current = null;
+    setDengar(false);
+    if (!r) return;
+    // .stop() dulu (minta berhenti baik-baik, browser sempet beresin sesi audionya) baru .abort()
+    // (paksa putus) - sama alasannya kayak matikanMic() di Catat.jsx: di sebagian Android, .abort()
+    // doang kadang nggak langsung ngelepas indikator mic.
+    try {
+      r.stop();
+    } catch {
+      /* abaikan */
+    }
+    try {
+      r.abort();
+    } catch {
+      /* abaikan */
+    }
+  };
+
+  // Mic dilepas kalau komponennya dilepas (pindah tab ke Komunitas / pindah menu) - tanpa ini,
+  // sesi speech-nya bisa nyangkut jalan terus padahal layarnya udah nggak keliatan.
+  useEffect(() => () => matikanDikte(), []);
+
+  // rec.start() WAJIB dipanggil LANGSUNG di dalam handler klik ini, bukan belakangan di useEffect -
+  // Chrome Android bisa diam-diam gagal minta izin mic TANPA nge-trigger onerror kalau start()-nya
+  // di luar "user gesture" asli. Persis pelajaran yang udah kena sekali di bukaVoice() (Catat.jsx).
+  const toggleDikte = () => {
+    if (dengar) {
+      matikanDikte();
+      return;
+    }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      toast('Browser ini belum bisa dikte suara. Ketik aja ya.');
+      return;
+    }
+    matikanDikte(); // beresin sesi nyangkut kalau ada, biar start() nggak ditolak
+    const rec = new SR();
+    rec.lang = 'id-ID';
+    rec.continuous = false;
+    // interimResults ON (beda dari Catat.jsx yang cuma ambil hasil final): di sini teksnya nongol
+    // di kotak ketik selagi ngomong, jadi kelihatan kalau salah dengar SEBELUM selesai - nggak
+    // nunggu diem dulu baru tau hasilnya ngawur.
+    rec.interimResults = true;
+    rec.maxAlternatives = 1;
+    dasarRef.current = draf ? draf.trimEnd() + ' ' : '';
+    finalRef.current = '';
+    rec.onresult = (e) => {
+      let sementara = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) finalRef.current += t;
+        else sementara += t;
+      }
+      setDraf((dasarRef.current + finalRef.current + sementara).replace(/\s+/g, ' ').trimStart());
+    };
+    rec.onerror = (ev) => {
+      if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+        toast(pesanIzinMikrofon('dikte suara'));
+      } else if (ev.error === 'no-speech') {
+        toast('Nggak kedengeran suaranya. Coba lagi, atau ketik aja.');
+      } else if (ev.error === 'audio-capture') {
+        toast('Mikrofonnya nggak kebaca. Cek HP-nya ya.');
+      } else if (ev.error === 'network') {
+        toast('Dikte suara butuh internet. Ketik dulu aja ya.');
+      } else if (ev.error !== 'aborted') {
+        toast('Dikte suara lagi nggak jalan. Ketik aja dulu ya.');
+      }
+      matikanDikte();
+    };
+    // onend kepanggil juga pas berhenti wajar (user diem sejenak) - bukan cuma pas dimatiin manual.
+    rec.onend = () => {
+      recRef.current = null;
+      setDengar(false);
+    };
+    try {
+      rec.start();
+    } catch {
+      toast('Lagi proses sesi sebelumnya, coba lagi sebentar.');
+      return;
+    }
+    recRef.current = rec;
+    setDengar(true);
+  };
+
   // Simpen ulang tiap kali log berubah (pesan baru masuk/dihapus) - cuma N pesan terakhir yang
   // disimpen (lihat CHAT_LOG_MAKS), riwayat lama nggak sepenting itu buat disimpen selamanya.
   useEffect(() => {
@@ -182,6 +293,7 @@ function TanyaAI() {
   const tanya = async (teks) => {
     const q = teks.trim();
     if ((!q && !fotoTerlampir) || typing) return;
+    matikanDikte(); // pesannya udah kekirim - jangan biarin mic nyala nempel ke pesan berikutnya
     // Perintah reset - dicek LOKAL doang (nggak manggil API sama sekali, langsung bersihin log &
     // localStorage-nya ikut ke-overwrite lewat efek penyimpan di atas), biar instan & gratis. Match
     // EXACT (bukan .includes()) - biar pertanyaan asli yang KEBETULAN ngandung kata ini di tengah
@@ -310,23 +422,56 @@ function TanyaAI() {
     setLog((l) => l.map((b) => (b.id === id ? { ...b, status: 'batal' } : b)));
   };
 
+  // Obrolannya belum jalan sama sekali (cuma sapaan bawaan, belum ada satu pun pesan user).
+  // Bedain dari "log kosong" karena SAPAAN_AWAL selalu ada isinya sejak awal.
+  const baruMulai = log.length <= 1 && !typing;
+
   return (
     <>
-      <div className="head">
-        {/* background dibikin transparent (bukan warna .ava bawaan) - gambarnya sendiri udah
-            transparan, jadi biar nggak ada "kotak"/lingkaran warna nongol di belakang karakternya */}
-        <div className="ava" style={{ background: 'transparent', borderRadius: '50%' }}>
-          <img src={mangWarungImg} alt="Mang Warung" />
+      {/* Header ringkas cuma dipakai kalau obrolannya UDAH jalan - pas masih kosong, kenalannya
+          dipegang blok sambutan di tengah (lihat .sambutan), biar nggak ada dua avatar Mang
+          Warung nongol bareng di satu layar. */}
+      {!baruMulai && (
+        <div className="head">
+          {/* background dibikin transparent (bukan warna .ava bawaan) - gambarnya sendiri udah
+              transparan, jadi biar nggak ada "kotak"/lingkaran warna nongol di belakang karakternya */}
+          <div className="ava" style={{ background: 'transparent', borderRadius: '50%' }}>
+            <img src={mangWarungImg} alt="Mang Warung" />
+          </div>
+          <div>
+            <p className="p-h1">Mang Warung</p>
+            <p className="p-sub">Tanya apa aja soal warung</p>
+          </div>
         </div>
-        <div>
-          <p className="p-h1">Mang Warung</p>
-          <p className="p-sub">Tanya apa aja soal warung</p>
-        </div>
-      </div>
+      )}
 
       <div className="chat-log" ref={logRef}>
-        {log.map((b) => {
-          const kelas = 'bubble ' + (b.who === 'me' ? 'me' : 'bot');
+        {baruMulai && (
+          <div className="sambutan">
+            <img src={mangWarungImg} alt="" />
+            <h2>Mang Warung</h2>
+            <p className="p-sub">
+              Tanya soal untung, stok, atau kasbon warungmu. Bisa juga nyuruh nyatat - ketik atau
+              tap tombol mic di bawah.
+            </p>
+            <div className="chip-tanya">
+              {CONTOH_TANYA.map((t) => (
+                <button key={t} type="button" onClick={() => tanya(t)}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {!baruMulai &&
+          log.map((b, i) => {
+          // Pesan beruntun dari pengirim yang sama didempetin jadi satu "giliran ngomong" (lihat
+          // .bubble.rapat di index.css). Kartu aksi/nota dikecualiin - itu kartu lebar berdiri
+          // sendiri, bukan gelembung omongan, jadi tetap dapet jarak penuh.
+          const kartu = (x) => x.type === 'aksi' || x.type === 'nota-hasil';
+          const sblm = log[i - 1];
+          const rapat = sblm && sblm.who === b.who && !kartu(sblm) && !kartu(b);
+          const kelas = 'bubble ' + (b.who === 'me' ? 'me' : 'bot') + (rapat ? ' rapat' : '');
           if (b.type === 'foto') {
             return (
               <div key={b.id} className={kelas + ' bubble-foto'}>
@@ -386,8 +531,16 @@ function TanyaAI() {
             </button>
           </div>
         )}
+        {/* Lagi ndengerin - dikasih keterangan teks, bukan cuma tombolnya yang merah. Mic nyala
+            tanpa penjelasan itu bikin was-was, apalagi HP-nya lagi ditaruh di meja warung. */}
+        {dengar && (
+          <div className="dengar-nota">
+            <i /> Lagi dengerin... ngomong aja ya
+          </div>
+        )}
+
         <form
-          className="tanya"
+          className="tanya tanya--ai"
           onSubmit={(e) => {
             e.preventDefault();
             tanya(draf);
@@ -400,27 +553,47 @@ function TanyaAI() {
               tetep jalur/alur masing-masing di belakangnya, cuma pintu masuknya disatuin. */}
           <button
             type="button"
-            className="mic"
-            style={{ marginLeft: 0 }}
+            className="tanya-samping"
             onClick={() => setFotoMenuOpen(true)}
             disabled={typing}
             aria-label="Kirim foto"
           >
-            <CameraIcon style={{ width: 22, height: 22, marginRight: 0, verticalAlign: 'middle' }} />
+            <CameraIcon style={{ width: 21, height: 21, marginRight: 0, verticalAlign: 'middle' }} />
           </button>
           <input ref={inputFotoRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={pilihFotoLampiran} />
           <input
             type="text"
-            placeholder="Tulis pertanyaan…"
+            placeholder={dengar ? 'Lagi dengerin...' : 'Tulis atau sebut…'}
             value={draf}
             onChange={(e) => setDraf(e.target.value)}
             disabled={typing}
           />
-          <button type="submit" className="mic" disabled={(!draf.trim() && !fotoTerlampir) || typing} aria-label="Kirim pertanyaan">
-            <svg viewBox="0 0 24 24">
-              <path d="M12 19V5M5 12l7-7 7 7" />
-            </svg>
-          </button>
+          {/* Satu tempat, dua tombol gantian - BUKAN mic & kirim berdiri bareng. Di layar 360px
+              tiga tombol sekaligus (kamera + mic + kirim) bikin kotak ketiknya tinggal sejumput,
+              dan dua-duanya nggak pernah kepake barengan: belum ngetik = belum ada yang bisa
+              dikirim, udah ngetik = mic-nya bakal numpuk di atas teks yang udah ada. Jadi mic
+              nongol pas kosong, dan langsung ganti jadi kirim begitu ada isinya (termasuk kalau
+              isinya cuma foto lampiran, tanpa teks). */}
+          {draf.trim() || fotoTerlampir ? (
+            <button type="submit" className="mic" disabled={typing} aria-label="Kirim pertanyaan">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 19V5M5 12l7-7 7 7" />
+              </svg>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={'mic' + (dengar ? ' dengar' : '')}
+              onClick={toggleDikte}
+              disabled={typing}
+              aria-label={dengar ? 'Berhenti dengerin' : 'Sebut pertanyaan'}
+            >
+              <svg viewBox="0 0 24 24">
+                <rect x="9" y="3" width="6" height="11" rx="3" />
+                <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3" />
+              </svg>
+            </button>
+          )}
         </form>
       </div>
 

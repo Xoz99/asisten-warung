@@ -9,6 +9,12 @@ export const escapeHtml = (s) =>
 
 export const rupiah = (n) => 'Rp ' + Math.round(n).toLocaleString('id-ID');
 
+// Angka pecahan buat ditampilin ke user - dibuletin ke 1 angka di belakang koma, dan koma-nya
+// dibuang kalau emang bulat. Dipakai buat "laku x/hari", yang aslinya hasil bagi (misal 50 kg
+// kejual dalam 15 hari = 3.3333333333333335) - kalau dicetak apa adanya, yang kebaca pemilik
+// warung deretan angka panjang yang nggak ada gunanya sama sekali.
+export const angkaRingkas = (n) => (Math.round((+n || 0) * 10) / 10).toLocaleString('id-ID');
+
 export const singkat = (n) =>
   n >= 1000000 ? (n / 1000000).toFixed(2).replace('.', ',') + 'jt' : Math.round(n / 1000) + 'rb';
 
