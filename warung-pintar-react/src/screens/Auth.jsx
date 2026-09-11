@@ -85,7 +85,7 @@ export default function Auth() {
 
       {planUrl && (
         <p className="p-sub" style={{ marginTop: 8, color: 'var(--ink)', fontWeight: 700 }}>
-          Paket dipilih: {{ bulanan: 'Bulanan', triwulan: '3 Bulan', tahunan: 'Tahunan', permanen: 'Permanen' }[planUrl] || planUrl} — lanjut ke pembayaran setelah ini
+          Paket dipilih: {{ bulanan: 'Bulanan', triwulan: '3 Bulan', tahunan: 'Tahunan', permanen: 'Permanen' }[planUrl] || planUrl} - lanjut ke pembayaran setelah ini
         </p>
       )}
 

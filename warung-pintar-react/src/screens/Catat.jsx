@@ -192,7 +192,7 @@ export default function Catat() {
       const laba = items.reduce((a, { id, qty }) => a + produkById[id].untung * qty, 0);
       const pembeli = pelangganTerpilih ? pelangganTerpilih.nama : null;
       dispatch({ type: 'SELESAI_BAYAR', items, total: totalCart, laba, metode, pembeli, pembeliId: pelangganTerpilih?.id });
-      setStrukData({ waktu: new Date().toISOString(), total: totalCart, items: itemsTxt(items), pembeli, metode, oleh: S.penjagaAktif || '—' });
+      setStrukData({ waktu: new Date().toISOString(), total: totalCart, items: itemsTxt(items), pembeli, metode, oleh: S.penjagaAktif || '-' });
       kosongkanCart();
       setPelangganTerpilih(null);
     });
@@ -204,7 +204,7 @@ export default function Catat() {
   const prosesKasbon = (namaPembeli, pelangganId) => {
     const items = itemsFromCart();
     dispatch({ type: 'CATAT_KASBON', items, total: totalCart, pembeli: namaPembeli, pembeliId: pelangganId });
-    openOk('Kasbon dicatat', `${rupiah(totalCart)} atas nama <b>${escapeHtml(namaPembeli)}</b>. Dicatat oleh ${escapeHtml(S.penjagaAktif) || '—'}.`);
+    openOk('Kasbon dicatat', `${rupiah(totalCart)} atas nama <b>${escapeHtml(namaPembeli)}</b>. Dicatat oleh ${escapeHtml(S.penjagaAktif) || '-'}.`);
     kosongkanCart();
     setPelangganTerpilih(null);
     setSiapaOpen(false);
@@ -306,7 +306,7 @@ export default function Catat() {
             </div>
             <p className="t" style={{ marginTop: 8 }}>
               {terkumpul >= target ? (
-                <>Target {rupiah(target)} tercapai — lebih {rupiah(terkumpul - target)}</>
+                <>Target {rupiah(target)} tercapai - lebih {rupiah(terkumpul - target)}</>
               ) : (
                 <>Kurang {rupiah(target - terkumpul)} dari target {rupiah(target)}</>
               )}
@@ -488,7 +488,7 @@ function SheetCariManual({ onClose }) {
                   <ProductIcon id={row.items[0].id} foto={row.items[0].foto} />
                   <div>
                     <div className="nama">{row.grup}</div>
-                    <div className="tgl">{row.items.length} varian — pilih ukuran/jenisnya</div>
+                    <div className="tgl">{row.items.length} varian - pilih ukuran/jenisnya</div>
                   </div>
                   <span className="mirip">{grupTerbuka === row.grup ? '▲' : '▼'}</span>
                 </button>
@@ -678,7 +678,7 @@ function SheetVoice({ rec, onClose }) {
         if (hasilAi.length) {
           hasilAi.forEach(({ produk, qty }) => tambah(produk.id, qty, true));
           const tambahan = hasilAi.reduce((a, { produk, qty }) => a + produk.harga * qty, 0);
-          toast(`${hasilAi.length} jenis barang (dibantu AI) — <b>${rupiah(totalCart + tambahan)}</b>`);
+          toast(`${hasilAi.length} jenis barang (dibantu AI) - <b>${rupiah(totalCart + tambahan)}</b>`);
           return tutupManual();
         }
       } catch {
@@ -694,7 +694,7 @@ function SheetVoice({ rec, onClose }) {
     pasti.forEach((h) => tambah(h.p.id, h.q, true));
     if (pasti.length) {
       const tambahan = pasti.reduce((a, h) => a + h.p.harga * h.q, 0);
-      toast(`${pasti.length} jenis barang masuk — <b>${rupiah(totalCart + tambahan)}</b>`);
+      toast(`${pasti.length} jenis barang masuk - <b>${rupiah(totalCart + tambahan)}</b>`);
     }
     if (ambigu.length) {
       setAntrianAmbigu(ambigu);
@@ -734,7 +734,7 @@ function SheetVoice({ rec, onClose }) {
             </button>
             {diIOS && (
               <p style={{ fontSize: 12, opacity: 0.6, textAlign: 'center', marginTop: 10 }}>
-                Titik oranye di pojok atas kadang tetap nyala sesaat setelah ini ditutup — itu
+                Titik oranye di pojok atas kadang tetap nyala sesaat setelah ini ditutup - itu
                 batasan Safari/iOS ngelepas mic, bukan aplikasi ini yang diam-diam masih merekam.
               </p>
             )}
@@ -743,7 +743,7 @@ function SheetVoice({ rec, onClose }) {
         {step === 'tidak-didukung' && (
           <>
             <h3>Browser ini belum dukung dengar suara</h3>
-            <p>Fitur ini pakai Web Speech API — coba pakai Chrome/Edge, atau ketik manual dulu ya.</p>
+            <p>Fitur ini pakai Web Speech API - coba pakai Chrome/Edge, atau ketik manual dulu ya.</p>
             <button className="btn utama" style={{ width: '100%', marginTop: 16 }} onClick={tutupManual}>
               Tutup
             </button>
@@ -774,7 +774,7 @@ function SheetVoice({ rec, onClose }) {
           <div style={{ textAlign: 'left' }}>
             <h3 style={{ textAlign: 'center' }}>{antrianAmbigu[0].grup} yang mana?</h3>
             <p style={{ textAlign: 'center' }}>
-              Nggak nyebut ukuran/variannya — pilih salah satu ({antrianAmbigu[0].q}×)
+              Nggak nyebut ukuran/variannya - pilih salah satu ({antrianAmbigu[0].q}×)
             </p>
             {antrianAmbigu[0].kandidat.map((p) => (
               <button key={p.id} className="hasil" style={{ marginTop: 10 }} onClick={() => pilihVarian(p)}>
@@ -841,7 +841,7 @@ function SheetVisual({ onClose }) {
       // 404 (barang belum terdaftar) ATAU error jaringan/server — dua-duanya sama-sama JANGAN
       // nginterupsi kasir yang lagi transaksi (beda konteks sama menu Stok yang emang niatnya
       // ngedaftarin barang baru). Kasih tau doang & lanjut scan lagi.
-      toast(e.status === 404 ? 'Barcode ini belum terdaftar — daftarin dulu lewat menu Stok' : e.message ? escapeHtml(e.message) : 'Gagal mencari barang dari barcode');
+      toast(e.status === 404 ? 'Barcode ini belum terdaftar - daftarin dulu lewat menu Stok' : e.message ? escapeHtml(e.message) : 'Gagal mencari barang dari barcode');
       if (!matiRef.current) mulaiBarcode();
     }
   };
@@ -912,7 +912,7 @@ function SheetVisual({ onClose }) {
       const fotoKirim = await keWebp(fotoAsli, 1024);
       const hasilBanyakBaru = await api.scan.visualAiBanyak(fotoKirim);
       if (!hasilBanyakBaru.length) {
-        toast('AI nggak nemu barang yang yakin dikenali — coba foto ulang lebih jelas, atau satu-satu aja');
+        toast('AI nggak nemu barang yang yakin dikenali - coba foto ulang lebih jelas, atau satu-satu aja');
         setStatus('siap');
         if (!matiRef.current) mulaiBarcode();
         return;
@@ -933,7 +933,7 @@ function SheetVisual({ onClose }) {
     // 1 toast rangkuman di akhir aja cukup.
     hasilBanyak.forEach(({ produk, qty }) => tambah(produk.id, qty, true));
     const total = hasilBanyak.reduce((a, { produk, qty }) => a + produk.harga * qty, 0);
-    toast(`${hasilBanyak.length} barang ditambahin — total <b>${rupiah(total)}</b>`);
+    toast(`${hasilBanyak.length} barang ditambahin - total <b>${rupiah(total)}</b>`);
     onClose();
   };
 
@@ -958,7 +958,7 @@ function SheetVisual({ onClose }) {
       <div className="panel">
         <div className={'viewfinder' + (sedangLive ? '' : ' diam')}>
           <div className="frame" />
-          {/* video TETAP dimount biar stream & loop scan barcode-nya gak pernah putus — kalau
+          {/* video TETAP dimount biar stream & loop scan barcode-nya gak pernah putus - kalau
               di-unmount lalu status balik ke 'siap', elemen <video> baru yang ke-mount gak
               ke-reattach ke stream & loop-nya ikut mati diam-diam. Disembunyiin doang lewat CSS
               pas lagi nampilin hasil/foto. */}
@@ -994,7 +994,7 @@ function SheetVisual({ onClose }) {
         {status === 'siap' && (
           <>
             <h3 style={{ textAlign: 'center' }}>Arahkan ke barangnya</h3>
-            <p style={{ textAlign: 'center' }}>Ada barcode-nya kebaca otomatis — kalau nggak ada/nggak kebaca, tahan sebentar biar jelas terus tap tombol di bawah</p>
+            <p style={{ textAlign: 'center' }}>Ada barcode-nya kebaca otomatis - kalau nggak ada/nggak kebaca, tahan sebentar biar jelas terus tap tombol di bawah</p>
           </>
         )}
         {status === 'memindai' && (
@@ -1042,7 +1042,7 @@ function SheetVisual({ onClose }) {
                       <ProductIcon id={row.items[0].produk.id} foto={row.items[0].produk.fotoUrl} />
                       <div>
                         <div className="nama">{row.grup}</div>
-                        <div className="tgl">{row.items.length} varian mirip — pilih ukuran/jenisnya</div>
+                        <div className="tgl">{row.items.length} varian mirip - pilih ukuran/jenisnya</div>
                       </div>
                       <span className="mirip">{grupTerbuka === row.grup ? '▲' : '▼'}</span>
                     </button>
@@ -1071,7 +1071,7 @@ function SheetVisual({ onClose }) {
         {status === 'hasil-banyak' && (
           <>
             <h3 style={{ textAlign: 'center' }}>{hasilBanyak.length} barang dikenali AI</h3>
-            <p style={{ textAlign: 'center' }}>Cek dulu — hapus yang salah/nggak sesuai, baru tambahin semua ke keranjang</p>
+            <p style={{ textAlign: 'center' }}>Cek dulu - hapus yang salah/nggak sesuai, baru tambahin semua ke keranjang</p>
             <div>
               {hasilBanyak.map(({ produk, qty }) => (
                 <div key={produk.id} className="hasil" style={{ cursor: 'default' }}>
@@ -1256,7 +1256,7 @@ function SheetWajah({ onClose, onTambahBaru }) {
         {state === 'tidak-ketemu' && (
           <>
             <h3>Wajah belum dikenali</h3>
-            <p>Belum ketemu yang cocok — bisa jadi belum terdaftar, atau fotonya belum kedaftar wajahnya.</p>
+            <p>Belum ketemu yang cocok - bisa jadi belum terdaftar, atau fotonya belum kedaftar wajahnya.</p>
             <button className="btn" style={{ width: '100%', marginTop: 10 }} onClick={onTambahBaru}>
               + Tambahkan pelanggan baru
             </button>
@@ -1433,7 +1433,7 @@ function SheetSiapaKasbon({ onClose, onPilih }) {
             </label>
             {!foto && (
               <p className="p-sub" style={{ textAlign: 'center', marginTop: 6, fontSize: 13 }}>
-                Boleh dilewati — kasbonnya tetap kecatat, cuma kenal wajah nggak jalan buat orang ini.
+                Boleh dilewati - kasbonnya tetap kecatat, cuma kenal wajah nggak jalan buat orang ini.
               </p>
             )}
             {statusWajah === 'mengecek' && (
@@ -1448,7 +1448,7 @@ function SheetSiapaKasbon({ onClose, onPilih }) {
             )}
             {statusWajah === 'gagal' && (
               <p className="p-sub" style={{ textAlign: 'center', marginTop: 6, color: '#e5484d', fontWeight: 700 }}>
-                ⚠ Wajah nggak kedeteksi — coba foto ulang, atau lanjut tanpa foto
+                ⚠ Wajah nggak kedeteksi - coba foto ulang, atau lanjut tanpa foto
               </p>
             )}
           </>
@@ -1482,7 +1482,7 @@ function SheetTarget({ awal, onSimpan, onClose }) {
         <p>
           Target jualan buat hari ini. Dipakai buat nyocokin isi laci sama barang yang kejual, dan
           ikut kegambar di grafik Laporan biar kelihatan hari mana yang kekejar dan mana yang nggak.
-          Tersimpan otomatis — nggak ilang walau aplikasinya ditutup.
+          Tersimpan otomatis - nggak ilang walau aplikasinya ditutup.
         </p>
         <div className="field">
           <label>Target (Rp)</label>

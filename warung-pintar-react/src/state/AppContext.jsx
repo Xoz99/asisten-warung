@@ -135,7 +135,7 @@ function normTransaksi(r) {
     total: Number(r.total),
     laba: Number(r.laba),
     mode: r.mode,
-    oleh: r.penjaga_nama || '—',
+    oleh: r.penjaga_nama || '-',
     pembeli: r.pembeli_nama || null,
     items: (r.items || []).map((it) => `${it.qty}x ${it.nama_produk}`),
   };
@@ -181,7 +181,7 @@ const AppCtx = createContext(null);
 export function AppProvider({ children }) {
   const [prefs, setPrefs] = useState(muatPrefs);
   const [S, setS] = useState(dataKosong);
-  const [penjagaRows, setPenjagaRows] = useState([]); // {id,nama,aktif} dari backend — buat cari id dari nama
+  const [penjagaRows, setPenjagaRows] = useState([]); // {id,nama,aktif} dari backend - buat cari id dari nama
 
   const [authWarung, setAuthWarung] = useState(sesi.warung);
   const [authLoading, setAuthLoading] = useState(!!sesi.token());
@@ -551,7 +551,7 @@ export function AppProvider({ children }) {
         const next = { ...c, [id]: sudah + q };
         if (!diam) {
           const total = Object.entries(next).reduce((a, [pid, n]) => a + produkById[pid].harga * n, 0);
-          toast(`${q}× ${escapeHtml(p.nama)} — total <b>${rupiahCepat(total)}</b>`);
+          toast(`${q}× ${escapeHtml(p.nama)} - total <b>${rupiahCepat(total)}</b>`);
         }
         return next;
       });
@@ -657,7 +657,7 @@ export function AppProvider({ children }) {
                 return it ? { ...p, stok: p.stok - it.qty } : p;
               }),
               transaksi: [
-                { waktu: waktuIso, total, laba, mode: isKasbon ? 'kasbon' : 'bayar', oleh: s.penjagaAktif || '—', pembeli: action.pembeli || null, items: itemsTeks },
+                { waktu: waktuIso, total, laba, mode: isKasbon ? 'kasbon' : 'bayar', oleh: s.penjagaAktif || '-', pembeli: action.pembeli || null, items: itemsTeks },
                 ...s.transaksi,
               ],
               untung: s.untung + tambahUntung,
@@ -692,7 +692,7 @@ export function AppProvider({ children }) {
             } catch (e) {
               if (e.status === undefined) {
                 // offline murni - biarin di outbox, retry otomatis lewat listener 'online'
-                toast('Tersimpan lokal — disinkron otomatis begitu online');
+                toast('Tersimpan lokal - disinkron otomatis begitu online');
                 return;
               }
               // HTTP error beneran (bukan soal koneksi) - transaksinya nggak jadi diproses server,
@@ -774,7 +774,7 @@ export function AppProvider({ children }) {
             return;
         }
       } catch (e) {
-        toast(e.message ? escapeHtml(e.message) : 'Gagal menyimpan perubahan — coba lagi');
+        toast(e.message ? escapeHtml(e.message) : 'Gagal menyimpan perubahan - coba lagi');
       }
     },
     [S.penjagaAktif, penjagaRows, refreshData, toast, produkById]

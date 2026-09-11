@@ -20,7 +20,7 @@ export async function bukaKamera(facingMode = 'environment') {
     } catch (e) {
       errTerakhir = e;
       if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
-        throw new Error('Akses kamera ditolak — izinkan dulu lewat pengaturan browser');
+        throw new Error('Akses kamera ditolak - izinkan dulu lewat pengaturan browser');
       }
       if (e.name === 'NotFoundError') {
         throw new Error('Kamera tidak ditemukan di perangkat ini');

@@ -241,7 +241,7 @@ body{font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased
    .screen di atas (sudah termasuk env(safe-area-inset-bottom) buat HP ber-notch). Tapi Mang AI beda
    kebutuhan: chat butuh kotak input nempel FIXED di bawah layar, jadi tetap pakai panel tinggi-penuh
    + scroll internal sendiri (chat-log scroll sendiri, .chat-tail nempel di bawah) lewat
-   .chat-page--ai — header tetap di atas, log scroll sendiri, input nempel di bawah, konsisten di
+   .chat-page--ai - header tetap di atas, log scroll sendiri, input nempel di bawah, konsisten di
    mobile & desktop. (Bug ketutup yang sempat kejadian di sini bukan dari pola panelnya, tapi dari
    target scroll-otomatis yang salah - sudah dibenerin di useEffect TanyaAI, lihat Chat.jsx.) */
 .vp:has(.chat-page--ai){overflow:hidden}
@@ -391,7 +391,7 @@ body{font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased
 .viewfinder::after{content:"";position:absolute;left:10%;right:10%;height:3px;background:var(--aksen);top:12%;
   box-shadow:0 0 24px var(--aksen);animation:scan 1.3s ease-in-out infinite alternate}
 @keyframes scan{to{top:86%}}
-.viewfinder.diam::after{content:none} /* udah selesai motret/nemu hasil — garis animasi scan-nya dimatiin */
+.viewfinder.diam::after{content:none} /* udah selesai motret/nemu hasil - garis animasi scan-nya dimatiin */
 .viewfinder .frame{position:absolute;inset:16%;border:3px solid rgba(255,255,255,.35);border-radius:20px}
 .viewfinder .isi{position:absolute;inset:0;display:grid;place-items:center;color:#fff}
 .viewfinder .isi svg{width:72px;height:72px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
@@ -421,7 +421,7 @@ body{font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased
 .wave i:nth-child(6){animation-delay:.5s}.wave i:nth-child(7){animation-delay:.15s}
 @keyframes w{to{height:30px}}
 /* pas SpeechRecognition beneran deteksi ada suara (onspeechstart), batangnya "membesar" lewat
-   transform+opacity yang di-transition — animasi height di atas (keyframe w) TETAP jalan terus
+   transform+opacity yang di-transition - animasi height di atas (keyframe w) TETAP jalan terus
    tanpa pernah diganti nama/durasinya, soalnya ganti animation-name/duration bikin animasinya
    restart dari awal (kelihatan nyentak/patah tiap kali toggle). Transform ini cuma numpang di
    atas animasi yang jalan, jadi transisinya mulus. */

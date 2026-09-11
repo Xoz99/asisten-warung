@@ -153,7 +153,7 @@ export default function Lainnya() {
                 jelas, bukan cuma strip, karena tanpa nomor mereka nggak punya jalan pulih sama
                 sekali kalau lupa sandi (nggak ada CS yang bisa reset manual). */}
             <span style={authWarung?.noHp ? undefined : { color: '#e5484d' }}>
-              {authWarung?.noHp ? tampilNoHp(authWarung.noHp) : 'Belum diisi — isi sekarang biar bisa pulih kalau lupa sandi'}
+              {authWarung?.noHp ? tampilNoHp(authWarung.noHp) : 'Belum diisi - isi sekarang biar bisa pulih kalau lupa sandi'}
             </span>
           </span>
           <span className="ar">›</span>
@@ -196,7 +196,7 @@ export default function Lainnya() {
           </span>
           <span className="tx">
             <b>Ganti penjaga</b>
-            <span>Sedang jaga: {S.penjagaAktif || '—'}</span>
+            <span>Sedang jaga: {S.penjagaAktif || '-'}</span>
           </span>
           <span className="ar">›</span>
         </button>
@@ -381,10 +381,10 @@ function SectionLangganan() {
           {planAktif && <p className="opnhint" style={{ marginTop: 12 }}>{planAktif.sub}</p>}
 
           <button className="btn utama" style={{ width: '100%', marginTop: 10 }} onClick={bayar} disabled={loading || !planAktif}>
-            {loading ? 'Membuka pembayaran…' : planAktif ? `Lanjut bayar — ${rupiah(planAktif.harga)}` : 'Memuat paket…'}
+            {loading ? 'Membuka pembayaran…' : planAktif ? `Lanjut bayar - ${rupiah(planAktif.harga)}` : 'Memuat paket…'}
           </button>
           <p className="opnhint" style={{ marginTop: 10, textAlign: 'center' }}>
-            Pembayaran lewat QRIS. Langganan nggak otomatis diperpanjang — kamu yang atur sendiri
+            Pembayaran lewat QRIS. Langganan nggak otomatis diperpanjang - kamu yang atur sendiri
             kapan mau lanjut.
           </p>
         </div>
@@ -796,7 +796,7 @@ function SheetCaraPasang({ iOS, onClose }) {
         {iOS ? (
           <>
             <p>
-              Di iPhone, pemasangan harus lewat menu Safari — Apple nggak ngizinin aplikasi
+              Di iPhone, pemasangan harus lewat menu Safari - Apple nggak ngizinin aplikasi
               memunculkan tombolnya sendiri. Caranya:
             </p>
             <div className="menu" style={{ marginTop: 12 }}>
@@ -839,7 +839,7 @@ function SheetCaraPasang({ iOS, onClose }) {
               </div>
             </div>
             <p className="opnhint" style={{ marginTop: 12 }}>
-              Kalau kamu buka dari dalam WhatsApp atau Instagram, menunya nggak lengkap — buka
+              Kalau kamu buka dari dalam WhatsApp atau Instagram, menunya nggak lengkap - buka
               dulu di Chrome.
             </p>
           </>

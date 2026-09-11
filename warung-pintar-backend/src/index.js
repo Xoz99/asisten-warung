@@ -134,6 +134,6 @@ cekKonsistensiPlan();
 app.listen(PORT, () => {
   console.log(`Warung Pintar API jalan di http://localhost:${PORT}`);
   if (!process.env.DATABASE_URL) {
-    console.warn('⚠️  DATABASE_URL belum diisi di .env — endpoint yang butuh database akan gagal sampai ini diisi.');
+    console.warn('⚠️  DATABASE_URL belum diisi di .env - endpoint yang butuh database akan gagal sampai ini diisi.');
   }
 });

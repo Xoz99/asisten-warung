@@ -351,7 +351,7 @@ function SheetBarcode({ mode, onClose, onKelola }) {
 
   const [barcodeBaru, setBarcodeBaru] = useState('');
   const [kodeManual, setKodeManual] = useState('');
-  const [refFotos, setRefFotos] = useState([]); // [{sudut, embedding, foto}] — bisa lebih dari 1
+  const [refFotos, setRefFotos] = useState([]); // [{sudut, embedding, foto}] - bisa lebih dari 1
   const [fotoJepretan, setFotoJepretan] = useState(null);
   const [namaBaru, setNamaBaru] = useState('');
   const [hargaBaru, setHargaBaru] = useState(0);
@@ -370,7 +370,7 @@ function SheetBarcode({ mode, onClose, onKelola }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const controlsRef = useRef(null);
-  const matiRef = useRef(false); // true kalau sheet ini udah ditutup/unmount — dicek loop biar gak terus jalan setelah itu
+  const matiRef = useRef(false); // true kalau sheet ini udah ditutup/unmount - dicek loop biar gak terus jalan setelah itu
   const fotoAsliRef = useRef(null); // foto res-penuh dari jepretan visual terakhir - dipakai lagi kalau nyoba cadangan AI
   const embeddingRef = useRef(null); // embedding MobileNet dari jepretan visual terakhir
 
@@ -513,7 +513,7 @@ function SheetBarcode({ mode, onClose, onKelola }) {
         setKandidat(cocok);
         setStep('pilih');
       } else {
-        toast('AI juga nggak nemu yang cocok — kayaknya emang barang baru');
+        toast('AI juga nggak nemu yang cocok - kayaknya emang barang baru');
         setStep('tidak-ketemu-visual');
       }
     } catch (e) {
@@ -624,7 +624,7 @@ function SheetBarcode({ mode, onClose, onKelola }) {
     try {
       const { kode } = await api.scan.barcodeAi(fotoAsliRef.current);
       if (kode) return handleBarcode(kode);
-      toast('AI juga nggak nemu angka yang jelas — coba isi manual aja');
+      toast('AI juga nggak nemu angka yang jelas - coba isi manual aja');
       setStep('barcode-gagal');
     } catch (e) {
       tanganiErrorAi(e);
@@ -756,7 +756,7 @@ function SheetBarcode({ mode, onClose, onKelola }) {
   return (
     <div className="sheet tengah show">
       <div className="panel mid">
-        {/* video TETAP dimount pas mode barcode lagi 'memindai' (proses jepret manual) — kalau
+        {/* video TETAP dimount pas mode barcode lagi 'memindai' (proses jepret manual) - kalau
             di-unmount lalu step balik ke 'scan', React bikin elemen <video> BARU yang srcObject-nya
             gak pernah di-reattach (efek buka-kamera cuma jalan sekali pas mount awal), hasilnya
             video jadi blank hitam permanen begitu balik ke scan. Video hidden aja kalau lagi
@@ -801,7 +801,7 @@ function SheetBarcode({ mode, onClose, onKelola }) {
         {step === 'scan' && (
           <>
             <h3>{mode === 'foto' ? 'Arahkan ke barangnya' : 'Memindai barcode…'}</h3>
-            <p>{mode === 'foto' ? 'Tahan sebentar biar jelas, terus tap tombol di bawah' : 'Arahkan kamera ke barcode — biasanya kebaca otomatis, tapi kalau lama, tahan anteng lalu tap "Jepret & pindai"'}</p>
+            <p>{mode === 'foto' ? 'Tahan sebentar biar jelas, terus tap tombol di bawah' : 'Arahkan kamera ke barcode - biasanya kebaca otomatis, tapi kalau lama, tahan anteng lalu tap "Jepret & pindai"'}</p>
             {mode === 'barcode' && (
               <div style={{ textAlign: 'left', marginTop: 16 }}>
                 <div className="field">
@@ -888,7 +888,7 @@ function SheetBarcode({ mode, onClose, onKelola }) {
               ))}
             </div>
             <button className="btn" style={{ width: '100%', marginTop: 10 }} onClick={daftarkanBarangBaru}>
-              Bukan barang ini — daftarkan baru
+              Bukan barang ini - daftarkan baru
             </button>
           </>
         )}
@@ -1034,7 +1034,7 @@ function SheetBarcode({ mode, onClose, onKelola }) {
             {mode === 'foto' && (
               <div className="field">
                 <label>
-                  Foto referensi ({refFotos.length}/{MAKS_SUDUT}) — makin banyak sudut, makin gampang dikenali nanti
+                  Foto referensi ({refFotos.length}/{MAKS_SUDUT}) - makin banyak sudut, makin gampang dikenali nanti
                 </label>
                 <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
                   {refFotos.map((r, i) => (
@@ -1096,7 +1096,7 @@ function SheetBarcode({ mode, onClose, onKelola }) {
               />
             </div>
             <div className="field" style={{ position: 'relative' }}>
-              <label>Grup varian (opsional — CUMA nama merek, TANPA ukuran, misal "Aqua" bukan "Aqua 600ml")</label>
+              <label>Grup varian (opsional - CUMA nama merek, TANPA ukuran, misal "Aqua" bukan "Aqua 600ml")</label>
               <input
                 value={grupBaru}
                 onChange={(e) => setGrupBaru(e.target.value)}
@@ -1137,7 +1137,7 @@ function SheetBarcode({ mode, onClose, onKelola }) {
               <input value={satuanBaru} onChange={(e) => setSatuanBaru(e.target.value)} placeholder="pcs / botol / butir / bungkus" />
             </div>
             <div className="field">
-              <label>Isi per kemasan besar (opsional — misal 1 dus isi berapa pcs)</label>
+              <label>Isi per kemasan besar (opsional - misal 1 dus isi berapa pcs)</label>
               <input type="number" inputMode="numeric" min="1" value={isiKemasanBaru} onChange={(e) => setIsiKemasanBaru(e.target.value)} />
             </div>
             {+isiKemasanBaru > 1 && (
@@ -1306,7 +1306,7 @@ function SheetOpname({ produk, onClose }) {
   const pctBaru = hargaNum ? Math.round((untungBaru / hargaNum) * 100) : 0;
   let nada = 'Margin tipis, coba naikkan sedikit.';
   if (pctBaru >= 25 && pctBaru < 45) nada = 'Margin sehat untuk warung.';
-  else if (pctBaru >= 45) nada = 'Margin tinggi — pastikan tidak kemahalan dari warung sebelah.';
+  else if (pctBaru >= 45) nada = 'Margin tinggi - pastikan tidak kemahalan dari warung sebelah.';
   const margeHtml = hargaNum ? `Untung <b>${rupiah(untungBaru)}</b> per buah (<b>${pctBaru}%</b>). ${nada}` : 'Isi harga jualnya.';
 
   const fisikNum = parseInt(fisik, 10);
@@ -1316,7 +1316,7 @@ function SheetOpname({ produk, onClose }) {
       ? 'Isi jumlah nyata di rak kalau mau dicocokkan.'
       : selisih === 0
         ? 'Cocok dengan catatan ✓'
-        : `Selisih <b>${selisih > 0 ? '+' : ''}${selisih} buah</b> dari catatan (${produk.stok} buah) — nilai ${rupiah(Math.abs(selisih) * produk.modal)}.`;
+        : `Selisih <b>${selisih > 0 ? '+' : ''}${selisih} buah</b> dari catatan (${produk.stok} buah) - nilai ${rupiah(Math.abs(selisih) * produk.modal)}.`;
 
   const reko = MARGIN_REKOMENDASI.map((m) => ({ m, h: hargaDariMargin(produk.modal, m) }));
 
@@ -1393,7 +1393,7 @@ function SheetOpname({ produk, onClose }) {
           {[
             ['Nilai stok (modal)', rupiah(produk.stok * produk.modal)],
             ['Potensi omzet', rupiah(produk.stok * produk.harga)],
-            ['Perkiraan habis', habis === null ? '—' : `${habis} hari`],
+            ['Perkiraan habis', habis === null ? '-' : `${habis} hari`],
           ].map(([k, v]) => (
             <div key={k}>
               <div className="k">{k}</div>
@@ -1454,12 +1454,12 @@ function SheetOpname({ produk, onClose }) {
 
         <div className="field">
           <label>
-            Foto referensi visual ({refLoading ? '…' : refList.length}) — dipakai scan AI buat kenalin barang ini, BEDA
+            Foto referensi visual ({refLoading ? '…' : refList.length}) - dipakai scan AI buat kenalin barang ini, BEDA
             dari foto tampilan di atas
           </label>
           {!refLoading && refList.length === 0 && (
             <p className="opnhint" style={{ color: '#e5484d' }}>
-              Belum ada foto referensi — barang ini nggak akan ke-detect di scan barang (non-AI) sampai ditambahin
+              Belum ada foto referensi - barang ini nggak akan ke-detect di scan barang (non-AI) sampai ditambahin
               minimal 1 foto.
             </p>
           )}
@@ -1511,7 +1511,7 @@ function SheetOpname({ produk, onClose }) {
         </div>
 
         <div className="field" style={{ position: 'relative' }}>
-          <label>Grup varian (opsional — CUMA nama merek, TANPA ukuran, misal "Aqua" bukan "Aqua 600ml")</label>
+          <label>Grup varian (opsional - CUMA nama merek, TANPA ukuran, misal "Aqua" bukan "Aqua 600ml")</label>
           <input
             value={grup}
             onChange={(e) => setGrup(e.target.value)}

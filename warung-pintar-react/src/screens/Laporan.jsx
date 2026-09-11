@@ -552,7 +552,7 @@ export default function Laporan() {
         {S.ngendap.length === 0 && <div className="kosong">Tidak ada barang yang ngendap</div>}
         {S.ngendap.map((p) => (
           <div className="item" key={p.id}>
-            <div className="rk dim">—</div>
+            <div className="rk dim">-</div>
             <div>
               <div className="nama">{p.nama}</div>
               <div className="tgl">{p.terakhirLaku ? `Laku terakhir ${tglID(p.terakhirLaku)}` : 'Belum pernah laku'}</div>

@@ -56,7 +56,7 @@ const BASE_URL = isProd ? 'https://app.midtrans.com' : 'https://app.sandbox.midt
 function authHeader() {
   const serverKey = process.env.MIDTRANS_SERVER_KEY;
   if (!serverKey) {
-    throw Object.assign(new Error('MIDTRANS_SERVER_KEY belum diisi di .env — minta Server Key dari dashboard Midtrans dulu'), { status: 500 });
+    throw Object.assign(new Error('MIDTRANS_SERVER_KEY belum diisi di .env - minta Server Key dari dashboard Midtrans dulu'), { status: 500 });
   }
   return 'Basic ' + Buffer.from(serverKey + ':').toString('base64');
 }

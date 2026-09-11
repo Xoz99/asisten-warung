@@ -22,7 +22,7 @@ router.get('/prediksi-belanja', async (req, res, next) => {
 
     const rekomendasi = [];
     if (besok >= 60) {
-      rekomendasi.push({ kategori: 'mie instan', catatan: `Peluang hujan ${besok}% besok — penjualan mie instan biasanya naik` });
+      rekomendasi.push({ kategori: 'mie instan', catatan: `Peluang hujan ${besok}% besok - penjualan mie instan biasanya naik` });
       rekomendasi.push({ kategori: 'telur', catatan: 'Cenderung ikut naik bareng mie instan pas hujan' });
     }
     res.json({ cuaca: cuaca.daily, rekomendasi, catatan: 'Prediksi rule-based sederhana, bukan model ML terlatih' });

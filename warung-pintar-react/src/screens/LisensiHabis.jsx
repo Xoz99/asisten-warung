@@ -42,7 +42,7 @@ export default function LisensiHabis() {
       </div>
 
       <button className="btn utama" style={{ width: '100%', marginTop: 16 }} onClick={bayar} disabled={loading || !planAktif}>
-        {loading ? 'Membuka halaman pembayaran…' : planAktif ? `Lanjut bayar — ${rupiah(planAktif.harga)}` : 'Memuat paket…'}
+        {loading ? 'Membuka halaman pembayaran…' : planAktif ? `Lanjut bayar - ${rupiah(planAktif.harga)}` : 'Memuat paket…'}
       </button>
       <button className="btn kecil" style={{ marginTop: 10, width: '100%' }} onClick={logout}>
         Keluar akun

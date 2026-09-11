@@ -100,7 +100,7 @@ export default function PhoneShell() {
       <div className={`phone ${S.tema} sz-${S.ukuran || 'sedang'}`} style={{ '--brand': S.warna, '--f-body': fontFamily }}>
         <div className="login">
           <p className="p-h1">Perlu koneksi internet</p>
-          <p className="p-sub">Perangkat ini belum pernah tervalidasi — sambungkan ke internet dulu buat masuk pertama kali di sini.</p>
+          <p className="p-sub">Perangkat ini belum pernah tervalidasi - sambungkan ke internet dulu buat masuk pertama kali di sini.</p>
           <button className="btn utama" style={{ width: '100%', marginTop: 16 }} onClick={cobaLagiKoneksi}>
             Coba lagi
           </button>
@@ -253,7 +253,7 @@ function BadgeSync({ status, lastSyncAt, outboxCount, lisensiDicekPada }) {
   const lisensiBasi = lisensiDicekPada && Date.now() - lisensiDicekPada > JAM_24;
   if (status === 'online' && !outboxCount && !lisensiBasi) return null;
 
-  const teks = outboxCount > 0 ? `${outboxCount} transaksi menunggu dikirim` : status === 'offline' ? 'Offline — pakai data cache' : 'Menyinkronkan…';
+  const teks = outboxCount > 0 ? `${outboxCount} transaksi menunggu dikirim` : status === 'offline' ? 'Offline - pakai data cache' : 'Menyinkronkan…';
   const titleDasar =
     outboxCount > 0
       ? `${outboxCount} transaksi tersimpan lokal, dikirim otomatis begitu online`
@@ -264,7 +264,7 @@ function BadgeSync({ status, lastSyncAt, outboxCount, lisensiDicekPada }) {
   // (kalau lagi offline) atau tampil sendiri (kalau ternyata online tapi belum sempat re-cek)
   const title =
     lisensiBasi && lisensiDicekPada
-      ? `${titleDasar ? titleDasar + ' — ' : ''}Lisensi terakhir dicek ${waktuLalu(lisensiDicekPada)}`
+      ? `${titleDasar ? titleDasar + ' - ' : ''}Lisensi terakhir dicek ${waktuLalu(lisensiDicekPada)}`
       : titleDasar;
 
   return (

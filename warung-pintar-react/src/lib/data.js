@@ -92,7 +92,7 @@ export const UKURAN = [
 ];
 
 export const TEMA_CAPTION = {
-  't-mono': 'Terang. Data tersimpan di HP (localStorage) — tutup lalu buka lagi, isinya tetap.',
+  't-mono': 'Terang. Data tersimpan di HP (localStorage) - tutup lalu buka lagi, isinya tetap.',
   't-dark': 'Gelap. Nyaman dipakai subuh sebelum warung buka.',
 };
 

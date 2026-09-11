@@ -56,7 +56,7 @@ export default function SheetStruk({ data, onClose }) {
               <span>
                 {tglID(data.waktu)} {jamID(data.waktu)}
               </span>
-              <span>Kasir: {data.oleh || '—'}</span>
+              <span>Kasir: {data.oleh || '-'}</span>
             </div>
             <div className="meta">
               <span>No. {no}</span>

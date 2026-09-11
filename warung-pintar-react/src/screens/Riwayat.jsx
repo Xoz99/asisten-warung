@@ -43,8 +43,8 @@ export default function Riwayat() {
                 {rupiah(r.jual)} · {r.trx}×
               </div>
             </div>
-            <div className="tgl">Stok menipis: {r.habis.length ? r.habis.join(', ') : '—'}</div>
-            <div className="tgl">Utang baru: {r.utangBaru.length ? r.utangBaru.join(', ') : '—'}</div>
+            <div className="tgl">Stok menipis: {r.habis.length ? r.habis.join(', ') : '-'}</div>
+            <div className="tgl">Utang baru: {r.utangBaru.length ? r.utangBaru.join(', ') : '-'}</div>
           </div>
         );
       })}

@@ -169,9 +169,9 @@ function SheetPelangganForm() {
       const pelanggan = await api.pelanggan.tambah({ nama: n, wa: wa.trim(), fotoUrl: foto });
       if (descriptor) {
         await api.wajah.daftarkan(pelanggan.id, descriptor);
-        toast(`<b>${escapeHtml(n)}</b> terdaftar — wajahnya bisa dikenali otomatis`);
+        toast(`<b>${escapeHtml(n)}</b> terdaftar - wajahnya bisa dikenali otomatis`);
       } else if (foto) {
-        toast(`<b>${escapeHtml(n)}</b> terdaftar TANPA wajah (nggak kedeteksi) — foto ulang lewat menu Pelanggan nanti`);
+        toast(`<b>${escapeHtml(n)}</b> terdaftar TANPA wajah (nggak kedeteksi) - foto ulang lewat menu Pelanggan nanti`);
       } else {
         toast(`<b>${escapeHtml(n)}</b> terdaftar`);
       }
@@ -198,7 +198,7 @@ function SheetPelangganForm() {
       </label>
       {!foto && (
         <p className="p-sub" style={{ textAlign: 'center', marginTop: 6, fontSize: 13 }}>
-          Boleh dilewati — pelanggan (termasuk yang kasbon) tetap bisa dicatat tanpa foto, cuma
+          Boleh dilewati - pelanggan (termasuk yang kasbon) tetap bisa dicatat tanpa foto, cuma
           fitur kenal wajah otomatis nggak jalan buat orang ini.
         </p>
       )}
@@ -214,7 +214,7 @@ function SheetPelangganForm() {
       )}
       {statusWajah === 'gagal' && (
         <p className="p-sub" style={{ textAlign: 'center', marginTop: 8, color: '#e5484d', fontWeight: 700 }}>
-          ⚠ Wajah nggak kedeteksi — coba foto ulang lebih dekat &amp; terang, atau lanjut tanpa
+          ⚠ Wajah nggak kedeteksi - coba foto ulang lebih dekat &amp; terang, atau lanjut tanpa
           wajah (kenal wajah nggak akan jalan buat pelanggan ini)
         </p>
       )}

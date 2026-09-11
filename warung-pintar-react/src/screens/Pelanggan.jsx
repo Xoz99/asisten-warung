@@ -21,7 +21,7 @@ export default function Pelanggan() {
         <p className="p-h1" style={{ marginTop: 16 }}>
           Pelanggan
         </p>
-        <p className="p-sub">Catat pelanggan tetap — foto wajah sifatnya opsional, buat yang mau kenal wajah otomatis aja</p>
+        <p className="p-sub">Catat pelanggan tetap - foto wajah sifatnya opsional, buat yang mau kenal wajah otomatis aja</p>
       </div>
 
       <div className="card">
@@ -37,7 +37,7 @@ export default function Pelanggan() {
                   {!p.punyaWajah && (
                     <>
                       {' · '}
-                      {/* opsional — sengaja dibikin nggak nyolok/nge-warning kayak dulu, biar nggak
+                      {/* opsional - sengaja dibikin nggak nyolok/nge-warning kayak dulu, biar nggak
                           kerasa maksa (misal buat pelanggan yang lagi kasbon & nggak nyaman difoto) */}
                       <button
                         onClick={() => setDaftarWajahUntuk(p)}
@@ -115,7 +115,7 @@ function SheetDaftarWajah({ pelanggan, onClose }) {
     <div className="sheet show">
       <div className="panel">
         <h3>Daftarkan wajah {pelanggan.nama}</h3>
-        <p>Foto sebelumnya (kalau ada) nggak kedeteksi jelas — coba ambil ulang lebih dekat &amp; terang.</p>
+        <p>Foto sebelumnya (kalau ada) nggak kedeteksi jelas - coba ambil ulang lebih dekat &amp; terang.</p>
         <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
           <div className="ava" style={{ width: 110, height: 110, borderRadius: 34, fontSize: 34 }}>
             {foto ? <img src={foto} alt="" /> : <Ikon nama="orang" />}
@@ -137,7 +137,7 @@ function SheetDaftarWajah({ pelanggan, onClose }) {
         )}
         {status === 'gagal' && (
           <p className="p-sub" style={{ textAlign: 'center', marginTop: 8, color: '#e5484d', fontWeight: 700 }}>
-            ⚠ Masih nggak kedeteksi — coba lebih dekat, lebih terang, hadap langsung ke kamera
+            ⚠ Masih nggak kedeteksi - coba lebih dekat, lebih terang, hadap langsung ke kamera
           </p>
         )}
         <button className="btn utama" style={{ width: '100%', marginTop: 16 }} onClick={simpan} disabled={!descriptor || loading}>

@@ -551,7 +551,7 @@ function BubbleCatatModal({ data, onSelesai, onBatal }) {
             <label>Keterangan</label>
             <input value={keterangan} onChange={(e) => setKeterangan(e.target.value)} placeholder="Modal masuk" />
           </div>
-          <p className="opnhint">Dicatat sebagai modal masuk, bukan hasil jualan — jadi laporan untung tetap bersih.</p>
+          <p className="opnhint">Dicatat sebagai modal masuk, bukan hasil jualan - jadi laporan untung tetap bersih.</p>
           <div className="notabtn">
             <button className="btn" onClick={onBatal}>Batal</button>
             <button className="btn utama" onClick={setuju} disabled={loading}>
@@ -645,7 +645,7 @@ function BubbleBelanjaBanyak({ data, onSelesai, onBatal }) {
       {status === 'menunggu' ? (
         <>
           <p className="opnhint">
-            Harga & stok di bawah masih <b>perkiraan Mang AI</b>, bukan dari nota beneran — cek dulu sama harga
+            Harga & stok di bawah masih <b>perkiraan Mang AI</b>, bukan dari nota beneran - cek dulu sama harga
             kulakan kamu. Harga jual yang kosong diisi otomatis pakai <b>margin {MARGIN_DEFAULT}%</b>, sama kayak
             saran harga di detail stok. Lepas centang buat barang yang nggak jadi diambil.
           </p>
@@ -718,7 +718,7 @@ function BubbleTargetPenjualan({ data, onSelesai, onBatal }) {
     if (!Number.isFinite(n) || n <= 0) return toast('Jumlahnya harus lebih dari 0');
     setTargetSetoran(n);
     goTo('s-catat');
-    toast(`Target <b>${escapeHtml(rupiah(n))}</b> dipasang — ceklis barangnya sampai pas`);
+    toast(`Target <b>${escapeHtml(rupiah(n))}</b> dipasang - ceklis barangnya sampai pas`);
     onSelesai();
   };
 
@@ -733,7 +733,7 @@ function BubbleTargetPenjualan({ data, onSelesai, onBatal }) {
           </div>
           <p className="opnhint">
             Kamu bakal dibawa ke <b>Catat jualan</b> dengan target ini kepasang. Tinggal ceklis barang yang
-            kejual sampai totalnya pas — stok sama untungnya tetap kehitung bener.
+            kejual sampai totalnya pas - stok sama untungnya tetap kehitung bener.
           </p>
           <div className="notabtn">
             <button className="btn" onClick={onBatal}>Batal</button>
@@ -1063,7 +1063,7 @@ function Komunitas() {
   const [sukaMap, setSukaMap] = useState({}); // postId -> daftar nama warung yang suka (buat badge ala Facebook)
   const [draftKomentar, setDraftKomentar] = useState('');
   const [balasKe, setBalasKe] = useState(null); // komentar (bukan cuma id - butuh nama-nya buat "Membalas @...") yang lagi ditarget, null = komentar biasa langsung ke post
-  const [filter, setFilter] = useState('terbaru'); // terbaru | ramai | <nama topik> — cuma nyaring/ngurutin feed yang UDAH kemuat, bukan query baru ke server
+  const [filter, setFilter] = useState('terbaru'); // terbaru | ramai | <nama topik> - cuma nyaring/ngurutin feed yang UDAH kemuat, bukan query baru ke server
   const [topikPilih, setTopikPilih] = useState(TOPIK[0]); // topik yang dipilih buat postingan BARU
   const [komposerBuka, setKomposerBuka] = useState(false); // sheet "nanya ke komunitas" - kebuka pas tombol + dipencet
   const [confirmHapus, setConfirmHapus] = useState(null); // null | {tipe:'post', post} | {tipe:'komentar', postId, komentarId}

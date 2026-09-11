@@ -9,7 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 async function migrate() {
   const sql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf-8');
   await pool.query(sql);
-  console.log('Migrasi selesai — semua tabel sudah siap di database.');
+  console.log('Migrasi selesai - semua tabel sudah siap di database.');
   await pool.end();
 }
 

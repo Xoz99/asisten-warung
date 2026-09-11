@@ -8,7 +8,7 @@ export async function requireLisensiAktif(req, res, next) {
     const w = rows[0];
     if (!w) return res.status(401).json({ error: 'Akun tidak ditemukan' });
     if (new Date(w.lisensi_berlaku_sampai) < new Date()) {
-      return res.status(402).json({ error: 'Masa langganan sudah habis — perpanjang dulu ya', plan: w.plan, lisensiBerlakuSampai: w.lisensi_berlaku_sampai });
+      return res.status(402).json({ error: 'Masa langganan sudah habis - perpanjang dulu ya', plan: w.plan, lisensiBerlakuSampai: w.lisensi_berlaku_sampai });
     }
     next();
   } catch (e) {

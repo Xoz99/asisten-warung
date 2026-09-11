@@ -230,7 +230,7 @@ export default function Beranda() {
           kosong="Belum ada penjualan hari ini"
           rows={trxHariIni.map((t) => ({
             nama: t.items.length ? t.items.join(', ') : 'Penjualan',
-            sub: `${tglID(t.waktu)} · ${jamID(t.waktu)} · ${t.oleh || '—'}${t.mode === 'kasbon' ? ' · kasbon ' + (t.pembeli || '') : ''}`,
+            sub: `${tglID(t.waktu)} · ${jamID(t.waktu)} · ${t.oleh || '-'}${t.mode === 'kasbon' ? ' · kasbon ' + (t.pembeli || '') : ''}`,
             kanan: <span className="p-num">{rupiah(t.total)}</span>,
             onClick: () => {
               setDaftarOpen(null);
@@ -372,7 +372,7 @@ function SheetSerah({ onClose }) {
       <div className="panel">
         <h3>Serah terima jaga</h3>
         <p style={{ marginTop: 8 }}>
-          Giliran {S.penjagaAktif || '—'} ·{' '}
+          Giliran {S.penjagaAktif || '-'} ·{' '}
           {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}
         </p>
         <div className="field">
