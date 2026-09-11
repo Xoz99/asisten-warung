@@ -118,10 +118,18 @@ export default function Laporan() {
       setDragX(0); // batal - pegas balik ke tengah
       return;
     }
-    const kanan = delta < 0; // geser ke kiri (delta negatif) = maju, animasinya keluar ke kiri
+    const kanan = delta < 0; // geser ke kiri (delta negatif) = MAJU ke tampilan berikutnya
     setDragX(kanan ? -LEBAR_GESER : LEBAR_GESER); // nerusin keluar layar ke arah geser
     setTimeout(() => {
-      setHeroView((v) => URUT_HERO[(URUT_HERO.indexOf(v) + 1) % URUT_HERO.length]);
+      // Arah geser IKUT nentuin tampilan mana yang dituju - dulu selalu maju (+1) apa pun arahnya.
+      // Waktu tampilannya masih 2, maju & mundur kebetulan sama jadi nggak kerasa. Begitu jadi 3,
+      // geser ke kanan tetep maju: kartunya keluar ke kanan lalu konten barunya masuk dari kanan
+      // juga - gerakannya jadi patah, nggak nyambung sama jari.
+      setHeroView((v) => {
+        const i = URUT_HERO.indexOf(v);
+        const langkah = kanan ? 1 : -1;
+        return URUT_HERO[(i + langkah + URUT_HERO.length) % URUT_HERO.length];
+      });
       setTransisi(false);
       setDragX(kanan ? LEBAR_GESER : -LEBAR_GESER); // "teleport" ke sisi seberang, konten baru masuk dari situ
       requestAnimationFrame(() => {
@@ -287,6 +295,15 @@ export default function Laporan() {
             transition: transisi ? 'transform .22s cubic-bezier(.2,.9,.3,1)' : 'none',
           }}
         >
+        {/* key={heroView} MEMAKSA React bikin ulang isinya tiap ganti tampilan, bukan dipakai ulang.
+            Tanpa ini: struktur 'bar' & 'target' mirip (sama-sama .chart berisi .col > i), jadi React
+            nganggep node-nya sama dan cuma nge-update inline height-nya. Akibatnya CSS
+            `transition: height .7s` di .col i ikut jalan - batangnya pelan-pelan berubah bentuk
+            SELAMA kartunya lagi digeser (0,22 detik). Dua animasi tabrakan dengan durasi beda tiga
+            kali lipat, itu yang kerasa patah.
+            Dengan key, node lama dibuang & yang baru muncul langsung di tinggi finalnya - nggak ada
+            transisi height yang nyangkut, gesernya jadi satu gerakan bersih. */}
+        <div key={heroView}>
         {heroView === 'bar' ? (
           <>
             <p className="lbl">{chartLbl}</p>
@@ -443,8 +460,9 @@ export default function Laporan() {
           </>
         )}
         </div>
+        </div>
 
-        {/* Dot indikator 2 tampilan - tap juga bisa, nggak wajib geser */}
+        {/* Dot indikator tiap tampilan - tap juga bisa, nggak wajib geser */}
         <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 16 }}>
           {URUT_HERO.map((v) => (
             <button
