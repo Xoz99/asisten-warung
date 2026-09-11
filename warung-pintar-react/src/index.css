@@ -396,8 +396,14 @@ body{font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased
 .viewfinder .isi{position:absolute;inset:0;display:grid;place-items:center;color:#fff}
 .viewfinder .isi svg{width:72px;height:72px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 .viewfinder .isi img{width:100%;height:100%;object-fit:cover}
+/* z-index PALING ATAS (100) - toast wajib kelihatan di atas APA PUN.
+   Dulu 19, di BAWAH .sheet (20) & .login (40). Akibatnya pesan error justru ketutup persis di
+   saat paling dibutuhin: mayoritas kegagalan kejadian PAS sheet lagi kebuka (simpan barang, ganti
+   sandi, bayar) dan pas layar pilih penjaga (Login.jsx juga manggil toast). Pemilik warung cuma
+   liat aksinya "nggak ngapa-ngapain", padahal pesannya ada - cuma ketimbun.
+   pointer-events:none bikin dia nggak pernah ngalangin ketukan walau paling atas. */
 .toast{position:absolute;left:20px;right:20px;bottom:122px;background:var(--ink);color:var(--bg);border-radius:var(--r);padding:17px 20px;
-  font-size:16px;font-weight:600;z-index:19;opacity:0;transform:translateY(14px);transition:opacity .25s,transform .25s;pointer-events:none;border:var(--tepi)}
+  font-size:16px;font-weight:600;z-index:100;opacity:0;transform:translateY(14px);transition:opacity .25s,transform .25s;pointer-events:none;border:var(--tepi)}
 .t-dark .toast{background:var(--surface);color:var(--ink);border:1px solid var(--garis)}
 .toast.show{opacity:1;transform:none}
 .toast b{color:var(--aksen)}
