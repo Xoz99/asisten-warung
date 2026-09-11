@@ -72,14 +72,6 @@ export async function buatTransaksiSnap({ orderId, plan, jumlah, namaWarung, ema
     callbacks: { finish: `${appUrl}/?lisensi=selesai` },
   };
 
-  // Batasi metode bayar lewat MIDTRANS_METODE (dipisah koma, mis. "qris" atau "qris,gopay").
-  // Kalau kosong, Midtrans nampilin semua metode yang aktif di akun merchant - itu perilaku lama.
-  //
-  // Kenapa perlu dibatasi: MDR-nya beda jauh antar metode, dan di harga paket bulanan bedanya
-  // menentukan. QRIS motong 0,7% (Rp 350), tapi retail Indomaret motong Rp 5.000 flat - 10% dari
-  // harga paket bulanan. Tanpa pembatasan, margin Anda ditentukan pilihan pelanggan, bukan Anda.
-  const metode = (process.env.MIDTRANS_METODE || '').split(',').map((x) => x.trim()).filter(Boolean);
-  if (metode.length) body.enabled_payments = metode;
 
   let res;
   try {
