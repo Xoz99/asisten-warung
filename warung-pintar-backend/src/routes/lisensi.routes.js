@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { query } from '../db.js';
-import { buatTransaksiSnap, cekStatusTransaksi, HARGA_PLAN } from '../services/midtrans.service.js';
+import { buatTransaksiSnap, cekStatusTransaksi, HARGA_PLAN, KATALOG_PLAN } from '../services/midtrans.service.js';
 import { aktifkanPembayaran } from '../services/lisensi.service.js';
 import { JATAH_TOKEN_HARIAN } from '../services/aiQuota.service.js';
 
@@ -30,6 +30,17 @@ router.get('/status', async (req, res, next) => {
       plan: w.plan,
       berlakuSampai: w.lisensi_berlaku_sampai,
       aktif,
+      // Katalog paket ikut dikirim di sini (bukan endpoint terpisah) - frontend udah manggil
+      // /status buat nampilin status langganan, jadi daftar harganya nebeng sekalian. Satu
+      // request, dan yang lebih penting: harga di layar DIJAMIN sama sama yang ditagih Midtrans.
+      paket: KATALOG_PLAN.map((p) => ({
+        ...p,
+        harga: HARGA_PLAN[p.id],
+        // Padanan per bulan buat paket tahunan - angka ini yang bikin "hemat"-nya kelihatan nyata
+        // ("Rp 41.667/bulan" vs "Rp 50.000/bulan"), bukan cuma diklaim di teks.
+        perBulan: p.bulan ? Math.round(HARGA_PLAN[p.id] / p.bulan) : null,
+        jatahAi: JATAH_TOKEN_HARIAN[p.id] ?? JATAH_TOKEN_HARIAN.trial,
+      })),
       aiUsage: {
         // `terpakai` DI-CLAMP ke jatah buat ditampilin. Kenapa bisa lewat: jatah dicek SEBELUM
         // manggil AI (`terpakai < jatah`), sementara token yang kepake baru ketauan SESUDAH

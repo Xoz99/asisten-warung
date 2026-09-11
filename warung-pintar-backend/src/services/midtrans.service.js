@@ -63,6 +63,34 @@ function authHeader() {
 // Bikin transaksi Snap baru — balikin { token, redirectUrl } buat dibuka di browser/WebView pelanggan.
 const LABEL_PLAN = { bulanan: '1 Bulan', tahunan: '1 Tahun', permanen: 'Permanen (Seumur Hidup)' };
 
+// Katalog paket yang DITAMPILKAN ke pelanggan. Ditaruh di sini, sebelahan sama HARGA_PLAN, supaya
+// harga yang dipajang & harga yang ditagih Midtrans NGGAK MUNGKIN beda.
+//
+// Dulu daftar ini ditulis ulang di frontend sebagai teks ('Rp 490.000'). Begitu harga backend
+// dinaikin, yang di layar ketinggalan - pelanggan liat Rp 49.000 tapi ditagih Rp 50.000. Nggak ada
+// error, nggak ada yang ngeh, cuma pelanggan yang ngerasa dikadalin.
+export const KATALOG_PLAN = [
+  {
+    id: 'bulanan',
+    label: 'Bulanan',
+    sub: 'Cocok buat nyoba dulu',
+    bulan: 1,
+  },
+  {
+    id: 'tahunan',
+    label: 'Tahunan',
+    sub: 'Bayar setahun, hemat 2 bulan',
+    bulan: 12,
+    badge: 'PALING HEMAT',
+  },
+  {
+    id: 'permanen',
+    label: 'Permanen',
+    sub: 'Sekali bayar, seumur hidup — nggak perlu perpanjang lagi',
+    bulan: null, // nggak ada padanan per-bulan; jangan dibagi-bagi
+  },
+];
+
 export async function buatTransaksiSnap({ orderId, plan, jumlah, namaWarung, email }) {
   const appUrl = process.env.APP_BASE_URL || 'http://localhost:5173';
   const body = {

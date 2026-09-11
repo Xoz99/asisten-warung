@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { Ikon } from '../lib/icons.jsx';
 import { useApp } from '../state/AppContext.jsx';
 import { WARNA, FONTS, UKURAN } from '../lib/data';
-import { escapeHtml, tampilNoHp } from '../lib/format';
+import { escapeHtml, tampilNoHp, rupiah } from '../lib/format';
 import { api } from '../lib/api.js';
+import KartuPaket from '../components/KartuPaket.jsx';
 import mangWarungImg from '../assets/mangwarung.webp';
 
 export default function Lainnya() {
@@ -236,12 +237,17 @@ export default function Lainnya() {
 
 // Harga di sini cuma buat tampilan - sumber kebenarannya tetap di backend (HARGA_PLAN di
 // midtrans.service.js). Samain juga dengan daftar plan di LisensiHabis.jsx kalau harganya berubah.
-// `jatahAi` juga cuma tampilan - sumber kebenarannya JATAH_TOKEN_HARIAN di aiQuota.service.js
-// (backend) - SAMAIN keduanya kalau angka jatahnya diubah, biar nggak beda janji vs kenyataan.
-const PLAN_LANGGANAN = [
-  { id: 'bulanan', label: 'Bulanan', harga: 'Rp 49.000', sub: 'per bulan', jatahAi: 50_000 },
-  { id: 'tahunan', label: 'Tahunan', harga: 'Rp 490.000', sub: 'per tahun · hemat 2 bulan', jatahAi: 120_000 },
-  { id: 'permanen', label: 'Permanen', harga: 'Rp 3.620.000', sub: 'sekali bayar, seumur hidup - nggak perlu perpanjang lagi', jatahAi: 250_000 },
+// `jatahAi` juga cuma tampilan - sumber kebenarannya JATAH_TOKEN_HARIAN di aiQuota.service.js// Manfaat yang didapat kalau berlangganan. Ini murni teks jualan - beda dari daftar PAKET yang
+// sekarang datang dari BACKEND (lihat KATALOG_PLAN di midtrans.service.js). Harga sengaja nggak
+// ditulis di frontend lagi: dulu ditulis ulang sebagai teks ('Rp 490.000'), lalu harga backend
+// naik & yang di layar ketinggalan - pelanggan liat satu angka tapi ditagih angka lain.
+const MANFAAT = [
+  'Catat jualan pakai suara, barcode, & foto barang',
+  'Laporan untung rugi harian, mingguan, bulanan',
+  'Kasbon & kenal wajah pelanggan',
+  'Scan nota belanja jadi stok otomatis',
+  'Mang AI yang ngerti isi warung kamu',
+  'Satu akun dipakai bareng di beberapa HP',
 ];
 
 function SectionLangganan() {
@@ -254,7 +260,9 @@ function SectionLangganan() {
 
   const sisaHari = Math.max(0, Math.ceil((new Date(lisensi.berlakuSampai) - new Date()) / 86400000));
   const labelPlan = { trial: 'Masa coba gratis', bulanan: 'Bulanan', tahunan: 'Tahunan', permanen: 'Permanen' }[lisensi.plan] || lisensi.plan;
-  const planAktif = PLAN_LANGGANAN.find((p) => p.id === pilih);
+  // Paket datang dari backend (lisensi.paket) - satu sumber harga sama yang ditagih Midtrans.
+  const paket = lisensi.paket || [];
+  const planAktif = paket.find((p) => p.id === pilih) || paket[0];
   // paket permanen di-backend direpresentasiin "berlaku 100 tahun" - nampilin "36500 hari lagi"
   // apa adanya bakal aneh/nggak masuk akal buat user, tampilin "Aktif selamanya" aja
   const statusMasaAktif = lisensi.plan === 'permanen' ? 'Aktif selamanya' : sisaHari > 0 ? `${sisaHari} hari lagi` : 'Sudah habis';
@@ -330,28 +338,42 @@ function SectionLangganan() {
           transisi CSS-nya (grid-template-rows + fade) sempet jalan mulus - bukan lompat instan */}
       <div className={'geser-akordeon' + (buka ? ' buka' : '')}>
         <div>
-          {PLAN_LANGGANAN.map((p) => (
-            <button
-              key={p.id}
-              className="penjaga"
-              onClick={() => setPilih(p.id)}
-              style={pilih === p.id ? { boxShadow: 'inset 0 0 0 2px var(--brand)' } : undefined}
-            >
-              <div>
-                <b>{p.label}</b>
-                <span className="kecil">{p.sub}</span>
-                <span className="kecil" style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                  <img src={mangWarungImg} alt="" style={{ width: 14, height: 14, objectFit: 'contain', flex: 'none' }} />
-                  Jatah AI {p.jatahAi.toLocaleString('id-ID')} token/hari
+          {/* Daftar manfaat ditaruh DI ATAS harga - orang perlu tau dapat apa dulu sebelum liat
+              angkanya. Pola ini diambil dari layar langganan yang umum dipakai aplikasi lain, dan
+              alasannya masuk akal: kartu harga tanpa konteks cuma kelihatan mahal. */}
+          <div className="card" style={{ marginTop: 4 }}>
+            <p className="p-sub" style={{ margin: '0 0 12px', fontWeight: 700, color: 'var(--ink)' }}>
+              Yang kamu dapat
+            </p>
+            {MANFAAT.map((m) => (
+              <div key={m} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 9 }}>
+                <span
+                  style={{
+                    width: 20, height: 20, borderRadius: 7, flex: 'none', marginTop: 1,
+                    background: 'var(--brand)', color: '#0A0A0A',
+                    display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 800,
+                  }}
+                >
+                  ✓
                 </span>
+                <span style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.4 }}>{m}</span>
               </div>
-              <b style={{ marginLeft: 'auto' }}>{p.harga}</b>
-            </button>
-          ))}
+            ))}
+          </div>
 
-          <button className="btn utama" style={{ width: '100%', marginTop: 14 }} onClick={bayar} disabled={loading}>
-            {loading ? 'Membuka pembayaran…' : `Perpanjang ${planAktif.label.toLowerCase()} - ${planAktif.harga}`}
+          <div style={{ marginTop: 12 }}>
+            <KartuPaket paket={paket} pilih={pilih} onPilih={setPilih} />
+          </div>
+
+          {planAktif && <p className="opnhint" style={{ marginTop: 12 }}>{planAktif.sub}</p>}
+
+          <button className="btn utama" style={{ width: '100%', marginTop: 10 }} onClick={bayar} disabled={loading || !planAktif}>
+            {loading ? 'Membuka pembayaran…' : planAktif ? `Lanjut bayar — ${rupiah(planAktif.harga)}` : 'Memuat paket…'}
           </button>
+          <p className="opnhint" style={{ marginTop: 10, textAlign: 'center' }}>
+            Pembayaran lewat QRIS. Langganan nggak otomatis diperpanjang — kamu yang atur sendiri
+            kapan mau lanjut.
+          </p>
         </div>
       </div>
     </>
