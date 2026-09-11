@@ -39,6 +39,9 @@ router.get('/status', async (req, res, next) => {
         // Padanan per bulan buat paket tahunan - angka ini yang bikin "hemat"-nya kelihatan nyata
         // ("Rp 41.667/bulan" vs "Rp 50.000/bulan"), bukan cuma diklaim di teks.
         perBulan: p.bulan ? Math.round(HARGA_PLAN[p.id] / p.bulan) : null,
+        // Hemat dibanding bayar bulanan sebanyak durasinya. Dihitung DI SINI dari harga asli,
+        // bukan ditulis tangan - biar nggak mungkin meleset waktu harganya disetel ulang.
+        hemat: p.bulan && p.bulan > 1 ? HARGA_PLAN.bulanan * p.bulan - HARGA_PLAN[p.id] : 0,
         jatahAi: JATAH_TOKEN_HARIAN[p.id] ?? JATAH_TOKEN_HARIAN.trial,
       })),
       aiUsage: {

@@ -33,6 +33,7 @@ import { query } from '../db.js';
 export const JATAH_TOKEN_HARIAN = {
   trial: 15000,
   bulanan: 50000,
+  triwulan: 75000,
   tahunan: 120000,
   permanen: 250000,
 };

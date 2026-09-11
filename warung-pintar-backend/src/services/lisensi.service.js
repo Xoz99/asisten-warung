@@ -12,6 +12,7 @@ import { HARGA_PLAN, hitungBersih } from './midtrans.service.js';
 // GREATEST+interval yang sama, nggak perlu cabang query terpisah buat "nggak pernah expired".
 export const DURASI_HARI_PLAN = {
   bulanan: 30,
+  triwulan: 90,
   tahunan: 365,
   permanen: 36500,
 };

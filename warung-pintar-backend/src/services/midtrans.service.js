@@ -14,6 +14,7 @@ import crypto from 'crypto';
 // angkanya juga lebih enak diucapkan ke pemilik warung.
 export const HARGA_PLAN = {
   bulanan: 50000,
+  triwulan: 135000, // 3 bulan - hemat Rp 15.000 dibanding bayar bulanan 3x
   tahunan: 500000, // setara 2 bulan gratis dibanding bulanan
   permanen: 3650000, // sekali bayar, seumur hidup - lihat lisensiWebhook.routes.js (direpresentasiin sebagai "berlaku 100 tahun", bukan expiry beneran)
 };
@@ -61,7 +62,7 @@ function authHeader() {
 }
 
 // Bikin transaksi Snap baru — balikin { token, redirectUrl } buat dibuka di browser/WebView pelanggan.
-const LABEL_PLAN = { bulanan: '1 Bulan', tahunan: '1 Tahun', permanen: 'Permanen (Seumur Hidup)' };
+const LABEL_PLAN = { bulanan: '1 Bulan', triwulan: '3 Bulan', tahunan: '1 Tahun', permanen: 'Permanen (Seumur Hidup)' };
 
 // Katalog paket yang DITAMPILKAN ke pelanggan. Ditaruh di sini, sebelahan sama HARGA_PLAN, supaya
 // harga yang dipajang & harga yang ditagih Midtrans NGGAK MUNGKIN beda.
@@ -75,6 +76,21 @@ export const KATALOG_PLAN = [
     label: 'Bulanan',
     sub: 'Cocok buat nyoba dulu',
     bulan: 1,
+    // `manfaat` SENGAJA cuma nyebut yang BENERAN beda antar paket. Di aplikasi ini nggak ada satu
+    // pun fitur yang dikunci per paket (middleware/lisensi.js cuma ngecek langganan masih aktif,
+    // bukan paketnya apa) - yang beda CUMA jatah token AI harian & durasinya.
+    //
+    // Nulis daftar fitur yang beda-beda seolah paket mahal dapat fitur eksklusif itu janji palsu:
+    // pelanggan bayar tahunan lalu sadar fiturnya sama persis sama bulanan. Lebih baik bedanya
+    // jujur & sedikit daripada ramai tapi bohong.
+    manfaat: ['Semua fitur kebuka penuh', 'Bisa berhenti kapan aja', 'Pas buat ngerasain dulu sebulan'],
+  },
+  {
+    id: 'triwulan',
+    label: '3 Bulan',
+    sub: 'Sekali bayar buat 3 bulan',
+    bulan: 3,
+    manfaat: ['Semua fitur kebuka penuh', 'Jatah AI 1,5x lipat bulanan', 'Nggak perlu bayar tiap bulan'],
   },
   {
     id: 'tahunan',
@@ -82,12 +98,14 @@ export const KATALOG_PLAN = [
     sub: 'Bayar setahun, hemat 2 bulan',
     bulan: 12,
     badge: 'PALING HEMAT',
+    manfaat: ['Semua fitur kebuka penuh', 'Jatah AI 2,4x lipat bulanan', 'Tenang setahun, nggak mikir perpanjang'],
   },
   {
     id: 'permanen',
     label: 'Permanen',
-    sub: 'Sekali bayar, seumur hidup — nggak perlu perpanjang lagi',
+    sub: 'Sekali bayar, seumur hidup',
     bulan: null, // nggak ada padanan per-bulan; jangan dibagi-bagi
+    manfaat: ['Semua fitur kebuka penuh', 'Jatah AI 5x lipat bulanan', 'Nggak pernah perpanjang lagi', 'Harga nggak ikut naik nanti'],
   },
 ];
 

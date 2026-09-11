@@ -55,6 +55,13 @@ export default function KartuPaket({ paket = [], pilih, onPilih }) {
             <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2, fontWeight: 600 }}>
               {p.perBulan ? `≈ ${rupiah(p.perBulan)}/bulan` : 'sekali bayar'}
             </div>
+            {/* Hemat dalam RUPIAH, bukan persen - "hemat Rp 100.000" lebih kebayang buat pemilik
+                warung daripada "hemat 17%". Angkanya dihitung backend dari harga asli. */}
+            {p.hemat > 0 && (
+              <div style={{ fontSize: 12, marginTop: 4, fontWeight: 700, color: dipilih ? 'var(--brand)' : '#16a34a' }}>
+                Hemat {rupiah(p.hemat)}
+              </div>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 10, fontSize: 12, fontWeight: 600, opacity: 0.75 }}>
               <img src={mangWarungImg} alt="" style={{ width: 14, height: 14, objectFit: 'contain', flex: 'none' }} />
               AI {Number(p.jatahAi).toLocaleString('id-ID')}/hari

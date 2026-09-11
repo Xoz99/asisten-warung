@@ -6,9 +6,14 @@ import { EyeIcon } from '../lib/icons.jsx';
 // Konsulin (landing page) ngarahin ke sini pakai link kayak /?plan=bulanan waktu orang klik
 // paket harga. Begitu berhasil daftar/masuk, langsung lanjut ke pembayaran Midtrans — nggak
 // perlu muter-muter cari menu langganan dulu.
+// Paket yang boleh datang lewat ?plan= dari landing page Konsulin. HARUS disamakan sama
+// HARGA_PLAN di backend - dulu di sini cuma 'bulanan' & 'tahunan', jadi orang yang klik paket
+// PERMANEN di landing page (paket paling mahal) diam-diam kelewat: dia cuma kedaftar, nggak
+// pernah dibawa ke pembayaran. Ditulis sebagai daftar biar nambah paket cukup nambah satu kata.
+const PLAN_DARI_LINK = ['bulanan', 'triwulan', 'tahunan', 'permanen'];
 function planDariUrl() {
   const p = new URLSearchParams(window.location.search).get('plan');
-  return p === 'bulanan' || p === 'tahunan' ? p : null;
+  return PLAN_DARI_LINK.includes(p) ? p : null;
 }
 
 export default function Auth() {
@@ -80,7 +85,7 @@ export default function Auth() {
 
       {planUrl && (
         <p className="p-sub" style={{ marginTop: 8, color: 'var(--ink)', fontWeight: 700 }}>
-          Paket dipilih: {planUrl === 'tahunan' ? 'Tahunan' : 'Bulanan'} — lanjut ke pembayaran setelah ini
+          Paket dipilih: {{ bulanan: 'Bulanan', triwulan: '3 Bulan', tahunan: 'Tahunan', permanen: 'Permanen' }[planUrl] || planUrl} — lanjut ke pembayaran setelah ini
         </p>
       )}
 

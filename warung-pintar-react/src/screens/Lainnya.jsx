@@ -237,19 +237,7 @@ export default function Lainnya() {
 
 // Harga di sini cuma buat tampilan - sumber kebenarannya tetap di backend (HARGA_PLAN di
 // midtrans.service.js). Samain juga dengan daftar plan di LisensiHabis.jsx kalau harganya berubah.
-// `jatahAi` juga cuma tampilan - sumber kebenarannya JATAH_TOKEN_HARIAN di aiQuota.service.js// Manfaat yang didapat kalau berlangganan. Ini murni teks jualan - beda dari daftar PAKET yang
-// sekarang datang dari BACKEND (lihat KATALOG_PLAN di midtrans.service.js). Harga sengaja nggak
-// ditulis di frontend lagi: dulu ditulis ulang sebagai teks ('Rp 490.000'), lalu harga backend
-// naik & yang di layar ketinggalan - pelanggan liat satu angka tapi ditagih angka lain.
-const MANFAAT = [
-  'Catat jualan pakai suara, barcode, & foto barang',
-  'Laporan untung rugi harian, mingguan, bulanan',
-  'Kasbon & kenal wajah pelanggan',
-  'Scan nota belanja jadi stok otomatis',
-  'Mang AI yang ngerti isi warung kamu',
-  'Satu akun dipakai bareng di beberapa HP',
-];
-
+// `jatahAi` juga cuma tampilan - sumber kebenarannya JATAH_TOKEN_HARIAN di aiQuota.service.js
 function SectionLangganan() {
   const { lisensi, mulaiCheckout, toast } = useApp();
   const [buka, setBuka] = useState(false); // baris status di-tap dulu baru pilihan plan-nya kebuka
@@ -259,7 +247,7 @@ function SectionLangganan() {
   if (!lisensi) return null;
 
   const sisaHari = Math.max(0, Math.ceil((new Date(lisensi.berlakuSampai) - new Date()) / 86400000));
-  const labelPlan = { trial: 'Masa coba gratis', bulanan: 'Bulanan', tahunan: 'Tahunan', permanen: 'Permanen' }[lisensi.plan] || lisensi.plan;
+  const labelPlan = { trial: 'Masa coba gratis', bulanan: 'Bulanan', triwulan: '3 Bulan', tahunan: 'Tahunan', permanen: 'Permanen' }[lisensi.plan] || lisensi.plan;
   // Paket datang dari backend (lisensi.paket) - satu sumber harga sama yang ditagih Midtrans.
   const paket = lisensi.paket || [];
   const planAktif = paket.find((p) => p.id === pilih) || paket[0];
@@ -338,28 +326,38 @@ function SectionLangganan() {
           transisi CSS-nya (grid-template-rows + fade) sempet jalan mulus - bukan lompat instan */}
       <div className={'geser-akordeon' + (buka ? ' buka' : '')}>
         <div>
-          {/* Daftar manfaat ditaruh DI ATAS harga - orang perlu tau dapat apa dulu sebelum liat
-              angkanya. Pola ini diambil dari layar langganan yang umum dipakai aplikasi lain, dan
-              alasannya masuk akal: kartu harga tanpa konteks cuma kelihatan mahal. */}
-          <div className="card" style={{ marginTop: 4 }}>
-            <p className="p-sub" style={{ margin: '0 0 12px', fontWeight: 700, color: 'var(--ink)' }}>
-              Yang kamu dapat
-            </p>
-            {MANFAAT.map((m) => (
-              <div key={m} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 9 }}>
-                <span
-                  style={{
-                    width: 20, height: 20, borderRadius: 7, flex: 'none', marginTop: 1,
-                    background: 'var(--brand)', color: '#0A0A0A',
-                    display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 800,
-                  }}
-                >
-                  ✓
+          {/* Daftar manfaat ikut PAKET YANG DIPILIH, bukan satu daftar buat semua - jadi bedanya
+              kelihatan waktu user nge-tap kartu yang lain. Isinya datang dari backend, dan SENGAJA
+              cuma nyebut yang beneran beda: di aplikasi ini nggak ada fitur yang dikunci per paket
+              (middleware cuma ngecek langganan aktif), yang beda cuma jatah AI & durasinya. Nulis
+              fitur eksklusif yang nggak ada itu janji palsu yang balik jadi komplain. */}
+          {planAktif?.manfaat?.length > 0 && (
+            <div className="card" style={{ marginTop: 4 }}>
+              <p className="p-sub" style={{ margin: '0 0 12px', fontWeight: 700, color: 'var(--ink)' }}>
+                Yang kamu dapat di paket {planAktif.label}
+              </p>
+              {planAktif.manfaat.map((m) => (
+                <div key={m} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 9 }}>
+                  <span
+                    style={{
+                      width: 20, height: 20, borderRadius: 7, flex: 'none', marginTop: 1,
+                      background: 'var(--brand)', color: '#0A0A0A',
+                      display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 800,
+                    }}
+                  >
+                    ✓
+                  </span>
+                  <span style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.4 }}>{m}</span>
+                </div>
+              ))}
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 2 }}>
+                <img src={mangWarungImg} alt="" style={{ width: 20, height: 20, objectFit: 'contain', flex: 'none' }} />
+                <span style={{ fontSize: 14, fontWeight: 600 }}>
+                  Jatah AI {Number(planAktif.jatahAi).toLocaleString('id-ID')} token/hari
                 </span>
-                <span style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.4 }}>{m}</span>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
 
           <div style={{ marginTop: 12 }}>
             <KartuPaket paket={paket} pilih={pilih} onPilih={setPilih} />
