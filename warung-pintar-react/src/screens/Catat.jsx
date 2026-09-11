@@ -90,6 +90,13 @@ export default function Catat() {
   // karena bisa dipasang dari DUA arah: tombol "pasang target" di layar ini, ATAU lewat chat Mang
   // AI ("catat penjualan hari ini 900rb"). Nilainya sementara, nggak disimpen ke server.
   const target = targetSetoran;
+  // Yang dibandingin sama target itu PENJUALAN HARI INI, bukan isi keranjang yang lagi disusun.
+  // Dulu cuma totalCart - jadi tiap selesai checkout keranjangnya dikosongin & progress-nya balik
+  // ke Rp 0, seolah jualan hari itu belum ada apa-apa. Salah arah: target ini target HARIAN.
+  //
+  // Keranjang yang lagi jalan ikut DITAMBAHIN biar progress-nya gerak real-time selagi barang
+  // disebut, bukan baru meloncat setelah tap Bayar.
+  const terkumpul = S.omzetHariIni + totalCart;
   const setTarget = setTargetSetoran;
   const [targetOpen, setTargetOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
@@ -264,7 +271,7 @@ export default function Catat() {
           layar, NGGAK ikut kesimpen ke transaksi. */}
       <div className="total">
         <p className="t">
-          {target > 0 ? 'Sudah terkumpul' : 'Total belanja pembeli'}
+          {target > 0 ? 'Terkumpul hari ini' : 'Total belanja pembeli'}
           {/* marginTop DIMATIKAN: .linkkecil defaultnya punya margin-top 26px (buat link yang berdiri
               sendiri di bawah form). Di sini dia nempel di baris judul, jadi margin itu bikin
               tombolnya turun & kelihatan nggak sebaris sama "Total belanja pembeli". */}
@@ -276,7 +283,7 @@ export default function Catat() {
             {target > 0 ? 'ubah target' : 'pasang target'}
           </button>
         </p>
-        <p className="n p-num">{rupiah(totalCart)}</p>
+        <p className="n p-num">{rupiah(target > 0 ? terkumpul : totalCart)}</p>
         {target > 0 && (
           <>
             <div
@@ -288,21 +295,24 @@ export default function Catat() {
               <div
                 style={{
                   height: '100%',
-                  width: Math.min(100, (totalCart / target) * 100) + '%',
-                  background: totalCart > target ? '#e5484d' : totalCart === target ? '#4ade80' : 'var(--brand)',
+                  width: Math.min(100, (terkumpul / target) * 100) + '%',
+                  background: terkumpul >= target ? '#4ade80' : 'var(--brand)',
                   transition: 'width .2s',
                 }}
               />
             </div>
             <p className="t" style={{ marginTop: 8 }}>
-              {totalCart === target ? (
-                <>Pas dengan target {rupiah(target)} ✓</>
-              ) : totalCart > target ? (
-                <>Lebih {rupiah(totalCart - target)} dari target {rupiah(target)}</>
+              {terkumpul >= target ? (
+                <>Target {rupiah(target)} tercapai — lebih {rupiah(terkumpul - target)}</>
               ) : (
-                <>Kurang {rupiah(target - totalCart)} dari target {rupiah(target)}</>
+                <>Kurang {rupiah(target - terkumpul)} dari target {rupiah(target)}</>
               )}
             </p>
+            {totalCart > 0 && (
+              <p className="t" style={{ marginTop: 4, opacity: 0.45 }}>
+                Sudah kejual {rupiah(S.omzetHariIni)} + keranjang sekarang {rupiah(totalCart)}
+              </p>
+            )}
           </>
         )}
       </div>

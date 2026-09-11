@@ -60,6 +60,7 @@ function dataKosong() {
     ngendap: [],
     terjual: {},
     untung: 0,
+    omzetHariIni: 0,
     trx: 0,
   };
 }
@@ -166,6 +167,11 @@ function bangunState({ produkRows, kasbonRows, pelangganRows, riwayatRows, penja
     ngendap: ngendapRows.map((r) => ({ id: r.id, nama: r.nama, stok: r.stok, terakhirLaku: r.terakhir_laku })),
     terjual,
     untung: trxHariIni.reduce((a, t) => a + t.laba, 0),
+    // Omzet hari ini - duit yang MASUK, beda dari `untung` (laba). Dipakai buat progress target
+    // setoran di layar Catat jualan: yang dibandingin sama target itu isi laci, bukan labanya.
+    // Transaksi kasbon TIDAK dihitung: barangnya keluar tapi duitnya belum masuk, jadi kalau ikut
+    // dijumlah, target kelihatan kekejar padahal lacinya masih kosong.
+    omzetHariIni: trxHariIni.filter((t) => t.mode !== 'kasbon').reduce((a, t) => a + t.total, 0),
     trx: trxHariIni.length,
   };
 }
