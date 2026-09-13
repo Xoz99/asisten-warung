@@ -4,6 +4,7 @@ import { ProductIcon, Ikon } from '../lib/icons.jsx';
 import { kritisQ } from '../lib/voice';
 import { rupiah, singkat, tglID, jamID, escapeHtml } from '../lib/format';
 import { ambilCuaca, ikonCuaca } from '../lib/weather';
+import { api } from '../lib/api';
 import SheetStruk from '../components/SheetStruk.jsx';
 
 export default function Beranda() {
@@ -351,18 +352,41 @@ function SheetSerah({ onClose }) {
   const { S, dispatch, toast } = useApp();
   const [uangLaci, setUangLaci] = useState('');
   const [ke, setKe] = useState(S.penjagaList.find((n) => n !== S.penjagaAktif) || S.penjagaList[0]);
+  const [kirim, setKirim] = useState(false);
+  // Angka giliran DIAMBIL DARI SERVER, bukan dihitung ulang di sini. Versi lama ngitung sendiri
+  // dari state lokal pakai aturan yang beda sama backend: layar nampilin jumlah SEMUA transaksi
+  // (tunai + QRIS + kasbon), yang kesimpen cuma yang tunai. Pemilik warung ngitung laci sambil
+  // ngeliat angka gede, terus buka Riwayat jaga & nemu angka jauh lebih kecil - kayak duitnya
+  // ilang. Satu-satunya cara bikin itu nggak balik lagi: satu rumus, satu tempat.
+  const [ringkas, setRingkas] = useState(null);
+  const [gagalMuat, setGagalMuat] = useState(false);
 
-  const trxHariIni = S.transaksi.filter((t) => new Date(t.waktu).toDateString() === new Date().toDateString());
-  const jual = trxHariIni.reduce((a, t) => a + t.total, 0);
-  // sama seperti formula stok kritis di backend (POST /api/jaga/serah-terima) — preview di sini
-  // biar mendekati apa yang bakal tersimpan pas beneran dikonfirmasi
-  const habis = S.produk.filter((p) => p.stok <= Math.max(1, Math.floor(p.laku * 0.2)));
-  const utangBaru = S.kasbon.filter((k) => k.baru && !k.lunas);
+  useEffect(() => {
+    let batal = false;
+    api.jaga
+      .ringkasan()
+      .then((r) => !batal && setRingkas(r))
+      .catch(() => !batal && setGagalMuat(true));
+    return () => {
+      batal = true;
+    };
+  }, []);
 
-  const konfirmasi = () => {
-    const uang = parseInt(uangLaci, 10);
+  const uang = parseInt(uangLaci, 10) || 0;
+  // Selisih dihitung di layar SELAGI ngetik biar keliatan langsung, tapi patokannya
+  // ringkas.penjualanTunai - angka yang sama persis yang bakal dipakai server pas nyimpen.
+  const selisih = ringkas ? uang - ringkas.penjualanTunai : 0;
+
+  const konfirmasi = async () => {
     if (!uang) return toast('Isi dulu uang di laci');
-    dispatch({ type: 'SERAH_TERIMA', uangLaci: uang, ke });
+    if (kirim) return;
+    setKirim(true);
+    // DITUNGGU sampai selesai. Dulu nggak: toast "Giliran diserahkan ke X" langsung muncul & sheet
+    // ditutup sebelum servernya jawab - kalau gagal, pemilik warung udah terlanjur dikasih tau
+    // berhasil, terus muncul toast error kedua yang isinya bertentangan.
+    const ok = await dispatch({ type: 'SERAH_TERIMA', uangLaci: uang, ke });
+    setKirim(false);
+    if (!ok) return; // pesan gagalnya udah dikeluarin dispatch - sheet-nya biarin kebuka
     toast(`Giliran diserahkan ke <b>${escapeHtml(ke)}</b>`);
     onClose();
   };
@@ -385,32 +409,81 @@ function SheetSerah({ onClose }) {
             onChange={(e) => setUangLaci(e.target.value)}
           />
         </div>
-        <div className="card" style={{ marginTop: 16 }}>
-          <div className="item">
-            <div className="nama">Penjualan hari ini</div>
-            <div className="kanan p-num">{rupiah(jual)}</div>
-          </div>
-          <div className="item">
-            <div className="nama">Jumlah transaksi</div>
-            <div className="kanan p-num">{trxHariIni.length}×</div>
-          </div>
-          <div className="item">
-            <div className="nama">Untung tercatat</div>
-            <div className="kanan p-num">{rupiah(S.untung)}</div>
-          </div>
-          <div className="item">
-            <div style={{ flex: 1 }}>
-              <div className="nama">Stok menipis sejak pagi</div>
-              <div className="tgl">{habis.length ? habis.map((p) => `${p.nama} (${p.stok})`).join(', ') : 'tidak ada'}</div>
+        {gagalMuat && <p className="p-sub" style={{ marginTop: 12 }}>Ringkasan giliran gagal dimuat. Coba tutup lalu buka lagi ya.</p>}
+        {!ringkas && !gagalMuat && <p className="p-sub" style={{ marginTop: 12 }}>Ngitung giliran ini...</p>}
+        {ringkas && (
+          <div className="card" style={{ marginTop: 16 }}>
+            <div className="item">
+              <div style={{ flex: 1 }}>
+                <div className="nama">Penjualan tunai {ringkas.lanjutanGiliran ? 'giliran ini' : 'hari ini'}</div>
+                {/* Ditulis tegas ini yang HARUS ada di laci - selebihnya nggak nambah isi laci:
+                    QRIS/transfer masuk ke rekening, kasbon malah belum kebayar. Sebelumnya
+                    layar ini cuma nampilin satu angka gabungan tanpa keterangan apa-apa. */}
+                <div className="tgl">Ini yang harusnya ada di laci</div>
+              </div>
+              <div className="kanan p-num">{rupiah(ringkas.penjualanTunai)}</div>
+            </div>
+            {ringkas.penjualanNonTunai > 0 && (
+              <div className="item">
+                <div style={{ flex: 1 }}>
+                  <div className="nama">QRIS / transfer</div>
+                  <div className="tgl">Masuk ke rekening, bukan ke laci</div>
+                </div>
+                <div className="kanan p-num">{rupiah(ringkas.penjualanNonTunai)}</div>
+              </div>
+            )}
+            <div className="item">
+              <div className="nama">Jumlah transaksi</div>
+              <div className="kanan p-num">{ringkas.totalTransaksi}×</div>
+            </div>
+            <div className="item">
+              <div className="nama">Untung tercatat</div>
+              <div className="kanan p-num">{rupiah(ringkas.labaGiliran)}</div>
+            </div>
+            <div className="item">
+              <div style={{ flex: 1 }}>
+                <div className="nama">Stok menipis</div>
+                <div className="tgl">
+                  {ringkas.stokHabis.length ? ringkas.stokHabis.map((p) => `${p.nama} (${p.stok})`).join(', ') : 'tidak ada'}
+                </div>
+              </div>
+            </div>
+            <div className="item">
+              <div style={{ flex: 1 }}>
+                <div className="nama">Utang baru {ringkas.lanjutanGiliran ? 'giliran ini' : 'hari ini'}</div>
+                <div className="tgl">
+                  {ringkas.utangBaru.length ? ringkas.utangBaru.map((k) => `${k.nama} ${rupiah(k.jumlah)}`).join(', ') : 'tidak ada'}
+                </div>
+              </div>
             </div>
           </div>
-          <div className="item">
-            <div style={{ flex: 1 }}>
-              <div className="nama">Utang baru hari ini</div>
-              <div className="tgl">{utangBaru.length ? utangBaru.map((k) => `${k.nama} ${rupiah(k.jml)}`).join(', ') : 'tidak ada'}</div>
+        )}
+
+        {/* Selisih laci - ALASAN fitur ini ada, tapi dulu cuma dihitung diam-diam di server & nggak
+            pernah nongol di layar mana pun. Sekarang gerak langsung selagi angka lacinya diketik,
+            jadi ketauan di tempat, bukan pas udah telanjur ganti giliran. */}
+        {ringkas && uang > 0 && (
+          <div className="card" style={{ marginTop: 12 }}>
+            <div className="item" style={{ border: 0, padding: 0 }}>
+              <div style={{ flex: 1 }}>
+                <div className="nama">{selisih === 0 ? 'Uangnya pas' : selisih > 0 ? 'Uang lebih' : 'Uang kurang'}</div>
+                <div className="tgl">
+                  {selisih === 0
+                    ? 'Isi laci cocok sama penjualan tunai'
+                    : selisih > 0
+                      ? 'Ada uang lebih di laci - mungkin kembalian atau modal awal'
+                      : 'Isi laci kurang dari penjualan tunai - cek lagi sebelum diserahkan'}
+                </div>
+              </div>
+              {/* Tandanya dipisah dari angkanya: rupiah(-5000) ngasih "Rp -5.000", minusnya
+                  nyempil di tengah & gampang kelewat - padahal itu justru bagian pentingnya. */}
+              <div className="kanan p-num" style={{ color: selisih < 0 ? '#E5484D' : undefined }}>
+                {selisih > 0 ? '+ ' : selisih < 0 ? '- ' : ''}
+                {rupiah(Math.abs(selisih))}
+              </div>
             </div>
           </div>
-        </div>
+        )}
         <div className="field">
           <label>Diserahkan ke</label>
           <select value={ke} onChange={(e) => setKe(e.target.value)}>
@@ -421,8 +494,8 @@ function SheetSerah({ onClose }) {
             ))}
           </select>
         </div>
-        <button className="btn utama" style={{ width: '100%', marginTop: 16 }} onClick={konfirmasi}>
-          Konfirmasi serah terima
+        <button className="btn utama" style={{ width: '100%', marginTop: 16 }} onClick={konfirmasi} disabled={kirim || !ringkas}>
+          {kirim ? 'Menyimpan...' : 'Konfirmasi serah terima'}
         </button>
         <button className="btn" style={{ width: '100%', marginTop: 10 }} onClick={onClose}>
           Batal

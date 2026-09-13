@@ -9,10 +9,13 @@ export default function Login() {
 
   const pilih = (n) => dispatch({ type: 'PILIH_PENJAGA', nama: n });
 
-  const simpan = () => {
+  const simpan = async () => {
     const n = nama.trim();
     if (!n) return;
-    dispatch({ type: 'TAMBAH_PENJAGA', nama: n });
+    // Ditunggu dulu: nama kembar ditolak server, dan sheet-nya harus TETAP kebuka biar namanya
+    // bisa langsung dibenerin. Dulu langsung bilang "ditambahkan" & nutup sheet tanpa nunggu.
+    const ok = await dispatch({ type: 'TAMBAH_PENJAGA', nama: n });
+    if (!ok) return;
     toast(`<b>${escapeHtml(n)}</b> ditambahkan sebagai penjaga`);
     setNama('');
     setSheetOpen(false);

@@ -164,6 +164,10 @@ export const api = {
 
   jaga: {
     riwayat: () => get('/api/jaga/riwayat'),
+    // Pratinjau angka giliran yang lagi jalan. WAJIB dari server, jangan dihitung ulang di layar:
+    // angka yang sama pernah dihitung dua kali pakai aturan beda (lihat ringkasanGiliran di
+    // jaga.routes.js) dan bikin layar konfirmasi beda jauh sama catatan yang kesimpen.
+    ringkasan: () => get('/api/jaga/ringkasan'),
     serahTerima: (data) => post('/api/jaga/serah-terima', data),
   },
 

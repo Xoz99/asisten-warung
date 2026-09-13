@@ -14,8 +14,17 @@ router.get('/', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    const { nama } = req.body;
+    const nama = (req.body.nama || '').trim();
     if (!nama) return res.status(400).json({ error: 'nama wajib diisi' });
+    // Nama kembar ditolak. Tanpa ini, "Rina" bisa masuk dua kali: daftar penjaga nampilin dua
+    // baris Rina yang nggak bisa dibedain, React ngeluh soal key kembar, dan serah terima ke
+    // "Rina" nge-set DUA baris jadi aktif sekaligus. Dibandingin tanpa peduli huruf besar/kecil -
+    // "rina" & "Rina" itu orang yang sama di warung.
+    const { rows: kembar } = await query('SELECT id FROM penjaga WHERE warung_id=$1 AND lower(nama)=lower($2)', [
+      req.warungId,
+      nama,
+    ]);
+    if (kembar.length) return res.status(409).json({ error: `Penjaga "${nama}" udah ada di daftar` });
     const { rows } = await query(
       'INSERT INTO penjaga (warung_id, nama) VALUES ($1,$2) RETURNING id, nama, aktif',
       [req.warungId, nama]

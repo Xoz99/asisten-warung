@@ -124,9 +124,15 @@ function normRiwayat(r) {
     ke: r.ke,
     uang: Number(r.uang_laci),
     jual: Number(r.penjualan_tunai),
+    // Selisih laci vs penjualan tunai - INTINYA fitur ini ("deteksi selisih otomatis"), tapi dulu
+    // cuma disimpen di database & nggak pernah sampai ke layar mana pun. Jadi uang kurang nggak
+    // pernah ketauan siapa pun, padahal angkanya udah dihitung tiap serah terima.
+    selisih: Number(r.selisih),
     trx: r.total_transaksi,
     habis: (r.stok_habis || []).map((x) => x.nama),
-    utangBaru: (r.utang_baru || []).map((x) => `${x.nama} ${Number(x.jumlah)}`),
+    // Nominalnya dibiarin ANGKA di sini, diformat pas ditampilin - dulu digabung jadi teks di
+    // sini juga, hasilnya "Bu Sri 12000" mentah di layar Riwayat jaga.
+    utangBaru: (r.utang_baru || []).map((x) => ({ nama: x.nama, jml: Number(x.jumlah) })),
   };
 }
 function normTransaksi(r) {
@@ -610,10 +616,11 @@ export function AppProvider({ children }) {
             return;
           }
           case 'TAMBAH_PENJAGA': {
+            // Nama kembar ditolak server (409) - error-nya naik ke catch di bawah & jadi toast.
             const row = await api.penjaga.tambah(action.nama);
             setPenjagaRows((rs) => [...rs, row]);
-            setS((s) => ({ ...s, penjagaList: [...s.penjagaList, action.nama] }));
-            return;
+            setS((s) => ({ ...s, penjagaList: [...s.penjagaList, row.nama] }));
+            return true;
           }
           case 'KOSONGKAN_PENJAGA': {
             await api.penjaga.kosongkan();
@@ -767,7 +774,10 @@ export function AppProvider({ children }) {
           case 'SERAH_TERIMA': {
             await api.jaga.serahTerima({ dari: S.penjagaAktif, ke: action.ke, uangLaci: action.uangLaci });
             await refreshData();
-            return;
+            // true = beneran kesimpen. Layarnya (SheetSerah) nungguin ini sebelum bilang
+            // "Giliran diserahkan" - dulu toast-nya nongol duluan tanpa nunggu, jadi pas gagal
+            // pemilik warung dikasih tau berhasil, terus disusul toast error yang bertentangan.
+            return true;
           }
 
           default:

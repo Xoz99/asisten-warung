@@ -18,8 +18,16 @@ export const angkaRingkas = (n) => (Math.round((+n || 0) * 10) / 10).toLocaleStr
 export const singkat = (n) =>
   n >= 1000000 ? (n / 1000000).toFixed(2).replace('.', ',') + 'jt' : Math.round(n / 1000) + 'rb';
 
-export const inisial = (n) =>
-  n.trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+// Huruf depan buat avatar bulat. Tanda baca dibuang dulu: nama penjaga bawaan "Ibu (pemilik)"
+// kebaca jadi dua kata "Ibu" + "(pemilik)", jadi inisialnya "I(" - kurung nongol di avatar layar
+// pilih penjaga. Potongan yang isinya tanda baca doang dibuang, bukan dipaksa diambil hurufnya.
+export const inisial = (n) => {
+  const kata = String(n || '')
+    .split(/\s+/)
+    .map((w) => w.replace(/[^\p{L}\p{N}]/gu, ''))
+    .filter(Boolean);
+  return kata.slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+};
 
 export const tglID = (d) =>
   new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
