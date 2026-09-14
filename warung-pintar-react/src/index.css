@@ -430,6 +430,14 @@ body{font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased
 .langkah-izin li::before{content:counter(izin);position:absolute;left:0;top:0;width:24px;height:24px;border-radius:8px;
   background:var(--aksen);color:#0A0A0A;display:grid;place-items:center;font-size:13px;font-weight:800}
 
+/* Kode barcode di form "Barang belum terdaftar" (mode scan barcode) - gantiin kotak foto hasil scan
+   yang dulu makan setengah layar tapi isinya cuma ikon kosong. Pakai huruf monospace biar tiap
+   angka gampang dicocokin sama yang tercetak di bungkusnya. */
+.kode-barcode{display:flex;flex-direction:column;align-items:center;gap:2px;margin:10px auto 4px;padding:12px 20px;
+  border-radius:16px;background:var(--bg);width:fit-content;max-width:100%}
+.kode-barcode span{font-size:13px;font-weight:600;color:var(--abu)}
+.kode-barcode b{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:22px;letter-spacing:.06em;word-break:break-all;color:var(--ink)}
+
 /* form */
 .field{margin-top:14px}
 .field label{display:block;font-size:var(--small);font-weight:700;color:var(--abu);margin-bottom:8px}

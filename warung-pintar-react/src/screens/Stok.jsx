@@ -790,7 +790,11 @@ function SheetBarcode({ mode, onClose, onKelola }) {
             <div className="isi">{fotoJepretan && <img src={fotoJepretan} alt="" />}</div>
           </div>
         )}
-        {!(step === 'memuat' || step === 'scan' || step === 'tambah-sudut' || (mode === 'barcode' && step === 'memindai')) && (
+        {/* Mode barcode + barang baru: kotak ini DIHILANGKAN. Isinya cuma ikon kosong segede layar
+            (foto barcode-nya nggak pernah disimpen jadi foto barang) - yang penting buat pemilik itu
+            kodenya kebaca, dan itu dipajang jelas di form di bawah. */}
+        {!(step === 'memuat' || step === 'scan' || step === 'tambah-sudut' || (mode === 'barcode' && step === 'memindai')) &&
+          !(mode === 'barcode' && step === 'baru') && (
           <div className="viewfinder diam">
             <div className="frame" />
             <div className="isi">
@@ -1004,7 +1008,14 @@ function SheetBarcode({ mode, onClose, onKelola }) {
         {step === 'baru' && (
           <div style={{ textAlign: 'left' }}>
             <h3 style={{ textAlign: 'center' }}>Barang belum terdaftar</h3>
-            <p style={{ textAlign: 'center' }}>{mode === 'barcode' ? `Kode: ${barcodeBaru}` : 'Isi datanya buat didaftarkan'}</p>
+            {mode === 'barcode' ? (
+              <div className="kode-barcode">
+                <span>Kode barcode</span>
+                <b>{barcodeBaru}</b>
+              </div>
+            ) : (
+              <p style={{ textAlign: 'center' }}>Isi datanya buat didaftarkan</p>
+            )}
 
             {/* Cari referensi (AI) - opsional, biar nggak isi form satu-satu dari nol buat merek
                 yang udah umum dikenal (misal rokok - langsung tau isi kemasan & kisaran harga).
@@ -1688,44 +1699,93 @@ function SheetOpname({ produk, onClose }) {
   );
 }
 
+// Kunci buat buka detail modal & untung. PIN-nya LOKAL per HP (prefs browser), bukan kredensial
+// server - ini pagar dari orang yang kebetulan megang HP warung, bukan pengaman data.
+//
+// Dulu layar ini ikut nampilin PIN yang BERLAKU, apa pun isinya (termasuk yang udah diganti
+// pemilik), di layar yang justru minta PIN itu - jadi PIN-nya nggak ngunci apa-apa. Petunjuk itu
+// ada karena PIN bawaannya 1234 & nggak ada cara lain tau. Sekarang HP yang belum pernah bikin PIN
+// disuruh BIKIN sekali, jadi nggak ada PIN bawaan yang perlu dibocorin.
+const PIN_GAMPANG = new Set(['1234', '4321', '0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999']);
+
 function SheetPin({ onClose, onSukses }) {
-  const { S, toast } = useApp();
+  const { S, dispatch, toast, goTo } = useApp();
+  const buat = !S.pinDibuat;
   const [buf, setBuf] = useState('');
+  const [pertama, setPertama] = useState(null); // mode bikin: PIN ketikan pertama, nunggu diulang
+
+  const cek = (pin) => {
+    if (!buat) {
+      if (pin === S.pin) return onSukses();
+      toast('PIN salah, coba lagi');
+      return setBuf('');
+    }
+    if (pertama === null) {
+      // 1234 dulu PIN bawaan SEMUA akun & kepajang di layar - siapa pun yang pernah liat bakal
+      // nyoba itu duluan.
+      if (PIN_GAMPANG.has(pin)) {
+        toast('PIN itu gampang ditebak - pilih kombinasi lain ya');
+        return setBuf('');
+      }
+      setPertama(pin);
+      return setBuf('');
+    }
+    if (pin !== pertama) {
+      toast('PIN-nya beda - ulangi dari awal ya');
+      setPertama(null);
+      return setBuf('');
+    }
+    dispatch({ type: 'SET_PIN', pin });
+    toast('PIN pemilik udah dibuat');
+    onSukses();
+  };
 
   const tekan = (t) => {
-    if (t === '⌫') return setBuf((b) => b.slice(0, -1));
+    if (t === '\u232b') return setBuf((b) => b.slice(0, -1));
     if (!t || buf.length >= 4) return;
     const next = buf + t;
     setBuf(next);
-    if (next.length === 4) {
-      setTimeout(() => {
-        if (next === S.pin) onSukses();
-        else {
-          toast('PIN salah, coba lagi');
-          setBuf('');
-        }
-      }, 160);
-    }
+    if (next.length === 4) setTimeout(() => cek(next), 160);
   };
+
+  const judul = !buat ? 'Masukkan PIN' : pertama === null ? 'Bikin PIN pemilik' : 'Ulangi PIN';
+  const keterangan = !buat
+    ? 'Detail modal & untung hanya untuk pemilik.'
+    : pertama === null
+      ? 'PIN 4 angka ini ngunci detail modal & untung di HP ini. Cukup sekali - jangan dikasih tau ke penjaga ya.'
+      : 'Ketik sekali lagi PIN yang sama.';
 
   return (
     <div className="sheet tengah show">
       <div className="panel mid">
-        <h3>Masukkan PIN</h3>
-        <p>Detail modal &amp; untung hanya untuk pemilik. PIN demo: {S.pin}</p>
+        <h3>{judul}</h3>
+        <p>{keterangan}</p>
         <div className="pinbox">
           {[0, 1, 2, 3].map((i) => (
             <i key={i} className={i < buf.length ? 'on' : ''} />
           ))}
         </div>
         <div className="keypad">
-          {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'].map((t, i) => (
+          {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '\u232b'].map((t, i) => (
             <button key={i} style={!t ? { visibility: 'hidden' } : undefined} onClick={() => tekan(t)}>
               {t}
             </button>
           ))}
         </div>
-        <button className="btn" style={{ width: '100%', marginTop: 14 }} onClick={onClose}>
+        {!buat && (
+          <button
+            className="btn kecil"
+            style={{ width: '100%', marginTop: 14 }}
+            onClick={() => {
+              onClose();
+              goTo('s-lainnya');
+              toast('Lupa PIN? Pakai menu <b>Ganti PIN</b> - kodenya dikirim ke WhatsApp');
+            }}
+          >
+            Lupa PIN?
+          </button>
+        )}
+        <button className="btn" style={{ width: '100%', marginTop: 10 }} onClick={onClose}>
           Batal
         </button>
       </div>

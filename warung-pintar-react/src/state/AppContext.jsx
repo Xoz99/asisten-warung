@@ -35,12 +35,19 @@ const AKSI_WAJIB_ONLINE = new Set([
 ]);
 
 function prefsAwal() {
-  return { tema: 't-mono', warna: '#ffc001', font: 'Inter', ukuran: 'sedang', pin: '1234' };
+  // pinDibuat false = HP ini belum pernah bikin PIN pemilik -> SheetPin (Stok.jsx) nyuruh bikin dulu,
+  // bukan nerima PIN bawaan 1234 yang dulu bahkan dipajang di layarnya sendiri.
+  return { tema: 't-mono', warna: '#ffc001', font: 'Inter', ukuran: 'sedang', pin: '1234', pinDibuat: false };
 }
 function muatPrefs() {
   try {
     const raw = localStorage.getItem(PREFS_KEY);
-    return raw ? { ...prefsAwal(), ...JSON.parse(raw) } : prefsAwal();
+    if (!raw) return prefsAwal();
+    const tersimpan = JSON.parse(raw);
+    // Prefs lama belum punya pinDibuat. PIN yang udah BUKAN 1234 jelas pernah diganti pemilik lewat
+    // "Ganti PIN" - dianggap udah dibuat, jangan disuruh bikin ulang (PIN yang dia inget bakal ketimpa).
+    if (tersimpan.pinDibuat === undefined) tersimpan.pinDibuat = Boolean(tersimpan.pin && tersimpan.pin !== '1234');
+    return { ...prefsAwal(), ...tersimpan };
   } catch {
     return prefsAwal();
   }
@@ -617,7 +624,7 @@ export function AppProvider({ children }) {
           case 'SET_UKURAN':
             return setPrefs((p) => ({ ...p, ukuran: action.ukuran }));
           case 'SET_PIN':
-            return setPrefs((p) => ({ ...p, pin: action.pin }));
+            return setPrefs((p) => ({ ...p, pin: action.pin, pinDibuat: true }));
 
           case 'PILIH_PENJAGA': {
             const row = penjagaRows.find((p) => p.nama === action.nama);
