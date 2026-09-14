@@ -3,6 +3,8 @@
 // LAN, tunnel ngrok, domain produksi beneran, dst), lalu diteruskan ke backend asli lewat proxy
 // dev server (lihat vite.config.js) atau reverse proxy produksi. Set VITE_API_URL di .env cuma
 // kalau beneran perlu manggil backend di host/port yang BEDA dari origin frontend-nya sendiri.
+import { VERSI_MODEL_WAJAH } from './wajah';
+
 const BASE_URL = import.meta.env.VITE_API_URL || '';
 
 const TOKEN_KEY = 'warungpintar_token';
@@ -140,8 +142,10 @@ export const api = {
 
   wajah: {
     // descriptor wajah dihitung di client (face-api.js) — backend cuma nyimpen & nyocokin
-    daftarkan: (pelangganId, embedding) => post(`/api/wajah/pelanggan/${pelangganId}/wajah`, { embedding }),
-    identifikasi: (embedding) => post('/api/wajah/identifikasi', { embedding }),
+    // `versi` = versi susunan model (lib/wajah.js) - descriptor beda model nggak bisa dibandingin.
+    daftarkan: (pelangganId, embedding) =>
+      post(`/api/wajah/pelanggan/${pelangganId}/wajah`, { embedding, versi: VERSI_MODEL_WAJAH }),
+    identifikasi: (embedding) => post('/api/wajah/identifikasi', { embedding, versi: VERSI_MODEL_WAJAH }),
   },
 
   transaksi: {

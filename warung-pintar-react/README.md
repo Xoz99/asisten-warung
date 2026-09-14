@@ -31,8 +31,9 @@ simulasi kayak versi demo awal):
   Library-nya di-*lazy load* (baru didownload pas fitur ini dibuka), biar halaman utama tetap
   ringan buat HP kentang.
 - **Kasbon Kenal Wajah** (Catat → 👤, dan waktu daftar pelanggan baru) — `@vladmandic/face-api`
-  (fork face-api.js yang masih dirawat). Model weight-nya ada di `public/models/` (tiny face
-  detector + face landmark tiny + face recognition, total ~6.5MB) — **kalau folder ini kehapus**,
+  (fork face-api.js yang masih dirawat). Model weight-nya ada di `public/models/` (SSD MobileNet v1
+  + face landmark 68 + face recognition, total ~12.5MB; file tiny lama masih disimpan tapi nggak
+  dipakai lagi — alasannya di `src/lib/wajah.js`) — **kalau folder ini kehapus**,
   copy ulang dari package-nya:
   ```
   node -e "
@@ -40,12 +41,13 @@ simulasi kayak versi demo awal):
   const src = 'node_modules/@vladmandic/face-api/model';
   const dest = 'public/models';
   fs.mkdirSync(dest, { recursive: true });
-  ['tiny_face_detector_model-weights_manifest.json','tiny_face_detector_model.bin',
-   'face_landmark_68_tiny_model-weights_manifest.json','face_landmark_68_tiny_model.bin',
+  ['ssd_mobilenetv1_model-weights_manifest.json','ssd_mobilenetv1_model.bin',
+   'face_landmark_68_model-weights_manifest.json','face_landmark_68_model.bin',
    'face_recognition_model-weights_manifest.json','face_recognition_model.bin']
    .forEach(f => fs.copyFileSync(src + '/' + f, dest + '/' + f));
   "
   ```
 
 Semua fitur di atas nyimpen/nyocokin **vektor embedding** ke backend, bukan foto mentahnya —
-sesuai arsitektur PRD 10.1 & 10.3 (model jalan di client, server cuma nyimpen & cosine similarity).
+sesuai arsitektur PRD 10.1 & 10.3 (model jalan di client, server cuma nyimpen & nyocokin — cosine
+similarity buat barang, jarak Euclidean buat wajah, lihat `warung-pintar-backend/src/utils/wajah.js`).

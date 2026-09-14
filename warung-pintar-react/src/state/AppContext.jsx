@@ -122,6 +122,7 @@ function normPelanggan(r) {
     foto: r.foto_url || null,
     totalUtang: Number(r.total_utang || 0),
     punyaWajah: !!r.punya_wajah,
+    punyaWajahLama: !!r.punya_wajah_lama, // data wajah model lama - dihitung ulang otomatis dari fotonya
   };
 }
 function normRiwayat(r) {

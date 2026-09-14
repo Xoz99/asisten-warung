@@ -7,7 +7,10 @@ router.get('/', async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT p.*, COALESCE(SUM(k.jumlah) FILTER (WHERE NOT k.lunas), 0) AS total_utang,
-              EXISTS (SELECT 1 FROM pelanggan_wajah w WHERE w.pelanggan_id = p.id) AS punya_wajah
+              -- punya_wajah cuma ngitung data model versi 2 (lihat utils/wajah.js). Data lama dipisah biar HP bisa
+              -- ngitung ulang otomatis dari foto pelanggannya, tanpa pemilik warung harus foto ulang satu-satu.
+              EXISTS (SELECT 1 FROM pelanggan_wajah w WHERE w.pelanggan_id = p.id AND jsonb_typeof(w.embedding) = 'object') AS punya_wajah,
+              EXISTS (SELECT 1 FROM pelanggan_wajah w WHERE w.pelanggan_id = p.id AND jsonb_typeof(w.embedding) = 'array') AS punya_wajah_lama
        FROM pelanggan p LEFT JOIN kasbon k ON k.pelanggan_id = p.id
        WHERE p.warung_id = $1
        GROUP BY p.id ORDER BY p.nama`,

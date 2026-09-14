@@ -1,14 +1,21 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { singkat, escapeHtml, inisial } from '../lib/format';
 import { api } from '../lib/api';
 import { ambilDeskriptorWajah, gambarDariDataUrl } from '../lib/wajah';
+import { perbaruiWajahLama, perluPerbaruiWajah } from '../lib/wajahLama';
 import { keWebp } from '../lib/kamera';
 import { CameraIcon, Ikon } from '../lib/icons.jsx';
 
 export default function Pelanggan() {
-  const { S, goTo, setPelangganFormOpen } = useApp();
+  const { S, goTo, setPelangganFormOpen, refreshData } = useApp();
   const [daftarWajahUntuk, setDaftarWajahUntuk] = useState(null); // pelanggan | null
+
+  // Data wajah model lama dihitung ulang dari foto pelanggannya, diem-diem di belakang (lihat lib/wajahLama.js).
+  useEffect(() => {
+    if (!S.pelanggan.some(perluPerbaruiWajah)) return;
+    perbaruiWajahLama(S.pelanggan).then((n) => n > 0 && refreshData());
+  }, [S.pelanggan, refreshData]);
 
   const utangOf = (nama) => S.kasbon.filter((k) => !k.lunas && k.nama === nama).reduce((a, b) => a + b.jml, 0);
 

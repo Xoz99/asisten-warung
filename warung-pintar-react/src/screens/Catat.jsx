@@ -12,6 +12,7 @@ import { ambilEmbedding } from '../lib/visualScan';
 import { useModelVisual } from '../lib/useModelVisual';
 import { mulaiScanBarcode } from '../lib/barcodeScan';
 import { ambilDeskriptorWajah, gambarDariDataUrl, panaskanModelWajah } from '../lib/wajah';
+import { perbaruiWajahLama, perluPerbaruiWajah } from '../lib/wajahLama';
 import SheetStruk from '../components/SheetStruk.jsx';
 
 // Instance SpeechRecognition yang lagi AKTIF saat ini, kalau ada — sengaja modul-level (di luar
@@ -1271,9 +1272,9 @@ const MAKS_PERCOBAAN_WAJAH = 10;
 const BATAS_CARI_WAJAH_MS = 20000; // lewat segini (& udah >= 3 percobaan) -> tampilkan 'nggak ketemu'
 
 function SheetWajah({ onClose, onTambahBaru }) {
-  const { setPelangganTerpilih, toast, dispatch, openLunas } = useApp();
-  const [state, setState] = useState('memuat'); // memuat | mencari | hasil | tidak-ketemu | error
-  const [match, setMatch] = useState(null); // { pelanggan, totalUtang, skor, templateBelanjaan }
+  const { S, setPelangganTerpilih, toast, dispatch, openLunas, refreshData } = useApp();
+  const [state, setState] = useState('memuat'); // memuat | menyiapkan | mencari | hasil | tidak-ketemu | error
+  const [match, setMatch] = useState(null); // { pelanggan, totalUtang, jarak, templateBelanjaan }
   const [bayarSebagian, setBayarSebagian] = useState(false);
   const [jumlahCustom, setJumlahCustom] = useState('');
   const [percobaanWajah, setPercobaanWajah] = useState(0); // ditampilkan biar kelihatan masih jalan, bukan nyangkut
@@ -1297,6 +1298,10 @@ function SheetWajah({ onClose, onTambahBaru }) {
     let percobaan = 0;
     let timer;
     let mulaiCari = Date.now();
+    // Nama baru ditampilkan kalau DUA frame berturut-turut sepakat orangnya sama. Satu frame bisa aja
+    // jelek (blur, lagi noleh, ketutup tangan) & kebetulan deket ke pelanggan lain - nunjukin "Ini X?"
+    // dari satu frame gitu yang bikin salah orang. Ongkosnya cuma ~1 percobaan tambahan.
+    let kandidatId = null;
 
     const cobaKenali = async () => {
       if (batal) return;
@@ -1310,11 +1315,20 @@ function SheetWajah({ onClose, onTambahBaru }) {
         if (descriptor) {
           const hasil = await api.wajah.identifikasi(descriptor);
           if (batal) return;
-          if (hasil.cocok) {
+          if (hasil.cocok && hasil.pelanggan.id === kandidatId) {
             setMatch(hasil);
             setState('hasil');
             return;
           }
+          kandidatId = hasil.cocok ? hasil.pelanggan.id : null;
+          // Aplikasi masih versi lama padahal server udah baru - nggak bakal pernah kenal siapa pun.
+          if (hasil.perluUpdate) {
+            toast('Aplikasi perlu diperbarui - tutup lalu buka lagi aplikasinya');
+            onClose();
+            return;
+          }
+        } else {
+          kandidatId = null;
         }
       } catch (e) {
         // model gagal DIMUAT (timeout/koneksi) - bukan soal "wajah belum kedeteksi di frame ini".
@@ -1343,7 +1357,8 @@ function SheetWajah({ onClose, onTambahBaru }) {
         // lambat otomatis dapet jeda lebih panjang, main thread-nya kebagian napas buat gambar layar.
         const lama = performance.now() - mulai;
         setPercobaanWajah(percobaan);
-        timer = setTimeout(cobaKenali, Math.max(700, lama * 2));
+        // Lagi nunggu konfirmasi frame kedua - dipercepat, orangnya masih di depan kamera.
+        timer = setTimeout(cobaKenali, kandidatId ? Math.max(300, lama) : Math.max(700, lama * 2));
       }
     };
 
@@ -1363,6 +1378,13 @@ function SheetWajah({ onClose, onTambahBaru }) {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
+        }
+        // Pelanggan yang data wajahnya masih model lama dihitung ulang dulu dari fotonya (sekali doang
+        // seumur data) - kalau nggak, orang itu nggak bakal pernah kekenal di pencarian bawah.
+        if (S.pelanggan.some(perluPerbaruiWajah)) {
+          setState('menyiapkan');
+          if ((await perbaruiWajahLama(S.pelanggan)) > 0) refreshData();
+          if (batal) return;
         }
         setState('mencari');
         mulaiCari = Date.now();
@@ -1391,6 +1413,12 @@ function SheetWajah({ onClose, onTambahBaru }) {
           )}
         </div>
 
+        {state === 'menyiapkan' && (
+          <>
+            <h3>Menyiapkan data wajah…</h3>
+            <p>Data wajah pelanggan lama lagi diperbarui dari fotonya. Cuma sekali ini aja.</p>
+          </>
+        )}
         {(state === 'memuat' || state === 'mencari') && (
           <>
             <h3>Mengenali wajah…</h3>
@@ -1431,7 +1459,7 @@ function SheetWajah({ onClose, onTambahBaru }) {
               dangerouslySetInnerHTML={{
                 __html: match.totalUtang
                   ? `Utang belum lunas: <b style="color:var(--ink)">${rupiah(match.totalUtang)}</b>`
-                  : `Tidak punya utang. Kecocokan ${Math.round(match.skor * 100)}%.`,
+                  : 'Tidak punya utang.',
               }}
             />
             {match.templateBelanjaan?.length > 0 && (
@@ -1494,7 +1522,7 @@ function SheetWajah({ onClose, onTambahBaru }) {
             </button>
           </>
         )}
-        {(state === 'memuat' || state === 'mencari' || state === 'error' || state === 'tidak-ketemu') && (
+        {(state === 'memuat' || state === 'menyiapkan' || state === 'mencari' || state === 'error' || state === 'tidak-ketemu') && (
           <button className="btn" style={{ width: '100%', marginTop: 12 }} onClick={onClose}>
             Tutup
           </button>
