@@ -641,3 +641,54 @@ kosong - JANGAN ngarang varian yang kamu nggak yakin beneran ada.`;
       hargaPerkiraan: Math.max(0, +h.hargaPasaran || 0),
     }));
 }
+
+// Batas ukuran audio yang boleh masuk (base64). Rekaman dari lib/rekam.js udah WAV 16 kHz mono
+// dan dibatasi 20 detik (~850 KB base64), jadi ini pagar buat kiriman yang nggak wajar. Ditaruh
+// DI BAWAH batas body Express (2mb di index.js) biar yang kegedean kena pesan kita yang jelas,
+// bukan error mentah dari pengurai body.
+const MAKS_AUDIO_B64 = 1_500_000;
+
+// Ubah rekaman suara jadi teks pakai Gemini.
+//
+// Dipakai sebagai PENGGANTI SpeechRecognition di perangkat yang nggak ngasih API itu jalan -
+// paling sering iPhone yang aplikasinya dibuka dari ikon layar HP (lihat lib/rekam.js buat
+// duduk perkaranya). Hasilnya masuk ke alur yang sama persis kayak hasil SpeechRecognition:
+// ditaruh di kotak teks yang bisa dikoreksi user dulu, BUKAN langsung dieksekusi.
+//
+// Sengaja cuma disuruh NULIS ULANG, nggak disuruh sekalian ngerti "2 indomie" itu barang apa.
+// Pemisahan barang & jumlahnya udah punya jalurnya sendiri (parseUcapan / parseUcapanGemini) yang
+// tau daftar barang warung ini - kalau transkripnya sekalian ditebak-tebak di sini, hasilnya jadi
+// dua lapis tebakan yang susah dilacak waktu salah.
+export async function transkripSuaraGemini(audioBase64, warungId) {
+  const match = /^data:(audio\/[\w.+-]+);base64,(.+)$/.exec(audioBase64 || '');
+  if (!match) throw Object.assign(new Error('Format audio tidak valid'), { status: 400 });
+  const [, mimeType, data] = match;
+  if (data.length > MAKS_AUDIO_B64) throw Object.assign(new Error('Rekamannya kepanjangan'), { status: 413 });
+
+  const prompt = `Kamu alat tulis-ulang suara buat aplikasi warung kelontong Indonesia.
+
+Tulis ULANG PERSIS apa yang diucapkan di rekaman ini. Aturannya:
+- Bahasa Indonesia sehari-hari, termasuk logat/campuran bahasa daerah kalau ada.
+- JANGAN dirapikan, JANGAN diringkas, JANGAN dijawab. Cuma ditulis ulang.
+- Angka ditulis pakai ANGKA (2, bukan "dua") - ini dipakai buat ngitung jumlah barang.
+- Nama merek ditulis sesuai yang kedengeran (Indomie, Teh Botol, Gudang Garam, Aqua, dst).
+- Kalau nggak ada suara omongan yang kedengeran jelas, balas string kosong.
+
+Balas HANYA teksnya, tanpa tanda kutip dan tanpa penjelasan apa pun.`;
+
+  const data2 = await panggilGemini(
+    {
+      contents: [{ role: 'user', parts: [{ text: prompt }, { inlineData: { mimeType, data } }] }],
+      // Nulis ulang itu tugas yang nggak butuh kreativitas - suhunya dinolin biar dia nulis apa
+      // yang kedengeran, bukan nebak kalimat yang "lebih masuk akal".
+      generationConfig: { temperature: 0, maxOutputTokens: 400 },
+    },
+    warungId,
+    30000
+  );
+
+  const teks = (data2.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
+  // Model kadang tetep ngasih tanda kutip walau udah dilarang - dibuang di sini biar hasilnya
+  // nggak kebawa ke kotak teks yang dibaca pemisah barang.
+  return teks.replace(/^["'`]+|["'`]+$/g, '').trim();
+}

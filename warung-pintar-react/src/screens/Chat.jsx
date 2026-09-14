@@ -6,7 +6,9 @@ import { hargaDariMargin, modalDariHarga, MARGIN_DEFAULT } from '../lib/harga';
 import { Sheet } from '../components/SharedSheets.jsx';
 import { CameraIcon, Ikon } from '../lib/icons.jsx';
 import { bukaKamera, tutupKamera, jepretFrame, keWebp } from '../lib/kamera';
-import { pesanIzinMikrofon } from '../lib/mic';
+import { pesanIzinMikrofon, perangkatIOS } from '../lib/mic';
+import { mulaiRekam, rekamanDidukung } from '../lib/rekam';
+import { terpasangSebagaiApp } from '../lib/pwa';
 import mangWarungImg from '../assets/mangwarung.webp';
 
 // Balasan Gemini kadang ngandung markdown ringan (**tebal**, baris baru buat paragraf) - di-escape
@@ -203,12 +205,75 @@ function TanyaAI() {
   // rec.start() WAJIB dipanggil LANGSUNG di dalam handler klik ini, bukan belakangan di useEffect -
   // Chrome Android bisa diam-diam gagal minta izin mic TANPA nge-trigger onerror kalau start()-nya
   // di luar "user gesture" asli. Persis pelajaran yang udah kena sekali di bukaVoice() (Catat.jsx).
+  // --- Jalur cadangan: rekam lalu ditranskrip AI -----------------------------------------------
+  // Dipakai kalau SpeechRecognition nggak bisa dipakai di HP ini. Kasus utamanya iPhone yang
+  // aplikasinya dibuka dari IKON LAYAR HP: API-nya kelihatan ada tapi selalu ditolak WebKit walau
+  // izin mikrofonnya udah dikasih. Duduk perkaranya di lib/rekam.js.
+  const perekamRef = useRef(null);
+  const [rekamKirim, setRekamKirim] = useState(false); // true selagi rekamannya lagi ditranskrip
+
+  useEffect(
+    () => () => {
+      perekamRef.current?.batal();
+      perekamRef.current = null;
+    },
+    []
+  );
+
+  const mulaiRekamChat = async () => {
+    try {
+      perekamRef.current = await mulaiRekam({ onOtomatisBerhenti: () => selesaiRekamChat() });
+      setDengar(true);
+    } catch (e) {
+      perekamRef.current = null;
+      toast(e?.name === 'NotAllowedError' ? pesanIzinMikrofon('rekam suara') : 'Mikrofonnya nggak bisa dipakai. Ketik aja ya.');
+    }
+  };
+
+  const selesaiRekamChat = async () => {
+    const perekam = perekamRef.current;
+    if (!perekam) return;
+    perekamRef.current = null;
+    setDengar(false);
+    setRekamKirim(true);
+    try {
+      const audio = await perekam.selesai();
+      if (!audio) {
+        toast('Nggak ada suara yang kerekam. Coba lagi ya.');
+        return;
+      }
+      const { teks } = await api.suara.transkrip(audio);
+      if (!teks) {
+        toast('Suaranya nggak kedengeran jelas. Coba lagi, atau ketik aja.');
+        return;
+      }
+      // Sama kayak hasil dikte biasa: masuk ke kotak ketik dulu, BELUM kekirim - biar kebaca
+      // ulang & bisa dibenerin sebelum ditanyain ke Mang AI.
+      setDraf((d) => (d ? `${d.trimEnd()} ${teks}` : teks));
+    } catch (e) {
+      toast(e?.message ? escapeHtml(e.message) : 'Gagal membaca suara. Ketik aja dulu ya.');
+    } finally {
+      setRekamKirim(false);
+    }
+  };
+
   const toggleDikte = () => {
+    if (rekamKirim) return;
+    if (perekamRef.current) {
+      selesaiRekamChat();
+      return;
+    }
     if (dengar) {
       matikanDikte();
       return;
     }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    // iPhone dari ikon layar HP: jangan buang-buang percobaan ke SpeechRecognition yang udah
+    // pasti ditolak - langsung ke jalur rekam.
+    if ((!SR || (perangkatIOS() && terpasangSebagaiApp())) && rekamanDidukung()) {
+      mulaiRekamChat();
+      return;
+    }
     if (!SR) {
       toast('Browser ini belum bisa dikte suara. Ketik aja ya.');
       return;
@@ -533,9 +598,9 @@ function TanyaAI() {
         )}
         {/* Lagi ndengerin - dikasih keterangan teks, bukan cuma tombolnya yang merah. Mic nyala
             tanpa penjelasan itu bikin was-was, apalagi HP-nya lagi ditaruh di meja warung. */}
-        {dengar && (
+        {(dengar || rekamKirim) && (
           <div className="dengar-nota">
-            <i /> Lagi dengerin... ngomong aja ya
+            <i /> {rekamKirim ? 'Lagi dibaca jadi tulisan...' : 'Lagi dengerin... ngomong aja ya'}
           </div>
         )}
 
@@ -585,7 +650,7 @@ function TanyaAI() {
               type="button"
               className={'mic' + (dengar ? ' dengar' : '')}
               onClick={toggleDikte}
-              disabled={typing}
+              disabled={typing || rekamKirim}
               aria-label={dengar ? 'Berhenti dengerin' : 'Sebut pertanyaan'}
             >
               <svg viewBox="0 0 24 24">

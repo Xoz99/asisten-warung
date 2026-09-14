@@ -162,6 +162,12 @@ export const api = {
     tambah: (data) => post('/api/pelanggan', data),
   },
 
+  suara: {
+    // Rekaman suara -> teks. Jalur cadangan buat HP yang SpeechRecognition-nya diblokir (paling
+    // sering iPhone yang dibuka dari ikon layar HP) - lihat lib/rekam.js.
+    transkrip: (audio) => post('/api/suara/transkrip', { audio }),
+  },
+
   jaga: {
     riwayat: () => get('/api/jaga/riwayat'),
     // Pratinjau angka giliran yang lagi jalan. WAJIB dari server, jangan dihitung ulang di layar:

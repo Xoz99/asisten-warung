@@ -3,6 +3,8 @@ import { useApp } from '../state/AppContext.jsx';
 import { ProductIcon, CameraIcon, Ikon } from '../lib/icons.jsx';
 import { parseUcapan } from '../lib/voice';
 import { pesanIzinMikrofon, perangkatIOS } from '../lib/mic';
+import { mulaiRekam, rekamanDidukung } from '../lib/rekam';
+import { terpasangSebagaiApp } from '../lib/pwa';
 import { rupiah, inisial, escapeHtml } from '../lib/format';
 import { api } from '../lib/api';
 import { bukaKamera, tutupKamera, jepretFrame, keWebp } from '../lib/kamera';
@@ -29,7 +31,9 @@ let recAktifSaatIni = null;
 // laporan abort() pertama kadang gak nempel kalau dipanggil pas sesi audio internalnya masih
 // "baru banget" kesetup, panggilan kedua ini jaring pengaman ekstra buat kasus itu.
 function matikanMic(target) {
-  if (!target || target === 'tidak-didukung') return;
+  // Penanda mode (string 'tidak-didukung' / 'rekam') bukan sesi beneran - nggak ada yang perlu
+  // dimatiin, dan manggil .stop() di string bakal ngelempar.
+  if (!target || typeof target === 'string') return;
   const coba = () => {
     try {
       target.stop();
@@ -141,6 +145,17 @@ export default function Catat() {
   // yang cuma kejadian di HP, nggak di desktop.
   const bukaVoice = () => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    // iPhone yang dibuka dari IKON LAYAR HP: SpeechRecognition-nya ADA (jadi `SR` di atas nggak
+    // null) tapi SELALU ditolak WebKit, walau izin mikrofonnya udah dikasih. Jadi jangan dicoba
+    // dulu - percobaan itu cuma ngasih dialog error yang nggak ada obatnya. Langsung ke jalur
+    // rekam + transkrip AI, yang di situ jalan normal. Lihat lib/rekam.js.
+    const iosTerpasang = perangkatIOS() && terpasangSebagaiApp();
+    if ((!SR || iosTerpasang) && rekamanDidukung()) {
+      setVoiceRec('rekam');
+      setVoiceOpen(true);
+      return;
+    }
     if (!SR) {
       setVoiceRec('tidak-didukung');
       setVoiceOpen(true);
@@ -528,6 +543,74 @@ function SheetVoice({ rec, onClose }) {
   const [antrianAmbigu, setAntrianAmbigu] = useState([]); // entri yang variannya belum jelas (mis. "aqua" tanpa sebut ukuran), ditanyain satu-satu
   const recRef = useRef(null);
   const diIOS = perangkatIOS();
+  // Jalur rekam+transkrip (dipakai kalau SpeechRecognition nggak bisa dipakai - lihat bukaVoice).
+  // perekamRef nyimpen pengendali dari mulaiRekam(); mikrofonnya baru dilepas pas selesai/batal.
+  const perekamRef = useRef(null);
+  const [statusRekam, setStatusRekam] = useState('siap'); // siap | rekam | kirim
+
+  // Kalau sheet-nya ditutup selagi masih ngerekam (tap Batal, atau komponennya dilepas),
+  // mikrofonnya HARUS dilepas - kalau nggak, indikator rekaman di HP nyala terus.
+  useEffect(
+    () => () => {
+      perekamRef.current?.batal();
+      perekamRef.current = null;
+    },
+    []
+  );
+
+  const mulaiNgerekam = async () => {
+    try {
+      // Dipanggil LANGSUNG di dalam handler tap - getUserMedia butuh itu biar dialog izinnya
+      // kehitung sebagai permintaan user (sama alasannya kayak SpeechRecognition.start()).
+      perekamRef.current = await mulaiRekam({
+        onOtomatisBerhenti: () => {
+          // Kena batas 20 detik. Rekamannya tetep dikirim - yang udah kerekam masih berguna,
+          // daripada dibuang & user harus ngulang dari nol.
+          selesaiNgerekam();
+        },
+      });
+      setStatusRekam('rekam');
+    } catch (e) {
+      perekamRef.current = null;
+      toast(e?.name === 'NotAllowedError' ? pesanIzinMikrofon('rekam suara') : 'Mikrofonnya nggak bisa dipakai. Ketik manual dulu ya.');
+      setStep('teks'); // dialihin ke ketik manual, jangan mentok - pembelinya lagi nunggu
+    }
+  };
+
+  const selesaiNgerekam = async () => {
+    const perekam = perekamRef.current;
+    if (!perekam) return;
+    perekamRef.current = null;
+    setStatusRekam('kirim');
+    try {
+      const audio = await perekam.selesai();
+      if (!audio) {
+        toast('Nggak ada suara yang kerekam. Coba lagi ya.');
+        setStatusRekam('siap');
+        return;
+      }
+      const { teks: hasil } = await api.suara.transkrip(audio);
+      if (!hasil) {
+        toast('Suaranya nggak kedengeran jelas. Coba lagi, atau ketik manual.');
+        setStatusRekam('siap');
+        return;
+      }
+      // Masuk ke langkah yang SAMA PERSIS kayak hasil SpeechRecognition: ditaruh di kotak teks
+      // yang bisa dikoreksi dulu, baru dimasukin keranjang. Nggak ada jalur pintas yang langsung
+      // eksekusi - transkrip AI juga bisa salah denger.
+      setTeks(hasil);
+      setStep('teks');
+    } catch (e) {
+      toast(e?.message ? escapeHtml(e.message) : 'Gagal membaca suara. Ketik manual dulu ya.');
+      setStatusRekam('siap');
+    }
+  };
+
+  const batalRekam = () => {
+    perekamRef.current?.batal();
+    perekamRef.current = null;
+    onClose();
+  };
 
   // SpeechRecognition TIDAK ngasih data level volume suara asli — cuma event on/off
   // (onspeechstart/onspeechend). Visualizer amplitudo BENERAN butuh stream mic terpisah
@@ -537,7 +620,9 @@ function SheetVoice({ rec, onClose }) {
   // sesering mungkin SELAMA ngomong true — bukan amplitudo asli, tapi keliatan "hidup"/nyambung
   // sama omongan tanpa nyentuh mic sama sekali (nggak ada risiko konflik).
   useEffect(() => {
-    if (!ngomong) {
+    // Ikut hidup juga selama jalur rekam lagi jalan - di situ juga nggak ada data amplitudo asli
+    // (kita cuma nampung potongan suara), jadi perlakuannya sama: gerak biar keliatan nyala.
+    if (!ngomong && statusRekam !== 'rekam') {
       setBatang([1, 1, 1, 1, 1, 1, 1]);
       return;
     }
@@ -545,9 +630,13 @@ function SheetVoice({ rec, onClose }) {
       setBatang(Array.from({ length: 7 }, () => 0.6 + Math.random() * 1.6));
     }, 110);
     return () => clearInterval(iv);
-  }, [ngomong]);
+  }, [ngomong, statusRekam]);
 
   useEffect(() => {
+    if (rec === 'rekam') {
+      setStep('rekam');
+      return;
+    }
     if (rec === 'tidak-didukung' || !rec) {
       setStep('tidak-didukung');
       return;
@@ -712,6 +801,53 @@ function SheetVoice({ rec, onClose }) {
                 batasan Safari/iOS ngelepas mic, bukan aplikasi ini yang diam-diam masih merekam.
               </p>
             )}
+          </>
+        )}
+        {/* Jalur rekam+transkrip. Beda dari 'dengar' di atas yang otomatis berhenti sendiri pas
+            user diem: di sini user yang mutusin kapan selesai, soalnya nggak ada sinyal apa pun
+            dari browser soal "udah berhenti ngomong belum" - yang kita punya cuma potongan suara
+            mentah. Dua tap: mulai, terus selesai. */}
+        {step === 'rekam' && (
+          <>
+            <div className={'wave' + (statusRekam === 'rekam' ? ' ngomong' : '')}>
+              {batang.map((s2, i) => (
+                <i key={i} style={statusRekam === 'rekam' ? { transform: `scaleY(${s2})` } : undefined} />
+              ))}
+            </div>
+            {statusRekam === 'kirim' ? (
+              <>
+                <h3>Lagi dibaca...</h3>
+                <p>Sebentar ya, suaranya lagi diubah jadi tulisan.</p>
+              </>
+            ) : statusRekam === 'rekam' ? (
+              <>
+                <h3>Lagi merekam</h3>
+                <p>Sebutkan barangnya, terus tap Selesai.</p>
+                <button className="btn utama" style={{ width: '100%', marginTop: 18 }} onClick={selesaiNgerekam}>
+                  Selesai
+                </button>
+              </>
+            ) : (
+              <>
+                <h3>Sebut barang</h3>
+                <p>
+                  Tap Mulai, sebutkan barangnya, contoh:
+                  <br />
+                  &ldquo;tiga mie goreng satu minyak&rdquo;
+                </p>
+                <button className="btn utama" style={{ width: '100%', marginTop: 18 }} onClick={mulaiNgerekam}>
+                  Mulai rekam
+                </button>
+              </>
+            )}
+            <button className="btn" style={{ width: '100%', marginTop: 10 }} onClick={batalRekam}>
+              {/* Tetep ada selagi nunggu transkrip: kalau jaringannya lelet, jangan sampai user
+                  kekunci di layar "Lagi dibaca..." tanpa jalan keluar - pembelinya nunggu di depan. */}
+              {statusRekam === 'kirim' ? 'Batal, ketik manual aja' : 'Batal'}
+            </button>
+            <p style={{ fontSize: 12, opacity: 0.6, textAlign: 'center', marginTop: 10 }}>
+              Di HP ini suaranya dibaca lewat Mang AI - kepotong sendiri kalau lebih dari 20 detik.
+            </p>
           </>
         )}
         {step === 'tidak-didukung' && (

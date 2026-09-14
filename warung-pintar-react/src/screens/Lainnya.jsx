@@ -810,8 +810,12 @@ function BarisIzinMedia() {
     }
   };
 
+  // Disebutin fiturnya, bukan cuma "udah diizinkan". Izin yang aktif itu nggak otomatis berarti
+  // semua fitur suara jalan - "Sebut barang" di iPhone yang dibuka dari ikon layar HP sempet tetep
+  // mati walau izinnya udah dikasih (sekarang dibenerin lewat jalur rekam, lihat lib/rekam.js),
+  // dan baris yang cuma bilang "udah diizinkan" bikin itu kelihatan kayak aplikasinya bohong.
   const keterangan =
-    status === 'siap' ? 'Kamera & mikrofon udah diizinkan'
+    status === 'siap' ? 'Buat scan barang & sebut barang'
     : status === 'ditolak' ? 'Diblokir - buka setelan browser buat ngizinin lagi'
     : lagiMinta ? 'Nunggu jawaban kamu...'
     : 'Biar nggak ditanya pas lagi ngelayanin pembeli';
@@ -827,7 +831,7 @@ function BarisIzinMedia() {
           </svg>
         </span>
         <span className="tx">
-          <b>{status === 'siap' ? 'Izin kamera & mikrofon aktif' : 'Siapkan izin kamera & mikrofon'}</b>
+          <b>{status === 'siap' ? 'Kamera & mikrofon siap dipakai' : 'Siapkan izin kamera & mikrofon'}</b>
           <span>{keterangan}</span>
         </span>
         {status !== 'siap' && <span className="ar">›</span>}
