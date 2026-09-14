@@ -1,9 +1,10 @@
-// Hal-hal kecil soal mikrofon yang dipakai DI LEBIH DARI SATU layar (Catat "Sebut barang" &
-// dikte suara di chat Mang AI). Sengaja cuma yang murni fungsi tanpa state - sesi
-// SpeechRecognition-nya sendiri tetap diurus masing-masing layar, soalnya kebutuhannya beda
-// jauh: Catat butuh sheet + parse nama barang/qty, chat cuma butuh teksnya masuk ke kotak ketik.
-
-import { terpasangSebagaiApp } from './pwa';
+// Hal-hal soal mikrofon/kamera yang dipakai DI LEBIH DARI SATU layar (Catat "Sebut barang",
+// dikte suara di chat Mang AI, baris "Siapkan izin" di Lainnya). Sesi SpeechRecognition &
+// perekamannya sendiri tetap diurus masing-masing layar, soalnya kebutuhannya beda jauh: Catat
+// butuh sheet + parse nama barang/qty, chat cuma butuh teksnya masuk ke kotak ketik.
+//
+// Langkah membuka izin yang terlanjur diblokir TIDAK di sini - itu di lib/panduanIzin.js, karena
+// isinya beda-beda per perangkat & ditampilin sebagai layar sendiri (SheetIzin), bukan teks biasa.
 
 // Semua browser di iOS/iPadOS (Safari, Chrome, dst) WAJIB pakai mesin WebKit-nya Apple
 // (kebijakan App Store) - jadi keterbatasan WebKit soal mic kena ke SEMUANYA, bukan Safari doang.
@@ -14,48 +15,37 @@ export function perangkatIOS() {
   return /macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1;
 }
 
-
-// Pesan buat error izin mic ('not-allowed' / 'service-not-allowed'). DIBEDAIN PER PLATFORM karena
-// penyebab & cara benerinnya beda jauh - pesan generik "izinkan lewat pengaturan browser" nggak
-// nolong sama sekali di iPhone, di mana menunya bahkan nggak ada di tempat yang orang cari.
+// Minta izin kamera + mikrofon SEKALIGUS dalam satu panggilan - Chrome nampilin SATU dialog kalau
+// digabung, dua panggilan terpisah jadi dua dialog beruntun & yang kedua sering keburu ditutup.
 //
-// Kasus paling sering di iPhone: aplikasi dibuka dari ikon HOME SCREEN (mode standalone). Di situ
-// Safari nggak nampilin dialog izin mikrofon sama sekali - langsung ditolak, tanpa pernah nanya.
-// Satu-satunya jalan: buka lewat Safari biasa.
+// Dipakai bareng sama baris "Siapkan izin" di Lainnya DAN tombol "Sudah, cek lagi" di panduan
+// izin. Disatuin biar dua tempat itu nggak bisa beda perilaku - sebelumnya logika ini cuma ada di
+// dalam komponen Lainnya, jadi tempat lain yang butuh hal sama terpaksa nulis ulang.
 //
-// `namaFitur` dipakai di kalimat iPhone-standalone, biar nunjuk ke tombol yang BARUSAN dipencet
-// user ("Sebut barang" vs "Dikte suara") - bukan istilah umum yang harus ditebak sendiri.
-// Teksnya di-HTML-escape (&gt; &amp;) karena toast() nge-render isinya sebagai HTML.
-export function pesanIzinMikrofon(namaFitur = 'Mikrofon') {
-  if (perangkatIOS()) {
-    if (terpasangSebagaiApp()) {
-      return `Di iPhone, ${namaFitur} belum bisa dipakai dari ikon layar HP. Buka lewat Safari, atau ketik manual.`;
+// Balikin { ok, alasan }. `ok` true kalau minimal salah satu perangkat berhasil dibuka.
+export async function mintaIzinMedia() {
+  if (!navigator.mediaDevices?.getUserMedia) return { ok: false, alasan: 'tidak-didukung' };
+  const lepas = (stream) => stream.getTracks().forEach((t) => t.stop());
+  try {
+    // Track-nya langsung dilepas: tujuannya minta izin, bukan mulai ngerekam. Kalau dibiarin
+    // hidup, lampu kamera & indikator mic nyala terus tanpa sebab - itu justru bikin pemilik
+    // warung curiga terus nyabut izinnya.
+    lepas(await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: true }));
+    return { ok: true };
+  } catch (e) {
+    if (e.name !== 'NotFoundError' && e.name !== 'OverconstrainedError') {
+      return { ok: false, alasan: e.name === 'NotAllowedError' || e.name === 'SecurityError' ? 'ditolak' : 'gagal' };
     }
-    return 'Mikrofon ditolak. Cek Pengaturan &gt; Safari &gt; Mikrofon, dan pastikan Siri &amp; Dikte aktif.';
+    // Perangkat yang cuma punya salah satunya (mis. laptop tanpa kamera) bikin permintaan
+    // gabungan GAGAL TOTAL - nggak ada izin yang kekasih sama sekali, padahal yang satunya
+    // sebenernya bisa. Jadi dicoba satu-satu, biar yang ada tetap kepegang izinnya.
+    const satuan = await Promise.allSettled([
+      navigator.mediaDevices.getUserMedia({ video: true }),
+      navigator.mediaDevices.getUserMedia({ audio: true }),
+    ]);
+    satuan.forEach((h) => h.status === 'fulfilled' && lepas(h.value));
+    if (satuan.some((h) => h.status === 'fulfilled')) return { ok: true, alasan: 'sebagian' };
+    const pertama = satuan[0].reason;
+    return { ok: false, alasan: pertama?.name === 'NotAllowedError' ? 'ditolak' : 'tidak-ada-perangkat' };
   }
-  return 'Akses mikrofon ditolak. Tap ikon gembok di address bar &gt; izinkan Mikrofon.';
-}
-
-// Pesan buat izin kamera+mikrofon yang UDAH TERLANJUR DIBLOKIR. Dipisah dari
-// pesanIzinMikrofon() di atas: yang itu khusus fitur suara, dan cabang iPhone-standalone-nya
-// bilang "belum bisa dipakai dari ikon layar HP" - itu bener buat dikte suara (WebKit emang
-// nggak ngasih SpeechRecognition jalan di mode standalone), tapi SALAH buat kamera, yang
-// sebenernya jalan normal di sana.
-//
-// Yang dituju cuma satu: kasih jalan keluar yang beneran ada di perangkatnya. Sekali izin
-// diblokir, dialognya nggak akan nongol lagi sendiri - jadi kalimat "coba lagi ya" nggak ada
-// gunanya, harus nunjuk ke tempat setelannya.
-export function pesanIzinMedia() {
-  const standalone = terpasangSebagaiApp();
-  if (perangkatIOS()) {
-    // Di iPhone, aplikasi yang dipasang ke layar HP nyimpen izinnya sendiri, dan nggak ada menu
-    // setelan yang jelas buat ngebalikin - jalan yang PASTI berhasil itu pasang ulang ikonnya,
-    // jadi itu yang disaranin (bukan nyuruh nyari menu yang mungkin nggak ada di iOS-nya dia).
-    if (standalone) return 'Izinnya lagi diblokir. Paling gampang: hapus ikon Warung Pintar dari layar HP, terus pasang lagi - nanti ditanya ulang.';
-    return 'Izinnya diblokir. Buka Pengaturan &gt; Safari &gt; Kamera &amp; Mikrofon, ubah jadi Tanya/Izinkan.';
-  }
-  // Android yang UDAH kepasang jadi aplikasi nggak punya address bar, jadi nggak ada ikon
-  // gembok buat di-tap - setelannya pindah ke info aplikasi punya HP-nya.
-  if (standalone) return 'Izinnya diblokir. Buka setelan HP &gt; Aplikasi &gt; Warung Pintar &gt; Izin, nyalain Kamera &amp; Mikrofon.';
-  return 'Izinnya diblokir. Tap ikon gembok di address bar &gt; izinkan Kamera &amp; Mikrofon.';
 }

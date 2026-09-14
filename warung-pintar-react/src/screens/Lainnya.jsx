@@ -3,7 +3,7 @@ import { Ikon } from '../lib/icons.jsx';
 import { useApp } from '../state/AppContext.jsx';
 import { WARNA, FONTS, UKURAN } from '../lib/data';
 import { escapeHtml, tampilNoHp, rupiah } from '../lib/format';
-import { pesanIzinMedia } from '../lib/mic';
+import { mintaIzinMedia } from '../lib/mic';
 import { terpasangSebagaiApp } from '../lib/pwa';
 import { api } from '../lib/api.js';
 import KartuPaket from '../components/KartuPaket.jsx';
@@ -719,7 +719,7 @@ const KUNCI_IZIN_MEDIA = 'warungpintar_izin_media_v1';
 // terpisah: Chrome nampilin SATU dialog buat dua-duanya kalau dimintanya sekaligus. Dua panggilan
 // = dua dialog beruntun, dan yang kedua paling sering keburu ditutup.
 function BarisIzinMedia() {
-  const { toast } = useApp();
+  const { toast, openIzin } = useApp();
   const [status, setStatus] = useState(() => {
     try {
       return localStorage.getItem(KUNCI_IZIN_MEDIA) === 'ya' ? 'siap' : 'belum';
@@ -734,6 +734,7 @@ function BarisIzinMedia() {
   // lokal di atas yang dipakai apa adanya.
   useEffect(() => {
     let batal = false;
+    const langganan = [];
     (async () => {
       if (!navigator.permissions?.query) return;
       try {
@@ -742,81 +743,70 @@ function BarisIzinMedia() {
           navigator.permissions.query({ name: 'microphone' }),
         ]);
         if (batal) return;
-        const keadaan = hasil.map((h) => h.state);
-        if (keadaan.includes('denied')) setStatus('ditolak');
-        else if (keadaan.every((k) => k === 'granted')) setStatus('siap');
-        else setStatus('belum');
+        const perbarui = () => {
+          const keadaan = hasil.map((h) => h.state);
+          if (keadaan.includes('denied')) setStatus('ditolak');
+          else if (keadaan.every((k) => k === 'granted')) setStatus('siap');
+          else setStatus('belum');
+        };
+        perbarui();
+        // Ikutin perubahannya, jangan cuma dibaca sekali pas dipasang. Izinnya bisa berubah dari
+        // LUAR baris ini: lewat tombol "Sudah, cek lagi" di panduan (SheetIzin), atau user ngubah
+        // sendiri di setelan HP terus balik ke aplikasi. Tanpa ini, barisnya nyangkut bilang
+        // "Diblokir" padahal izinnya barusan dikasih - dan itu kejadian beneran waktu dites:
+        // panduannya bilang "Sip, izinnya udah masuk" tapi barisnya masih merah.
+        hasil.forEach((h) => {
+          h.onchange = perbarui;
+          langganan.push(h);
+        });
       } catch {
         /* Safari & kawan-kawan - biarin pakai penanda lokal */
       }
     })();
     return () => {
       batal = true;
+      langganan.forEach((h) => {
+        h.onchange = null;
+      });
     };
   }, []);
 
   const tap = async () => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      toast('Browser ini nggak bisa buka kamera/mikrofon');
-      return;
-    }
+    // Udah diblokir duluan: dialog izinnya NGGAK akan nongol lagi berapa kali pun dicoba, jadi
+    // langsung kasih langkah bukanya - bukan nyoba lagi terus gagal diem-diem.
+    if (status === 'ditolak') return openIzin();
     setLagiMinta(true);
-    try {
-      let stream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: true });
-      } catch (e) {
-        // Perangkat yang cuma punya salah satunya (mis. laptop tanpa kamera) bikin permintaan
-        // gabungan GAGAL TOTAL - nggak ada izin yang kekasih sama sekali, padahal yang satunya
-        // sebenernya bisa. Jadi dicoba satu-satu, biar yang ada tetep kepegang izinnya.
-        if (e.name !== 'NotFoundError' && e.name !== 'OverconstrainedError') throw e;
-        const satuan = await Promise.allSettled([
-          navigator.mediaDevices.getUserMedia({ video: true }),
-          navigator.mediaDevices.getUserMedia({ audio: true }),
-        ]);
-        satuan.forEach((h) => h.status === 'fulfilled' && h.value.getTracks().forEach((t) => t.stop()));
-        if (satuan.every((h) => h.status === 'rejected')) throw satuan[0].reason;
-        try {
-          localStorage.setItem(KUNCI_IZIN_MEDIA, 'ya');
-        } catch {
-          /* nggak kesimpen - nggak apa-apa, izinnya sendiri tetep kepegang browser */
-        }
-        setStatus('siap');
-        toast('Izin kesimpen. Yang nggak kedeteksi di HP ini dilewatin ya.');
-        return;
-      }
-      // Track-nya LANGSUNG dimatiin - tujuannya cuma minta izin, bukan mulai ngerekam. Kalau
-      // dibiarin hidup, lampu kamera HP nyala terus & indikator mic-nya nongol padahal nggak
-      // lagi dipakai apa-apa - itu justru bikin pemilik warung curiga terus nyabut izinnya.
-      stream.getTracks().forEach((t) => t.stop());
+    const { ok, alasan } = await mintaIzinMedia();
+    setLagiMinta(false);
+    if (ok) {
       try {
         localStorage.setItem(KUNCI_IZIN_MEDIA, 'ya');
       } catch {
-        /* abaikan */
+        /* nggak kesimpen - nggak apa-apa, izinnya sendiri tetep kepegang browser */
       }
       setStatus('siap');
-      toast('Beres. Scan barang & sebut barang nggak bakal nanya izin lagi.');
-    } catch (e) {
-      if (e.name === 'NotAllowedError' || e.name === 'SecurityError') {
-        setStatus('ditolak');
-        toast(pesanIzinMedia());
-      } else if (e.name === 'NotFoundError') {
-        toast('Kamera/mikrofonnya nggak kedeteksi di perangkat ini');
-      } else {
-        toast('Gagal minta izin. Coba lagi sebentar lagi ya.');
-      }
-    } finally {
-      setLagiMinta(false);
+      toast(
+        alasan === 'sebagian'
+          ? 'Izin kesimpen. Yang nggak kedeteksi di HP ini dilewatin ya.'
+          : 'Beres. Scan barang & sebut barang nggak bakal nanya izin lagi.'
+      );
+      return;
     }
+    if (alasan === 'ditolak') {
+      setStatus('ditolak');
+      openIzin();
+      return;
+    }
+    toast(
+      alasan === 'tidak-didukung' || alasan === 'tidak-ada-perangkat'
+        ? 'Kamera/mikrofonnya nggak kedeteksi di perangkat ini'
+        : 'Gagal minta izin. Coba lagi sebentar lagi ya.'
+    );
   };
 
-  // Disebutin fiturnya, bukan cuma "udah diizinkan". Izin yang aktif itu nggak otomatis berarti
-  // semua fitur suara jalan - "Sebut barang" di iPhone yang dibuka dari ikon layar HP sempet tetep
-  // mati walau izinnya udah dikasih (sekarang dibenerin lewat jalur rekam, lihat lib/rekam.js),
-  // dan baris yang cuma bilang "udah diizinkan" bikin itu kelihatan kayak aplikasinya bohong.
   const keterangan =
     status === 'siap' ? 'Buat scan barang & sebut barang'
-    : status === 'ditolak' ? 'Diblokir - buka setelan browser buat ngizinin lagi'
+    : status === 'ditolak' ? 'Diblokir - tap buat lihat cara ngizinin lagi'
     : lagiMinta ? 'Nunggu jawaban kamu...'
     : 'Biar nggak ditanya pas lagi ngelayanin pembeli';
 

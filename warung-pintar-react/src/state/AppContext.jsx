@@ -244,6 +244,7 @@ export function AppProvider({ children }) {
   const [lunasInfo, setLunasInfo] = useState(null); // {judul, pesan, onPilih}
   const [pelangganFormOpen, setPelangganFormOpen] = useState(false);
   const [kuotaAiInfo, setKuotaAiInfo] = useState(null); // {pesan} - null = sheet-nya ketutup
+  const [izinInfo, setIzinInfo] = useState(null); // panduan buka izin kamera/mic - null = ketutup
   const toastTimer = useRef();
 
   useEffect(() => {
@@ -262,6 +263,11 @@ export function AppProvider({ children }) {
 
   const goTo = useCallback((id) => setScreen(id), []);
   const openOk = useCallback((judul, pesan) => setOkInfo({ judul, pesan }), []);
+  // Panduan buka izin kamera/mikrofon yang terlanjur diblokir. Ditaruh di level aplikasi (bukan di
+  // dalam layar yang manggil) karena yang paling butuh justru muncul DI ATAS sheet lain - "Sebut
+  // barang" kena tolak izin itu kejadiannya pas sheet suara lagi kebuka.
+  const openIzin = useCallback(() => setIzinInfo({}), []);
+  const closeIzin = useCallback(() => setIzinInfo(null), []);
   const closeOk = useCallback(() => setOkInfo(null), []);
   const openLunas = useCallback((judul, pesan, onPilih) => setLunasInfo({ judul, pesan, onPilih }), []);
   const closeLunas = useCallback(() => setLunasInfo(null), []);
@@ -839,6 +845,9 @@ export function AppProvider({ children }) {
     toast,
     toastMsg,
     okInfo,
+    izinInfo,
+    openIzin,
+    closeIzin,
     openOk,
     closeOk,
     lunasInfo,

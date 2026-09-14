@@ -401,6 +401,16 @@ body{font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased
 .bubble.bot.rapat{border-top-left-radius:10px}
 .bubble.me.rapat{border-top-right-radius:10px}
 
+/* Langkah-langkah di panduan buka izin (SheetIzin). Nomornya dibikin sendiri pakai counter,
+   bukan angka bawaan <ol>: bawaan nempel di pinggir kiri & rata kanan, jadi kalau langkahnya
+   sampai dua baris, baris keduanya nyelip di bawah nomor. Di sini nomornya kotak tetap di kiri,
+   teksnya rata sendiri - kebaca sebagai urutan yang harus diikuti, bukan paragraf. */
+.langkah-izin{list-style:none;counter-reset:izin;margin:14px 0 0;padding:0;text-align:left}
+.langkah-izin li{counter-increment:izin;position:relative;padding:0 0 12px 34px;font-size:15px;line-height:1.5;font-weight:500}
+.langkah-izin li:last-child{padding-bottom:0}
+.langkah-izin li::before{content:counter(izin);position:absolute;left:0;top:0;width:24px;height:24px;border-radius:8px;
+  background:var(--aksen);color:#0A0A0A;display:grid;place-items:center;font-size:13px;font-weight:800}
+
 /* form */
 .field{margin-top:14px}
 .field label{display:block;font-size:var(--small);font-weight:700;color:var(--abu);margin-bottom:8px}

@@ -6,7 +6,7 @@ import { hargaDariMargin, modalDariHarga, MARGIN_DEFAULT } from '../lib/harga';
 import { Sheet } from '../components/SharedSheets.jsx';
 import { CameraIcon, Ikon } from '../lib/icons.jsx';
 import { bukaKamera, tutupKamera, jepretFrame, keWebp } from '../lib/kamera';
-import { pesanIzinMikrofon, perangkatIOS } from '../lib/mic';
+import { perangkatIOS } from '../lib/mic';
 import { mulaiRekam, rekamanDidukung } from '../lib/rekam';
 import { terpasangSebagaiApp } from '../lib/pwa';
 import mangWarungImg from '../assets/mangwarung.webp';
@@ -148,7 +148,7 @@ export default function Chat() {
 }
 
 function TanyaAI() {
-  const { dispatch, refreshData, toast, cekLisensi, authWarung } = useApp();
+  const { dispatch, refreshData, toast, cekLisensi, authWarung, openIzin } = useApp();
   const warungId = authWarung?.id || null;
   // Riwayat dimuat pakai kunci milik warung yang LAGI login - bukan kunci global. Sengaja lewat
   // fungsi (lazy initializer), bukan muatLogTersimpan(warungId) langsung, biar localStorage-nya
@@ -226,7 +226,8 @@ function TanyaAI() {
       setDengar(true);
     } catch (e) {
       perekamRef.current = null;
-      toast(e?.name === 'NotAllowedError' ? pesanIzinMikrofon('rekam suara') : 'Mikrofonnya nggak bisa dipakai. Ketik aja ya.');
+      if (e?.name === 'NotAllowedError') openIzin();
+      else toast('Mikrofonnya nggak bisa dipakai. Ketik aja ya.');
     }
   };
 
@@ -300,7 +301,7 @@ function TanyaAI() {
     };
     rec.onerror = (ev) => {
       if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
-        toast(pesanIzinMikrofon('dikte suara'));
+        openIzin(); // langkah bukanya, bukan toast sekilas - lihat SheetIzin di SharedSheets
       } else if (ev.error === 'no-speech') {
         toast('Nggak kedengeran suaranya. Coba lagi, atau ketik aja.');
       } else if (ev.error === 'audio-capture') {

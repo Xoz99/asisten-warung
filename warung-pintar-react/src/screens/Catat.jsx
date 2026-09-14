@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { ProductIcon, CameraIcon, Ikon } from '../lib/icons.jsx';
 import { parseUcapan } from '../lib/voice';
-import { pesanIzinMikrofon, perangkatIOS } from '../lib/mic';
+import { perangkatIOS } from '../lib/mic';
 import { mulaiRekam, rekamanDidukung } from '../lib/rekam';
 import { terpasangSebagaiApp } from '../lib/pwa';
 import { rupiah, inisial, escapeHtml } from '../lib/format';
@@ -535,7 +535,7 @@ function SheetCariManual({ onClose }) {
 // diminta TANPA nge-trigger onerror sama sekali (Chrome desktop lebih longgar soal ini, makanya
 // dulu bug ini cuma kejadian di HP, nggak kelihatan pas dites di desktop).
 function SheetVoice({ rec, onClose }) {
-  const { S, tambah, totalCart, toast } = useApp();
+  const { S, tambah, totalCart, toast, openIzin } = useApp();
   const [step, setStep] = useState('dengar'); // dengar | teks | tidak-didukung | memproses-ai | pilih-varian
   const [teks, setTeks] = useState('');
   const [ngomong, setNgomong] = useState(false); // true selagi speech recognition-nya deteksi ada suara masuk
@@ -572,7 +572,8 @@ function SheetVoice({ rec, onClose }) {
       setStatusRekam('rekam');
     } catch (e) {
       perekamRef.current = null;
-      toast(e?.name === 'NotAllowedError' ? pesanIzinMikrofon('rekam suara') : 'Mikrofonnya nggak bisa dipakai. Ketik manual dulu ya.');
+      if (e?.name === 'NotAllowedError') openIzin();
+      else toast('Mikrofonnya nggak bisa dipakai. Ketik manual dulu ya.');
       setStep('teks'); // dialihin ke ketik manual, jangan mentok - pembelinya lagi nunggu
     }
   };
@@ -665,10 +666,9 @@ function SheetVoice({ rec, onClose }) {
       clearTimeout(timeoutTimer);
       matikanMic(rec);
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-        // Pesannya dibedain per platform (iPhone dari ikon layar HP vs Safari biasa vs Android/
-        // desktop) - alasan lengkapnya ada di pesanIzinMikrofon(), lib/mic.js. Dipindah ke sana
-        // waktu dikte suara di chat Mang AI butuh pesan yang persis sama.
-        toast(pesanIzinMikrofon('"Sebut barang"'));
+        // Panduan langkah-per-langkah, bukan toast sekilas: menu setelannya beda tiap HP, dan
+        // toast 3 detik nggak cukup buat nuntun orang ke sana (lihat SheetIzin di SharedSheets).
+        openIzin();
         // Dialihkan ke ketik manual, JANGAN cuma ditutup - pembelinya lagi nunggu di depan,
         // jangan sampai pemilik warung mentok tanpa jalan lain gara-gara mic bermasalah.
         setStep('teks');

@@ -5,6 +5,8 @@ import { ambilDeskriptorWajah, gambarDariDataUrl } from '../lib/wajah';
 import { keWebp } from '../lib/kamera';
 import { CameraIcon, Ikon } from '../lib/icons.jsx';
 import { escapeHtml } from '../lib/format';
+import { panduanIzin } from '../lib/panduanIzin';
+import { mintaIzinMedia } from '../lib/mic';
 
 // Diekspor (bukan cuma dipakai internal file ini) - Chat.jsx pakai ini juga buat sheet detail
 // diskusi & konfirmasi hapus di Komunitas, biar gaya popup-nya konsisten sama sheet lain di app.
@@ -23,7 +25,56 @@ export default function SharedSheets() {
       <SheetLunas />
       <SheetPelangganForm />
       <SheetKuotaAiHabis />
+      <SheetIzin />
     </>
+  );
+}
+
+// Panduan buka izin kamera/mikrofon yang TERLANJUR DIBLOKIR.
+//
+// Sebelumnya ini cuma satu baris toast ("buka setelan browser") yang lewat 3 detik terus ilang -
+// dan menu yang dimaksud beda-beda tiap HP, jadi orangnya tetep nggak tau harus ke mana. Sekarang
+// langkahnya disebut satu-satu buat perangkat yang lagi dipakai (lihat panduanIzin di
+// lib/panduanIzin.js, di situ juga ada alasan kenapa nggak bisa langsung dilempar ke halaman
+// setelannya - browser emang ngeblokir itu).
+function SheetIzin() {
+  const { izinInfo, closeIzin, toast } = useApp();
+  const [cek, setCek] = useState(false);
+  if (!izinInfo) return null;
+  const panduan = panduanIzin();
+
+  // Bukan cuma NGECEK: getUserMedia dipanggil beneran lagi. Kalau setelannya barusan diubah jadi
+  // "Tanya", panggilan ini yang bakal munculin dialog izinnya - jadi satu tombol ini nutup dua
+  // kemungkinan sekaligus, dan user nggak perlu nebak mana yang berlaku buat HP-nya.
+  const cekLagi = async () => {
+    setCek(true);
+    const { ok } = await mintaIzinMedia();
+    setCek(false);
+    if (ok) {
+      toast('Sip, izinnya udah masuk. Sekarang bisa dipakai.');
+      closeIzin();
+      return;
+    }
+    toast('Masih diblokir. Pastikan langkahnya udah kesimpen, ya.');
+  };
+
+  return (
+    <Sheet center mid>
+      <h3>{panduan.judul}</h3>
+      <p>{panduan.pembuka}</p>
+      <ol className="langkah-izin">
+        {panduan.langkah.map((l, i) => (
+          <li key={i}>{l}</li>
+        ))}
+      </ol>
+      {panduan.catatan && <p className="p-sub" style={{ marginTop: 12 }}>{panduan.catatan}</p>}
+      <button className="btn utama brand" style={{ width: '100%', marginTop: 18 }} onClick={cekLagi} disabled={cek}>
+        {cek ? 'Ngecek...' : 'Sudah, cek lagi'}
+      </button>
+      <button className="btn" style={{ width: '100%', marginTop: 10 }} onClick={closeIzin}>
+        Nanti aja
+      </button>
+    </Sheet>
   );
 }
 
