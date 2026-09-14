@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { api } from '../lib/api';
 import { escapeHtml, rupiah, tglID, jamID, inisial } from '../lib/format';
+import { formatBot, saranLanjutan } from '../lib/formatChat';
 import { hargaDariMargin, modalDariHarga, MARGIN_DEFAULT } from '../lib/harga';
 import { Sheet } from '../components/SharedSheets.jsx';
 import { CameraIcon, Ikon } from '../lib/icons.jsx';
@@ -11,9 +12,7 @@ import { mulaiRekam, rekamanDidukung } from '../lib/rekam';
 import { terpasangSebagaiApp } from '../lib/pwa';
 import mangWarungImg from '../assets/mangwarung.webp';
 
-// Balasan Gemini kadang ngandung markdown ringan (**tebal**, baris baru buat paragraf) - di-escape
-// dulu (biar aman dari HTML asing), baru **teks** dikonversi jadi <b>, dan baris baru jadi <br>.
-const formatBot = (s) => escapeHtml(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+// formatBot & saranLanjutan ada di lib/formatChat.js (dipisah biar bisa diuji langsung).
 
 // Riwayat obrolan Mang AI disimpen di localStorage (bukan server - ini murni percakapan lokal di
 // HP, beda dari Komunitas yang emang feed bersama) - dulu cuma state lokal di TanyaAI, jadi ilang
@@ -148,7 +147,7 @@ export default function Chat() {
 }
 
 function TanyaAI() {
-  const { dispatch, refreshData, toast, cekLisensi, authWarung, openIzin } = useApp();
+  const { dispatch, refreshData, toast, cekLisensi, authWarung, openIzin, goTo } = useApp();
   const warungId = authWarung?.id || null;
   // Riwayat dimuat pakai kunci milik warung yang LAGI login - bukan kunci global. Sengaja lewat
   // fungsi (lazy initializer), bukan muatLogTersimpan(warungId) langsung, biar localStorage-nya
@@ -381,7 +380,7 @@ function TanyaAI() {
     setTyping(true);
     try {
       const { jawaban, aksi, jatahAiHabis } = await api.asisten.tanya(q || 'Tolong lihat foto ini.', riwayat, fotoKirim);
-      setLog((l) => [...l, { id: idBaru(), who: 'bot', html: formatBot(jawaban) }]);
+      setLog((l) => [...l, { id: idBaru(), who: 'bot', html: formatBot(jawaban), saran: saranLanjutan(q, jawaban) }]);
       // Jatah AI habis: jawabannya TETAP dikasih (versi rule-based, kaku), tapi user wajib dikasih
       // tau kenapa - tanpa ini dia cuma liat Mang Warung tiba-tiba jawab "aku belum paham" dan
       // ngiranya aplikasinya rusak, bukan jatahnya yang abis. Ditaruh sebagai gelembung terpisah
@@ -552,7 +551,29 @@ function TanyaAI() {
               />
             );
           }
-          return <div key={b.id} className={kelas} dangerouslySetInnerHTML={{ __html: b.html }} />;
+          // Tombol lanjutan cuma di balasan PALING BAWAH - kalau tiap balasan lama ikut bawa tombol,
+          // obrolannya penuh tombol yang udah nggak relevan.
+          const tampilSaran = b.who === 'bot' && i === log.length - 1 && !typing && b.saran?.length > 0;
+          return (
+            <Fragment key={b.id}>
+              <div className={kelas} dangerouslySetInnerHTML={{ __html: b.html }} />
+              {tampilSaran && (
+                <div className="aksi-cepat">
+                  {b.saran.map((sr) => (
+                    <button
+                      key={sr.label}
+                      type="button"
+                      className={sr.jenis === 'buka' ? 'buka' : ''}
+                      onClick={() => (sr.jenis === 'buka' ? goTo(sr.layar) : tanya(sr.label))}
+                    >
+                      {sr.label}
+                      {sr.jenis === 'buka' ? ' \u203a' : ''}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </Fragment>
+          );
         })}
         {typing && (
           <div className="bubble bot">

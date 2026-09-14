@@ -27,6 +27,171 @@ function cocokProdukTeks(rows, teks) {
   return skor >= 3 ? best : null;
 }
 
+// --- Penjualan PER BARANG berdasarkan WAKTU ------------------------------------------------------
+// Dulu konteks AI sama sekali nggak punya data barang yang kejual - cuma "laku per hari" rata-rata
+// di daftar barang. Jadi "Aqua laku berapa minggu ini", "barang apa aja yang kejual kemarin", "jam
+// berapa rokok paling rame" nggak mungkin kejawab, padahal itu yang paling sering pengen diketahui
+// pemilik warung buat nentuin kulakan.
+//
+// HEMAT TOKEN: blok ini CUMA dibikin kalau pertanyaannya emang soal jualan. Pertanyaan lain nggak
+// nambah satu token pun. Datanya juga udah diringkas di database (15 barang teratas / rincian satu
+// barang), bukan daftar transaksi mentah.
+//
+// Batas hari & jam pakai jam SERVER - sama kayak "untung hari ini" & "penjualan hari ini" di atas,
+// biar semua angka "hari ini" di satu jawaban nyambung satu sama lain.
+const KATA_JUALAN = ['terjual', 'kejual', 'laku', 'laris', 'penjualan', 'jualan', 'keluar', 'dibeli', 'omzet', 'pemasukan'];
+const KATA_WAKTU = ['hari ini', 'kemarin', 'minggu', '7 hari', 'bulan', '30 hari', 'jam', 'pagi', 'siang', 'sore', 'malam'];
+const KATA_PER_BARANG = ['barang', 'apa aja', 'apa saja', 'laris', 'laku', 'terjual', 'kejual'];
+const KATA_NGENDAP = ['ngendap', 'nggak laku', 'ga laku', 'tidak laku', 'mandek'];
+// Kata yang PASTI bukan bagian nama barang - dibuang dulu sebelum nyocokin nama, biar "hari" /
+// "penjualan" nggak kebetulan nyangkut ke nama produk.
+const KATA_BUKAN_NAMA = new Set([
+  'berapa', 'yang', 'hari', 'ini', 'kemarin', 'minggu', 'bulan', 'terjual', 'kejual', 'laku', 'laris',
+  'penjualan', 'jualan', 'barang', 'apa', 'aja', 'saja', 'jam', 'pagi', 'siang', 'sore', 'malam', 'udah',
+  'sudah', 'tadi', 'total', 'kita', 'warung', 'paling', 'banyak', 'dibeli', 'keluar', 'omzet', 'terakhir',
+]);
+const NAMA_HARI = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+const tglPendek = (d) => `${NAMA_HARI[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}`;
+const jamPendek = (d) => `${String(d.getHours()).padStart(2, '0')}.${String(d.getMinutes()).padStart(2, '0')}`;
+
+function periodeDariTeks(teks) {
+  const sekarang = new Date();
+  const awalHari = (geser) => {
+    const d = new Date(sekarang);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + geser);
+    return d;
+  };
+  if (teks.includes('kemarin')) return { label: 'kemarin', dari: awalHari(-1), sampai: awalHari(0) };
+  if (teks.includes('hari ini') || /\b(pagi|siang|sore|malam) ini\b/.test(teks)) return { label: 'hari ini', dari: awalHari(0), sampai: sekarang };
+  if (teks.includes('bulan ini')) {
+    const d = awalHari(0);
+    d.setDate(1);
+    return { label: 'bulan ini', dari: d, sampai: sekarang };
+  }
+  if (teks.includes('bulan') || teks.includes('30 hari')) return { label: '30 hari terakhir', dari: awalHari(-29), sampai: sekarang };
+  // Default 7 hari: cukup panjang buat kelihatan polanya, cukup pendek biar datanya nggak kebanyakan.
+  return { label: '7 hari terakhir', dari: awalHari(-6), sampai: sekarang };
+}
+
+// null kalau pertanyaannya bukan soal jualan. Kalau iya: { rentang, top, barang, detail }.
+async function dataPenjualanBarang(wid, teks) {
+  const tentangJualan = KATA_JUALAN.some((k) => teks.includes(k));
+  const adaWaktu = KATA_WAKTU.some((k) => teks.includes(k));
+  const { rows: produk } = await query('SELECT id, nama, satuan FROM produk WHERE warung_id=$1 AND aktif', [wid]);
+  const teksNama = teks
+    .split(/\s+/)
+    .filter((k) => !KATA_BUKAN_NAMA.has(k))
+    .join(' ');
+  const barang = cocokProdukTeks(produk, teksNama);
+  // Nama barang + kata waktu tanpa kata "laku" ("aqua minggu ini gimana") juga dianggap nanya jualan.
+  if (!tentangJualan && !(barang && adaWaktu)) return null;
+
+  const p = periodeDariTeks(teks);
+  const rentang = `${p.label} (${tglPendek(p.dari)} - ${tglPendek(new Date(p.sampai.getTime() - 1))})`;
+  const params = [wid, p.dari.toISOString(), p.sampai.toISOString()];
+
+  // Dikelompokin per produk_id (nama lama di transaksi_item ikut kebawa kalau barangnya diganti nama),
+  // jatuh ke nama kalau produknya udah dihapus.
+  const { rows: top } = await query(
+    `SELECT MAX(ti.nama_produk) AS nama, SUM(ti.qty)::int AS qty, SUM(ti.qty * ti.harga_satuan) AS nilai,
+            COALESCE(SUM(ti.qty) FILTER (WHERE t.mode='kasbon'),0)::int AS qty_kasbon
+     FROM transaksi_item ti JOIN transaksi t ON t.id = ti.transaksi_id
+     WHERE t.warung_id=$1 AND t.waktu >= $2 AND t.waktu < $3
+     GROUP BY COALESCE(ti.produk_id::text, ti.nama_produk)
+     ORDER BY qty DESC LIMIT 15`,
+    params
+  );
+
+  let detail = null;
+  if (barang) {
+    const { rows } = await query(
+      `SELECT t.waktu, ti.qty, ti.harga_satuan, t.mode
+       FROM transaksi_item ti JOIN transaksi t ON t.id = ti.transaksi_id
+       WHERE t.warung_id=$1 AND t.waktu >= $2 AND t.waktu < $3 AND ti.produk_id = $4
+       ORDER BY t.waktu`,
+      [...params, barang.id]
+    );
+    const perHari = [];
+    for (let d = new Date(p.dari); d < p.sampai; d.setDate(d.getDate() + 1)) {
+      perHari.push({ kunci: d.toDateString(), label: tglPendek(d), qty: 0 });
+    }
+    const perJam = new Map();
+    let qty = 0;
+    let nilai = 0;
+    let qtyKasbon = 0;
+    for (const r of rows) {
+      const w = new Date(r.waktu);
+      const q = Number(r.qty);
+      qty += q;
+      nilai += q * Number(r.harga_satuan);
+      if (r.mode === 'kasbon') qtyKasbon += q;
+      const hari = perHari.find((h) => h.kunci === w.toDateString());
+      if (hari) hari.qty += q;
+      perJam.set(w.getHours(), (perJam.get(w.getHours()) || 0) + q);
+    }
+    // Terakhir kejual dicari TANPA batas periode: "aqua minggu ini nggak laku" jauh lebih berguna
+    // kalau dilengkapin "terakhir laku 12 hari lalu" ketimbang cuma "0".
+    const { rows: akhir } = await query(
+      `SELECT t.waktu, ti.qty FROM transaksi_item ti JOIN transaksi t ON t.id = ti.transaksi_id
+       WHERE t.warung_id=$1 AND ti.produk_id=$2 ORDER BY t.waktu DESC LIMIT 1`,
+      [wid, barang.id]
+    );
+    detail = {
+      qty,
+      nilai,
+      qtyKasbon,
+      trx: rows.length,
+      perHari,
+      jamRamai: [...perJam.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([jam, q]) => ({ jam, qty: q })),
+      terakhir: akhir[0] ? { waktu: new Date(akhir[0].waktu), qty: Number(akhir[0].qty) } : null,
+    };
+  }
+  return { rentang, top, barang, detail };
+}
+
+const labelJam = (j) => `${String(j).padStart(2, '0')}.00-${String((j + 1) % 24).padStart(2, '0')}.00`;
+
+// Buat konteks AI: ringkas, angka polos, kolom dijelasin sekali di header.
+function penjualanBarangUntukAI(d) {
+  const baris = [];
+  baris.push(
+    d.top.length
+      ? `Penjualan per barang ${d.rentang}, urut terbanyak (nama | qty terjual termasuk kasbon | nilai rupiah polos), ${d.top.length} teratas:\n` +
+          d.top.map((r) => `- ${r.nama} | ${r.qty}${r.qty_kasbon ? ` (${r.qty_kasbon} lewat kasbon)` : ''} | ${Math.round(Number(r.nilai))}`).join('\n')
+      : `Penjualan per barang ${d.rentang}: belum ada barang yang kejual.`
+  );
+  if (d.barang && d.detail) {
+    const x = d.detail;
+    const sat = d.barang.satuan || 'pcs';
+    baris.push(
+      `Rincian "${d.barang.nama}" ${d.rentang}: total ${x.qty} ${sat}, nilai ${Math.round(x.nilai)}${x.qtyKasbon ? `, ${x.qtyKasbon} ${sat} lewat kasbon` : ''}, dari ${x.trx} transaksi.\n` +
+        `Per hari: ${x.perHari.map((h) => `${h.label}: ${h.qty}`).join(' | ')}\n` +
+        (x.jamRamai.length ? `Jam paling ramai: ${x.jamRamai.map((j) => `${labelJam(j.jam)} (${j.qty})`).join(', ')}\n` : '') +
+        (x.terakhir ? `Terakhir kejual: ${tglPendek(x.terakhir.waktu)} jam ${jamPendek(x.terakhir.waktu)}, ${x.terakhir.qty} ${sat}.` : 'Barang ini belum pernah kejual sama sekali.')
+    );
+  }
+  baris.push('(Data penjualan per barang di atas dihitung dari transaksi asli. Kalau user nanya periode lain yang nggak ada di sini, bilang terus terang & sebut periode yang tersedia.)');
+  return baris.join('\n');
+}
+
+// Buat jawaban cadangan tanpa AI: langsung dibaca user.
+function penjualanBarangUntukUser(d) {
+  if (d.barang && d.detail) {
+    const x = d.detail;
+    const sat = d.barang.satuan || 'pcs';
+    const hariLaku = x.perHari.filter((h) => h.qty > 0);
+    return [
+      `**${d.barang.nama}** ${d.rentang} kejual **${x.qty} ${sat}** (${rp(x.nilai)}).`,
+      ...(hariLaku.length ? [`- Per hari: ${hariLaku.map((h) => `${h.label} ${h.qty}`).join(', ')}`] : []),
+      ...(x.jamRamai.length ? [`- Jam paling ramai: ${x.jamRamai.map((j) => labelJam(j.jam)).join(', ')}`] : []),
+      x.terakhir ? `- Terakhir kejual: ${tglPendek(x.terakhir.waktu)} jam ${jamPendek(x.terakhir.waktu)}` : '- Belum pernah kejual',
+    ].join('\n');
+  }
+  if (!d.top.length) return `Belum ada barang yang kejual ${d.rentang}.`;
+  return [`Barang paling banyak kejual ${d.rentang}:`, ...d.top.slice(0, 8).map((r) => `- **${r.nama}**: ${r.qty}`)].join('\n');
+}
+
 // Rule-based keyword matching di atas data asli - jalan gratis & instan tanpa API luar. Ini
 // FALLBACK: dipanggil kalau Gemini gagal (down/quota abis/key belum diisi), jadi "Mang Warung"
 // nggak pernah mati total, walau jawabannya jadi kaku lagi pas lagi fallback.
@@ -39,6 +204,14 @@ async function jawabRuleBased(teks, wid) {
   }
   if (teks.includes('siapa kamu') || teks.includes('kamu siapa')) {
     return 'Aku Mang Warung, bantu ngecek untung, stok, kasbon, sampai barang paling laris di warungmu.';
+  }
+
+  // Penjualan per barang (dari transaksi asli) - dicek SEBELUM "laris" di bawah, yang cuma baca
+  // rata-rata "laku per hari" di data barang. Pertanyaan soal barang ngendap tetap ke cabangnya
+  // sendiri, walau ada kata "laku"-nya.
+  if (!KATA_NGENDAP.some((k) => teks.includes(k))) {
+    const jb = await dataPenjualanBarang(wid, teks);
+    if (jb && (jb.barang || KATA_PER_BARANG.some((k) => teks.includes(k)))) return penjualanBarangUntukUser(jb);
   }
 
   // barang yang lagi ngendap - dicek SEBELUM "barang laris" biar "nggak laku" nggak ketangkep salah
@@ -79,7 +252,23 @@ async function jawabRuleBased(teks, wid) {
     return 'Paling laris: ' + rows.map((r) => `${r.nama} (${Number(r.laku_per_hari).toFixed(1)}/hari, sisa ${r.stok})`).join(', ') + '.';
   }
 
-  if (teks.includes('untung') || teks.includes('laba') || teks.includes('omzet')) {
+  // Dicek SEBELUM "untung": dulu "omzet" ikut nyangkut ke cabang untung di bawah, jadi pertanyaan
+  // soal penjualan dijawab pakai angka laba.
+  if (['penjualan', 'jualan', 'omzet', 'pemasukan', 'pendapatan', 'uang masuk'].some((k) => teks.includes(k))) {
+    const awal = new Date();
+    awal.setHours(0, 0, 0, 0);
+    const { rows } = await query(
+      `SELECT COALESCE(SUM(total) FILTER (WHERE mode='bayar'),0) AS omzet,
+              COALESCE(SUM(total) FILTER (WHERE mode='bayar' AND COALESCE(metode,'Tunai')='Tunai'),0) AS tunai,
+              COUNT(*) FILTER (WHERE mode='bayar') AS trx
+       FROM transaksi WHERE warung_id=$1 AND waktu >= $2`,
+      [wid, awal.toISOString()]
+    );
+    const r = rows[0];
+    return `Penjualan hari ini **${rp(r.omzet)}** dari ${r.trx} transaksi:\n- Tunai: ${rp(r.tunai)}\n- QRIS/transfer: ${rp(Number(r.omzet) - Number(r.tunai))}`;
+  }
+
+  if (teks.includes('untung') || teks.includes('laba')) {
     const awal = new Date();
     awal.setHours(0, 0, 0, 0);
     const { rows } = await query('SELECT COALESCE(SUM(laba),0) AS untung, COUNT(*) AS trx FROM transaksi WHERE warung_id=$1 AND waktu >= $2', [
@@ -144,7 +333,14 @@ async function bangunKonteks(wid, pertanyaan = '') {
   awal.setHours(0, 0, 0, 0);
 
   const [untungR, kasbonR, produkR, jagaR, pelangganR] = await Promise.all([
-    query('SELECT COALESCE(SUM(laba),0) AS untung, COUNT(*) AS trx FROM transaksi WHERE warung_id=$1 AND waktu >= $2', [wid, awal.toISOString()]),
+    query(
+      `SELECT COALESCE(SUM(total) FILTER (WHERE mode='bayar'),0) AS omzet,
+              COALESCE(SUM(total) FILTER (WHERE mode='bayar' AND COALESCE(metode,'Tunai')='Tunai'),0) AS tunai,
+              COALESCE(SUM(total) FILTER (WHERE mode='kasbon'),0) AS kasbon,
+              COALESCE(SUM(laba),0) AS untung, COUNT(*) AS trx
+       FROM transaksi WHERE warung_id=$1 AND waktu >= $2`,
+      [wid, awal.toISOString()]
+    ),
     query('SELECT id, nama, jumlah FROM kasbon WHERE warung_id=$1 AND NOT lunas ORDER BY jumlah DESC LIMIT 15', [wid]),
     query('SELECT id, nama, harga, modal, stok, laku_per_hari, satuan, isi_kemasan, nama_kemasan FROM produk WHERE warung_id=$1 AND aktif ORDER BY nama LIMIT 60', [wid]),
     query('SELECT dari, ke, uang_laci, waktu FROM riwayat_jaga WHERE warung_id=$1 ORDER BY waktu DESC LIMIT 1', [wid]),
@@ -162,7 +358,17 @@ async function bangunKonteks(wid, pertanyaan = '') {
   const pelangganRows = pelangganR.rows;
 
   const baris = [];
-  baris.push(`Untung hari ini: ${rp(untungR.rows[0].untung)} dari ${untungR.rows[0].trx} transaksi.`);
+  // Penjualan & untung DIPISAH dan dikasih nama tegas. Dulu konteks cuma berisi "Untung hari ini",
+  // jadi pas user nanya "berapa penjualan hari ini", satu-satunya angka yang dipegang AI ya untung
+  // - dan itu yang dia jawab (kejadian beneran: penjualan dijawab "untung bersih Rp34.000").
+  const h = untungR.rows[0];
+  baris.push(
+    `Penjualan hari ini (uang yang masuk, di luar kasbon): ${rp(h.omzet)} - tunai ${rp(h.tunai)}, non-tunai/QRIS/transfer ${rp(Number(h.omzet) - Number(h.tunai))}. ` +
+      `Barang keluar lewat kasbon hari ini: ${rp(h.kasbon)}. Untung bersih hari ini: ${rp(h.untung)}. Jumlah transaksi: ${h.trx}. ` +
+      `(Penjualan/omzet/pemasukan BEDA dengan untung - jawab pakai angka yang ditanya.)`
+  );
+  const jualBarang = await dataPenjualanBarang(wid, pertanyaan);
+  if (jualBarang) baris.push(penjualanBarangUntukAI(jualBarang));
   baris.push(
     // "id" disertain (dulu nggak, jadi AI cuma bisa NYEBUT kasbon siapa, nggak bisa ngusulin
     // lunasi/bayar - lihat aksi "lunasi_kasbon"/"bayar_kasbon" di tanyaGemini) - kasbonId ini yang
@@ -344,4 +550,6 @@ router.post('/tanya', async (req, res, next) => {
   }
 });
 
+// Diekspor terpisah buat diuji langsung ke database, tanpa lewat HTTP & AI.
+export { bangunKonteks, dataPenjualanBarang, penjualanBarangUntukUser };
 export default router;

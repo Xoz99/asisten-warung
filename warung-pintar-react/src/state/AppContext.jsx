@@ -141,6 +141,10 @@ function normTransaksi(r) {
     total: Number(r.total),
     laba: Number(r.laba),
     mode: r.mode,
+    // Metode bayar (Tunai/QRIS/Transfer) WAJIB ikut. Dulu kolom ini dibuang di sini padahal
+    // backend udah ngirim - akibatnya struk di Riwayat penjualan (Beranda) jatuh ke cadangan
+    // 'Tunai' buat SEMUA transaksi, termasuk yang dibayar QRIS.
+    metode: r.metode || null,
     oleh: r.penjaga_nama || '-',
     pembeli: r.pembeli_nama || null,
     items: (r.items || []).map((it) => `${it.qty}x ${it.nama_produk}`),
@@ -670,7 +674,7 @@ export function AppProvider({ children }) {
                 return it ? { ...p, stok: p.stok - it.qty } : p;
               }),
               transaksi: [
-                { waktu: waktuIso, total, laba, mode: isKasbon ? 'kasbon' : 'bayar', oleh: s.penjagaAktif || '-', pembeli: action.pembeli || null, items: itemsTeks },
+                { waktu: waktuIso, total, laba, mode: isKasbon ? 'kasbon' : 'bayar', metode: isKasbon ? null : action.metode || null, oleh: s.penjagaAktif || '-', pembeli: action.pembeli || null, items: itemsTeks },
                 ...s.transaksi,
               ],
               untung: s.untung + tambahUntung,

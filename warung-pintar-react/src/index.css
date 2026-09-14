@@ -398,6 +398,25 @@ body{font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased
    diluruskan, jadi kebaca sebagai satu giliran ngomong - bukan bubble-bubble lepas yang
    jaraknya sama semua. */
 .bubble.rapat{margin-top:4px}
+
+/* Isi balasan Mang AI yang berformat (lihat formatBot di Chat.jsx): paragraf, daftar, tebal. Jarak
+   antar-bagian dibikin rapat - ini gelembung chat, bukan halaman artikel. */
+.bubble.bot p{margin:0 0 8px}
+.bubble.bot p:last-child{margin-bottom:0}
+.bubble.bot ul,.bubble.bot ol{margin:2px 0 8px;padding-left:22px}
+.bubble.bot ul:last-child,.bubble.bot ol:last-child{margin-bottom:0}
+.bubble.bot li{margin:4px 0;padding-left:2px}
+.bubble.bot li::marker{color:var(--abu)}
+.bubble.bot b{font-weight:700}
+
+/* Tombol lanjutan di bawah balasan terakhir (saranLanjutan di Chat.jsx). "buka" = pindah layar,
+   dikasih latar gelap biar kebedain dari yang cuma ngirim pertanyaan lanjutan. */
+.aksi-cepat{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;max-width:92%}
+.aksi-cepat button{border:var(--tepi);background:var(--surface);color:var(--ink);font:inherit;font-size:14px;font-weight:600;
+  padding:9px 14px;border-radius:999px;cursor:pointer;min-height:40px;box-shadow:0 4px 12px -8px rgba(20,20,25,.4)}
+.aksi-cepat button.buka{background:var(--ink);color:var(--bg)}
+.t-dark .aksi-cepat button.buka{background:var(--aksen);color:#0A0A0A}
+.aksi-cepat button:active{transform:scale(.97)}
 .bubble.bot.rapat{border-top-left-radius:10px}
 .bubble.me.rapat{border-top-right-radius:10px}
 
