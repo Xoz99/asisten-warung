@@ -19,7 +19,9 @@ export const PRODUCT_ICONS = {
 };
 
 // foto (opsional): kalau barangnya udah punya foto beneran (bukan cuma ikon generik), tampilin itu.
-export function ProductIcon({ id, foto, className = 'emo picon' }) {
+// 'produk-ikon' = bingkai membulat 44px (lihat index.css) - dulu ikon & foto produk sama-sama dikunci 26x26
+// tanpa sudut bulat kayak ikon UI biasa, jadi foto barang cuma jadi kotak kecil tajam yang isinya nggak kebaca.
+export function ProductIcon({ id, foto, className = 'emo picon produk-ikon' }) {
   if (foto) return <img className={className} src={foto} alt="" style={{ objectFit: 'cover' }} />;
   return (
     <span className={className} dangerouslySetInnerHTML={{ __html: PRODUCT_ICONS[id] || PRODUCT_ICONS.default }} />

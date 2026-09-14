@@ -59,6 +59,12 @@ body{font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased
 .t-dark .emo{filter:grayscale(1) brightness(1.6)}
 .emo.picon{width:26px;height:26px;font-size:0;filter:none;display:inline-flex;align-items:center;justify-content:center;color:var(--ink)}
 .emo.picon svg{width:100%;height:100%;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+/* Ikon/foto PRODUK: bingkai membulat seukuran, biar baris yang pakai foto & yang pakai ikon garis tetap sejajar.
+   Foto ngisi penuh bingkainya (cover), ikon garis ditaruh di tengah. Ikon UI biasa (Ikon) tetap 26px. */
+.emo.picon.produk-ikon{width:44px;height:44px;border-radius:14px;background:var(--bg);overflow:hidden}
+.emo.picon.produk-ikon svg{width:24px;height:24px}
+img.picon.produk-ikon{display:block;object-fit:cover}
+.chip .emo.picon.produk-ikon{width:56px;height:56px;border-radius:16px;margin:0 auto 8px}
 
 .card{background:var(--surface);border-radius:var(--r);padding:20px;margin-top:14px;border:var(--tepi)}
 .card.tap{cursor:pointer;transition:transform .12s}
