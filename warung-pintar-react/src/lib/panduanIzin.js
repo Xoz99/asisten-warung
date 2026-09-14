@@ -19,6 +19,18 @@ function androidKah() {
   return typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
 }
 
+// Browser yang dipakai buat masang aplikasinya. Aplikasi terpasang di Android tetap bawa user agent
+// browser asalnya, jadi masih bisa dibaca dari sini. Urutannya penting: user agent Samsung Internet,
+// Edge & Opera juga nyantumin kata "Chrome".
+function browserAndroid() {
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  if (/SamsungBrowser/i.test(ua)) return 'Samsung Internet';
+  if (/EdgA/i.test(ua)) return 'Microsoft Edge';
+  if (/OPR\/|Opera/i.test(ua)) return 'Opera';
+  if (/Firefox/i.test(ua)) return 'Firefox';
+  return 'Chrome';
+}
+
 export function panduanIzin() {
   const terpasang = terpasangSebagaiApp();
 
@@ -50,20 +62,40 @@ export function panduanIzin() {
   }
 
   if (androidKah()) {
+    const situs = typeof location !== 'undefined' ? location.hostname : 'situs Warung Pintar';
     if (terpasang) {
-      // PWA yang dipasang Chrome muncul sebagai aplikasi sendiri di daftar aplikasi Android,
-      // lengkap sama halaman Izin-nya. Nggak ada address bar di sini, jadi jalur ikon gembok
-      // yang biasa dipakai di tab browser nggak berlaku.
+      const browser = browserAndroid();
+      if (browser !== 'Chrome') {
+        return {
+          judul: 'Izinkan mikrofon & kamera',
+          pembuka: `Aplikasi ini dipasang lewat ${browser}, jadi izinnya dipegang ${browser} - bukan sama ikon Warung Pintar-nya:`,
+          langkah: [
+            `Buka aplikasi ${browser} (bukan Warung Pintar).`,
+            `Masuk ke setelan situs / izin situs, cari ${situs}.`,
+            'Ubah Kamera dan Mikrofon jadi Izinkan.',
+            'Balik ke Warung Pintar, terus tap Sudah, cek lagi.',
+          ],
+        };
+      }
+      // SALAH di versi sebelumnya: dulu nyuruh ke Setelan HP > Aplikasi > Warung Pintar > Izin.
+      // Aplikasi yang dipasang dari Chrome (WebAPK) NGGAK megang izin kamera/mikrofon sendiri -
+      // halaman Info aplikasinya bilang "Tidak ada izin yang diminta" & menunya abu-abu (kejadian
+      // beneran di HP pemilik). Izinnya dipegang CHROME, per situs. Jadi ada dua lapis:
+      //   1. izin situs di Chrome buat domain ini (ini yang paling sering keblokir)
+      //   2. izin Android buat aplikasi Chrome-nya sendiri (kalau Chrome pernah ditolak akses kamera)
+      // Nama situs ditulis persis dari location.hostname biar nggak nyari-nyari di daftar.
       return {
         judul: 'Izinkan mikrofon & kamera',
-        pembuka: 'Aplikasi ini kepasang sebagai aplikasi sendiri, jadi izinnya diatur dari setelan HP:',
+        pembuka: 'Aplikasi ini dipasang lewat Chrome, jadi izinnya dipegang Chrome - bukan di Info aplikasi Warung Pintar. Caranya:',
         langkah: [
-          'Buka Setelan HP > Aplikasi.',
-          'Cari Warung Pintar di daftarnya.',
-          'Masuk ke Izin > Mikrofon (dan Kamera) > pilih Izinkan.',
-          'Balik ke sini, terus tap Sudah, cek lagi.',
+          'Buka aplikasi Chrome (bukan Warung Pintar).',
+          'Tap titik tiga di pojok kanan atas > Setelan > Setelan situs > Semua situs.',
+          `Pilih ${situs}.`,
+          'Ubah Kamera dan Mikrofon jadi Izinkan.',
+          'Balik ke Warung Pintar, terus tap Sudah, cek lagi.',
         ],
-        catatan: 'Bisa juga dengan menahan ikon Warung Pintar di layar HP, lalu pilih Info aplikasi.',
+        catatan:
+          'Masih diblokir? Berarti Chrome-nya sendiri yang belum dikasih izin: Setelan HP > Aplikasi > Chrome > Izin > nyalakan Kamera dan Mikrofon.',
       };
     }
     return {
