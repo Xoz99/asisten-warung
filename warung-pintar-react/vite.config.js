@@ -20,6 +20,9 @@ export default defineConfig({
       { find: '@tensorflow/tfjs-backend-wasm/dist/index.js', replacement: lokal('./src/lib/stubTfjsWasm.js') },
     ],
   },
+  // Worker pengenal wajah (src/lib/wajahWorker.js) dibundel sebagai modul ES - format bawaan (iife) nggak
+  // bisa dipecah jadi beberapa chunk, dan TensorFlow.js di dalamnya kegedean buat dipaksa satu file.
+  worker: { format: 'es' },
   server: {
     // Proxy /api/* ke backend Express (port 4000) - biar frontend bisa diakses dari IP/domain
     // apapun (localhost, IP LAN, tunnel ngrok, dst) tanpa perlu hardcode alamat backend di .env.

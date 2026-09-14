@@ -498,9 +498,14 @@ body{font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased
 .panel p{margin:12px 0 0;font-size:17px;color:var(--abu);font-weight:600;line-height:1.5}
 .ok{width:84px;height:84px;border-radius:30px;background:var(--aksen);color:#0A0A0A;display:grid;place-items:center;font-size:40px;margin:0 auto 18px}
 .viewfinder{width:100%;aspect-ratio:1;border-radius:var(--r);background:#141414;position:relative;overflow:hidden;margin-bottom:18px}
-.viewfinder::after{content:"";position:absolute;left:10%;right:10%;height:3px;background:var(--aksen);top:12%;
-  box-shadow:0 0 24px var(--aksen);animation:scan 1.3s ease-in-out infinite alternate}
-@keyframes scan{to{top:86%}}
+/* Garis scan digerakin pakai TRANSFORM, bukan `top`. Animasi `top` dikerjain thread utama - begitu thread itu
+   sibuk (deteksi wajah/barang), garisnya ikut berhenti & kelihatan kayak aplikasinya nyangkut. Transform
+   dikerjain compositor, jadi tetap jalan mulus. Elemennya setinggi viewfinder (biar persen translateY-nya
+   = persen tinggi viewfinder), garis + cahayanya digambar di bagian atas lewat gradient. */
+.viewfinder::after{content:"";position:absolute;left:10%;right:10%;top:-12px;height:100%;pointer-events:none;
+  background:linear-gradient(to bottom,transparent 0,color-mix(in srgb,var(--aksen) 45%,transparent) 9px,var(--aksen) 12px,var(--aksen) 15px,color-mix(in srgb,var(--aksen) 45%,transparent) 18px,transparent 27px) top/100% 27px no-repeat;
+  transform:translateY(12%);will-change:transform;animation:scan 1.3s ease-in-out infinite alternate}
+@keyframes scan{to{transform:translateY(86%)}}
 .viewfinder.diam::after{content:none} /* udah selesai motret/nemu hasil - garis animasi scan-nya dimatiin */
 .viewfinder .frame{position:absolute;inset:16%;border:3px solid rgba(255,255,255,.35);border-radius:20px}
 .viewfinder .isi{position:absolute;inset:0;display:grid;place-items:center;color:#fff}

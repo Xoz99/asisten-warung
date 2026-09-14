@@ -86,6 +86,86 @@ function siapkanFoto(img) {
   return kanvas;
 }
 
+// ---- Jalur WORKER (utama) ----------------------------------------------------------------------------
+// Semua deteksi & pemuatan model jalan di lib/wajahWorker.js, bukan di thread tampilan. Diukur dengan CPU
+// dilambatin kayak HP menengah: di thread utama, sheet Kenal wajah bikin aplikasi beku sampai 11,8 detik
+// sekali jalan (garis scan berhenti, tombol Tutup nggak nanggap). Jalur lama di bawah cuma cadangan buat
+// browser yang nggak bisa jalanin worker-nya.
+let worker = null;
+let workerRusak = false;
+let nomorPesan = 0;
+const nungguBalasan = new Map();
+
+function ambilWorker() {
+  if (workerRusak) return null;
+  if (!worker) {
+    try {
+      worker = new Worker(new URL('./wajahWorker.js', import.meta.url), { type: 'module' });
+    } catch {
+      workerRusak = true;
+      return null;
+    }
+    worker.onmessage = ({ data }) => {
+      const tunggu = nungguBalasan.get(data.id);
+      if (!tunggu) return;
+      nungguBalasan.delete(data.id);
+      if (data.ok) tunggu.resolve(data);
+      else tunggu.reject(new Error(data.pesan));
+    };
+    // Worker gagal dimuat/crash (browser lama, modulnya error) - semua yang lagi nunggu dilepas, dan
+    // selanjutnya pakai jalur thread utama.
+    worker.onerror = (e) => {
+      e.preventDefault?.();
+      workerRusak = true;
+      worker = null;
+      for (const t of nungguBalasan.values()) t.reject(new Error('WORKER_RUSAK'));
+      nungguBalasan.clear();
+    };
+  }
+  return worker;
+}
+
+function kirimKeWorker(w, pesan, transfer = []) {
+  return new Promise((resolve, reject) => {
+    const id = ++nomorPesan;
+    nungguBalasan.set(id, { resolve, reject });
+    w.postMessage({ ...pesan, id }, transfer);
+  });
+}
+
+let workerSiap = null;
+function siapkanWorker() {
+  const w = ambilWorker();
+  if (!w) return null;
+  if (!workerSiap) {
+    workerSiap = denganTimeout(kirimKeWorker(w, { tipe: 'muat' }), TIMEOUT_MODEL_MS, 'Gagal memuat model pengenal wajah - koneksi kelamaan/kurang stabil. Coba lagi.').catch((e) => {
+      workerSiap = null;
+      throw e;
+    });
+  }
+  return workerSiap;
+}
+
+// Kanvas buat ngambil pixel frame video - dipakai ulang, nggak bikin baru tiap percobaan.
+let kanvasFrame = null;
+const LEBAR_MAKS_FRAME = 640;
+
+function ambilPixel(sumber) {
+  const lebarAsli = sumber.videoWidth || sumber.naturalWidth || sumber.width;
+  const tinggiAsli = sumber.videoHeight || sumber.naturalHeight || sumber.height;
+  if (!lebarAsli || !tinggiAsli) return null; // video belum siap
+  const skala = Math.min(1, LEBAR_MAKS_FRAME / Math.max(lebarAsli, tinggiAsli));
+  const lebar = Math.round(lebarAsli * skala);
+  const tinggi = Math.round(tinggiAsli * skala);
+  if (!kanvasFrame) kanvasFrame = document.createElement('canvas');
+  if (kanvasFrame.width !== lebar) kanvasFrame.width = lebar;
+  if (kanvasFrame.height !== tinggi) kanvasFrame.height = tinggi;
+  const ctx = kanvasFrame.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(sumber, 0, 0, lebar, tinggi);
+  return { data: ctx.getImageData(0, 0, lebar, tinggi).data.buffer, lebar, tinggi };
+}
+
+// ---- Jalur thread utama (cadangan) ------------------------------------------------------------------
 // Foto sekali jepret: nggak ada kesempatan kedua, jadi dicoba sampai ambang yang lebih longgar.
 const AMBANG_FOTO = [0.5, 0.3];
 // Video langsung: frame berikutnya dateng lagi sebentar, jadi cukup sekali jalan dengan ambang yang
@@ -96,6 +176,26 @@ const AMBANG_VIDEO = [0.5];
 // (face descriptor) kalau ketemu wajah, atau null kalau nggak ada wajah kedeteksi.
 // `cepat: true` buat sumber VIDEO yang di-loop, default (false) buat foto sekali jepret.
 export async function ambilDeskriptorWajah(videoOrImg, { cepat = false } = {}) {
+  if (siapkanWorker()) {
+    try {
+      await siapkanWorker();
+      const pixel = ambilPixel(cepat ? videoOrImg : siapkanFoto(videoOrImg));
+      if (!pixel) return null;
+      const balasan = await kirimKeWorker(
+        worker,
+        { tipe: 'deteksi', ...pixel, ambang: cepat ? AMBANG_VIDEO : AMBANG_FOTO },
+        [pixel.data]
+      );
+      return balasan.descriptor;
+    } catch (e) {
+      if (e.message !== 'WORKER_RUSAK') throw e;
+      // worker mati di tengah jalan -> lanjut pakai jalur thread utama di bawah
+    }
+  }
+  return ambilDeskriptorWajahThreadUtama(videoOrImg, { cepat });
+}
+
+async function ambilDeskriptorWajahThreadUtama(videoOrImg, { cepat }) {
   const faceapi = await muatLibrary();
   await muatModelWajah();
   const input = cepat ? videoOrImg : siapkanFoto(videoOrImg);
@@ -119,6 +219,10 @@ export async function ambilDeskriptorWajah(videoOrImg, { cepat = false } = {}) {
 // (cuma percobaan pertamanya balik lambat kayak dulu).
 export async function panaskanModelWajah() {
   try {
+    if (siapkanWorker()) {
+      await siapkanWorker(); // worker udah manasin model sendiri pas dimuat
+      return;
+    }
     const faceapi = await muatLibrary();
     await muatModelWajah();
     const kanvas = document.createElement('canvas');
