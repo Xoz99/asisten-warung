@@ -67,6 +67,23 @@ export default function PhoneShell() {
     if (vpRef.current) vpRef.current.scrollTop = 0;
   }, [screen]);
 
+  // Warna status bar HP ngikutin latar tema yang lagi dipakai. Di Android, aplikasi yang dibuka dari
+  // ikon layar HP (display standalone) ngewarnain status bar pakai <meta name="theme-color">, dan warna
+  // ikon jam/baterai dipilih otomatis biar kontras. Tanpa ini status bar-nya selalu satu warna tetap -
+  // tema gelap dapet strip terang, tema terang dapet strip gelap.
+  //
+  // Dibaca dari variabel --bg, BUKAN backgroundColor: .phone punya transisi background 0,25 detik,
+  // jadi backgroundColor yang dibaca pas tema baru diganti masih warna tengah-tengah transisi.
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      const el = document.querySelector('.phone');
+      const meta = document.querySelector('meta[name="theme-color"]');
+      const warna = el && getComputedStyle(el).getPropertyValue('--bg').trim();
+      if (meta && warna) meta.setAttribute('content', warna);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [S.tema, authed, lisensi]);
+
   const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
   const fontFamily = FONTS.find((f) => f.n === S.font)?.f || FONTS[0].f;
 

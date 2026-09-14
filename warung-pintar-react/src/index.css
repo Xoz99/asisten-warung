@@ -28,12 +28,10 @@ body{font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased
 }
 
 /* ================= APP SHELL ================= */
-/* padding-top env(safe-area-inset-top) BUKAN buat iPhone (status bar-nya udah "black", isi
-   aplikasi otomatis mulai di bawahnya - lihat index.html), tapi buat ANDROID pas kepasang sebagai
-   aplikasi: manifest-nya sekarang display fullscreen, jadi status bar-nya ilang TOTAL dan isi
-   aplikasi naik sampai ke pinggir atas layar - di HP yang kameranya bolong di tengah/pojok atas
-   (punch-hole), baris paling atas bisa ketiban lubang kameranya. Nilainya 0 di HP tanpa notch &
-   di browser biasa, jadi aman dipasang terus. */
+/* padding-top env(safe-area-inset-top): pengaman kalau isi aplikasi sampai naik ke belakang status
+   bar / lubang kamera (punch-hole). Manifest sempat display "fullscreen" - status bar HP ilang total,
+   jam & baterai nggak kelihatan - dan udah dibalikin ke "standalone" (status bar tampil, isi mulai di
+   bawahnya). Di mode itu, di iPhone ("black"), dan di browser biasa nilainya 0, jadi aman dipasang terus. */
 .phone{width:100%;height:100vh;height:100dvh;background:var(--bg);color:var(--ink);position:relative;overflow:hidden;
   padding-top:env(safe-area-inset-top);
   display:flex;flex-direction:column;transition:background .25s,color .25s}

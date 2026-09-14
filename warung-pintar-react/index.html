@@ -3,7 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-    <meta name="theme-color" content="#0A0A0A" />
+    <!-- Warna status bar HP (Android) pas aplikasi dibuka dari ikon layar HP. Disamain sama latar
+         aplikasi (tema terang bawaan) biar ikon jam & baterai kebaca gelap di atas terang. Diganti
+         otomatis waktu tema diganti - lihat efek theme-color di PhoneShell.jsx. -->
+    <meta name="theme-color" content="#F1F1EF" />
     <title>Warung Pintar</title>
     <!-- Ikon Mang Warung. Sebelumnya index.html NGGAK punya link ikon sama sekali - browser
          otomatis nyari /favicon.ico yang emang nggak ada, jadi tab-nya nampilin ikon bola dunia
@@ -24,7 +27,7 @@
          status bar iPhone - dan karena nggak ada satu pun padding env(safe-area-inset-top) di CSS,
          judul layar & tombol paling atas ketiban jam/baterai di HP ber-notch. Masalah keduanya:
          black-translucent MAKSA tulisan status bar jadi putih, sementara tema bawaan aplikasi ini
-         terang (--bg #F2F1EE) - putih di atas krem = jam & baterainya ilang.
+         terang (--bg #F1F1EF) - putih di atas krem = jam & baterainya ilang.
          "black" nyelesein dua-duanya sekaligus: strip hitam solid, tulisan putih (kebaca di tema
          terang MAUPUN gelap), dan isi aplikasi mulai TEPAT di bawahnya. Warnanya juga udah
          nyambung sama theme_color #0A0A0A yang dipakai Android. -->
