@@ -494,23 +494,10 @@ function TanyaAI() {
 
   return (
     <>
-      {/* Header ringkas cuma dipakai kalau obrolannya UDAH jalan - pas masih kosong, kenalannya
-          dipegang blok sambutan di tengah (lihat .sambutan), biar nggak ada dua avatar Mang
-          Warung nongol bareng di satu layar. */}
-      {!baruMulai && (
-        <div className="head">
-          {/* background dibikin transparent (bukan warna .ava bawaan) - gambarnya sendiri udah
-              transparan, jadi biar nggak ada "kotak"/lingkaran warna nongol di belakang karakternya */}
-          <div className="ava" style={{ background: 'transparent', borderRadius: '50%' }}>
-            <img src={mangWarungImg} alt="Mang Warung" />
-          </div>
-          <div>
-            <p className="p-h1">Mang Warung</p>
-            <p className="p-sub">Tanya apa aja soal warung</p>
-          </div>
-        </div>
-      )}
-
+      {/* Header "Mang Warung / Tanya apa aja soal warung" DIBUANG. Nggak ada fungsinya: nama & avatar
+          Mang AI udah ada di tab tepat di atasnya, dan pas obrolan masih kosong kenalannya dipegang
+          blok sambutan (.sambutan). Di HP header itu makan ~130px - hampir sepertiga tinggi area
+          chat - jadi gelembung obrolannya kerasa kejepit di antara header & kotak ketik. */}
       <div className="chat-log" ref={logRef}>
         {baruMulai && (
           <div className="sambutan">
