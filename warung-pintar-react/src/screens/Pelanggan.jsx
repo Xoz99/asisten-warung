@@ -38,16 +38,19 @@ export default function Pelanggan() {
                 <div className="nama">{p.nama}</div>
                 <div className="tgl">
                   {p.wa || 'Tanpa nomor WA'}
-                  {!p.punyaWajah && (
+                  {/* Muncul buat SEMUA pelanggan yang belum punya foto - dulu cuma yang belum punya data wajah.
+                      Pelanggan yang wajahnya udah kedaftar tapi fotonya kebuang (bug lama "+ foto wajah")
+                      nggak punya jalan buat dikasih foto, jadi di daftar kasbon Catat selamanya inisial. */}
+                  {(!p.foto || !p.punyaWajah) && (
                     <>
-                      {' · '}
+                      {' \u00b7 '}
                       {/* opsional - sengaja dibikin nggak nyolok/nge-warning kayak dulu, biar nggak
                           kerasa maksa (misal buat pelanggan yang lagi kasbon & nggak nyaman difoto) */}
                       <button
                         onClick={() => setDaftarWajahUntuk(p)}
                         style={{ color: 'var(--abu)', fontWeight: 600, background: 'none', border: 0, padding: 0, font: 'inherit', cursor: 'pointer' }}
                       >
-                        + foto wajah (opsional)
+                        {p.foto ? '+ daftarkan wajah (opsional)' : '+ foto (opsional)'}
                       </button>
                     </>
                   )}
@@ -101,16 +104,24 @@ function SheetDaftarWajah({ pelanggan, onClose }) {
     r.readAsDataURL(f);
   };
 
+  // Foto & data pengenal wajah itu dua kegunaan beda. Foto buat TAMPILAN (daftar kasbon di Catat, daftar
+  // Pelanggan) - itu nggak butuh wajahnya kedeteksi. Data wajah buat KENAL WAJAH otomatis - itu yang butuh.
+  // Dulu tombol simpan mati kalau wajahnya nggak kedeteksi, jadi foto yang kurang terang/agak miring nggak
+  // bisa disimpen sama sekali, padahal buat tampilan fotonya udah cukup.
   const simpan = async () => {
-    if (!descriptor) return;
+    if (!foto) return;
     setLoading(true);
     try {
-      await api.wajah.daftarkan(pelanggan.id, descriptor);
+      if (descriptor) await api.wajah.daftarkan(pelanggan.id, descriptor);
       // Fotonya ikut disimpen jadi foto pelanggan. Dulu CUMA data pengenal wajahnya yang dikirim - fotonya
       // kebuang, jadi pelanggan yang didaftarin wajahnya dari sini tetap tampil inisial di daftar pembeli
       // Catat jualan (padahal fotonya jelas-jelas udah diambil).
-      if (foto) await api.pelanggan.gantiFoto(pelanggan.id, foto);
-      toast(`Wajah <b>${escapeHtml(pelanggan.nama)}</b> berhasil didaftarkan`);
+      await api.pelanggan.gantiFoto(pelanggan.id, foto);
+      toast(
+        descriptor
+          ? `Foto & wajah <b>${escapeHtml(pelanggan.nama)}</b> tersimpan`
+          : `Foto <b>${escapeHtml(pelanggan.nama)}</b> tersimpan (kenal wajah belum aktif buat orang ini)`
+      );
       await refreshData();
       onClose();
     } catch (e) {
@@ -123,8 +134,12 @@ function SheetDaftarWajah({ pelanggan, onClose }) {
   return (
     <div className="sheet show">
       <div className="panel">
-        <h3>Daftarkan wajah {pelanggan.nama}</h3>
-        <p>Foto sebelumnya (kalau ada) nggak kedeteksi jelas - coba ambil ulang lebih dekat &amp; terang.</p>
+        <h3>Foto {pelanggan.nama}</h3>
+        <p>
+          {pelanggan.punyaWajah
+            ? 'Wajahnya udah kedaftar - tinggal fotonya, biar kelihatan di daftar kasbon.'
+            : 'Fotonya tampil di daftar kasbon. Kalau wajahnya kedeteksi jelas, sekalian dipakai buat kenal wajah otomatis.'}
+        </p>
         <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
           <div className="ava" style={{ width: 110, height: 110, borderRadius: 34, fontSize: 34 }}>
             {foto ? <img src={foto} alt="" /> : <Ikon nama="orang" />}
@@ -146,11 +161,12 @@ function SheetDaftarWajah({ pelanggan, onClose }) {
         )}
         {status === 'gagal' && (
           <p className="p-sub" style={{ textAlign: 'center', marginTop: 8, color: '#e5484d', fontWeight: 700 }}>
-            ⚠ Masih nggak kedeteksi - coba lebih dekat, lebih terang, hadap langsung ke kamera
+            Wajah nggak kedeteksi - fotonya tetap bisa disimpen buat tampilan, tapi kenal wajah nggak jalan pakai foto ini.
+            Mau dipakai kenal wajah? Foto ulang lebih dekat &amp; terang, hadap langsung ke kamera.
           </p>
         )}
-        <button className="btn utama" style={{ width: '100%', marginTop: 16 }} onClick={simpan} disabled={!descriptor || loading}>
-          {loading ? 'Menyimpan…' : 'Simpan wajah'}
+        <button className="btn utama" style={{ width: '100%', marginTop: 16 }} onClick={simpan} disabled={!foto || status === 'mengecek' || loading}>
+          {loading ? 'Menyimpan…' : 'Simpan foto'}
         </button>
         <button className="btn" style={{ width: '100%', marginTop: 10 }} onClick={onClose}>
           Batal
