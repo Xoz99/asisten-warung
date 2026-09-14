@@ -60,6 +60,30 @@ function gabungAngkaSatuan(token) {
   return hasil;
 }
 
+// Angka yang diikuti kata dan frasanya PERSIS ada di nama barang di katalog ("1 batang" di varian
+// "Rokok Magnum 1 Batang" / "1 Batang") diubah jadi teks - bagian NAMA, bukan jumlah beli.
+//
+// Dulu "magnum nya 1 batang 5" kebaca: "1" = jumlah buat "magnum", terus "batang 5" jadi barang
+// kedua yang nyangkut ke varian "batang" siapa aja (Magnum, Surya, sabun batang) - hasilnya dua baris
+// keranjang yang dua-duanya salah. Beda sama gabungAngkaSatuan() di atas yang bekerja berdasar DAFTAR
+// SATUAN tetap: ini berdasar KATALOG warung itu sendiri, jadi "gudang garam filter 3 batang" (nggak ada
+// barang bernama "3 batang") tetap kebaca 3 batang.
+function gabungAngkaNama(token, produk) {
+  const namaKatalog = produk.map((p) => ` ${p.nama} `.toLowerCase().replace(/\s+/g, ' '));
+  const hasil = [];
+  for (let i = 0; i < token.length; i++) {
+    const t = token[i];
+    const next = token[i + 1];
+    if (t.angka !== undefined && next?.kata && namaKatalog.some((n) => n.includes(` ${t.angka} ${next.kata} `))) {
+      hasil.push({ kata: String(t.angka) }, { kata: next.kata });
+      i++;
+    } else {
+      hasil.push(t);
+    }
+  }
+  return hasil;
+}
+
 export const kritisQ = (p) => p.stok <= Math.max(3, Math.ceil(p.laku / 4));
 
 // Balikin SEMUA produk yang skor cocoknya SAMA TINGGI dengan yang terbaik (bukan cuma 1
@@ -72,14 +96,29 @@ export const kritisQ = (p) => p.stok <= Math.max(3, Math.ceil(p.laku / 4));
 // dijual per bungkus VS "Gudang Garam Filter Ketengan" dijual per batang). Nyebut satuannya doang
 // ("gudang garam filter 3 batang") udah cukup nunjuk ke varian yang tepat tanpa perlu nanya balik
 // "yang mana" - kata "batang" match ke p.satuan="batang" punya si varian ketengan, menangin skor.
+//
+// `p.grup` juga ikut. Varian sering dinamai PENDEK di dalam grupnya (grup "Rokok Magnum", nama varian
+// "1 Batang") - tanpa grup, kata "magnum" cuma nyangkut ke produk induknya, dan varian "1 Batang"
+// punya Magnum nggak bisa dibedain dari "1 Batang" punya Surya.
+//
+// Angka di nama barang ("1 batang", "600 ml") nggak kena pencocokan per kata (kata <= 2 huruf
+// dilewati), jadi dikasih bonus per FRASA angka+kata yang persis ada di nama - itu yang bikin
+// "magnum 1 batang" menang atas "Rokok Magnum" polos.
 function cocokSemua(produk, teks) {
-  const kata = teks.toLowerCase().split(/\s+/).filter(Boolean);
+  const kata = teks
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((k) => (angkaKata[k] !== undefined ? String(angkaKata[k]) : k));
   const skorProduk = produk.map((p) => {
-    const target = (p.nama + ' ' + p.id + ' ' + (p.satuan || '')).toLowerCase();
+    const target = ` ${p.nama} ${p.grup || ''} ${p.id} ${p.satuan || ''} `.toLowerCase().replace(/\s+/g, ' ');
     let s = 0;
     kata.forEach((k) => {
       if (k.length > 2 && target.includes(k)) s += k.length;
     });
+    for (let i = 0; i < kata.length - 1; i++) {
+      if (/^\d+$/.test(kata[i]) && target.includes(` ${kata[i]} ${kata[i + 1]} `)) s += kata[i].length + kata[i + 1].length;
+    }
     return { p, s };
   });
   const terbaik = skorProduk.reduce((a, b) => (b.s > a.s ? b : a), { p: null, s: 0 });
@@ -141,7 +180,7 @@ export function parseUcapan(produk, teks) {
   const tokenMentah = kataMentah
     .filter((k) => !KATA_PENGISI.has(k))
     .map((k) => (isAngka(k) ? { angka: keAngka(k) } : { kata: luruhkanNya(k) }));
-  const token = gabungAngkaSatuan(tokenMentah);
+  const token = gabungAngkaNama(gabungAngkaSatuan(tokenMentah), produk);
   if (!token.length) return [];
 
   // Urutan dominan dideteksi dari token PERTAMA: kalau kalimat dibuka pakai nama barang dulu
