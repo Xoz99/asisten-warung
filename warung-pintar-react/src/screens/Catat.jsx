@@ -1268,6 +1268,7 @@ function SheetVisual({ onClose }) {
 // fotonya (lewat POST /api/wajah/identifikasi, cosine similarity di backend). Auto nyoba tiap
 // ~1.2 detik selagi kamera nyala — nggak perlu tap tombol, sesuai niatnya "otomatis" di PRD.
 const MAKS_PERCOBAAN_WAJAH = 10;
+const BATAS_CARI_WAJAH_MS = 20000; // lewat segini (& udah >= 3 percobaan) -> tampilkan 'nggak ketemu'
 
 function SheetWajah({ onClose, onTambahBaru }) {
   const { setPelangganTerpilih, toast, dispatch, openLunas } = useApp();
@@ -1275,6 +1276,7 @@ function SheetWajah({ onClose, onTambahBaru }) {
   const [match, setMatch] = useState(null); // { pelanggan, totalUtang, skor, templateBelanjaan }
   const [bayarSebagian, setBayarSebagian] = useState(false);
   const [jumlahCustom, setJumlahCustom] = useState('');
+  const [percobaanWajah, setPercobaanWajah] = useState(0); // ditampilkan biar kelihatan masih jalan, bukan nyangkut
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
@@ -1294,10 +1296,12 @@ function SheetWajah({ onClose, onTambahBaru }) {
     let batal = false;
     let percobaan = 0;
     let timer;
+    let mulaiCari = Date.now();
 
     const cobaKenali = async () => {
       if (batal) return;
       percobaan++;
+      const mulai = performance.now();
       try {
         // `cepat: true` - sumbernya video yang di-loop, bukan foto sekali jepret (lihat
         // penjelasan panjangnya di lib/wajah.js). Frame berikutnya toh dateng lagi sebentar lagi.
@@ -1325,13 +1329,21 @@ function SheetWajah({ onClose, onTambahBaru }) {
         }
         /* selain itu: frame gagal diproses / belum ada wajah kedeteksi — coba lagi di percobaan berikutnya */
       }
-      if (percobaan >= MAKS_PERCOBAAN_WAJAH) {
+      if (batal) return;
+      // Nyerah berdasar WAKTU juga, bukan cuma jumlah percobaan. Di HP lambat 1 deteksi bisa ~2 detik,
+      // jadi 10 percobaan = ~30 detik nyangkut di "Mengenali wajah..." tanpa tanda apa-apa - itu yang
+      // kerasa "ngestack". Minimal 3 percobaan biar HP lambat tetap dapet kesempatan.
+      if (percobaan >= MAKS_PERCOBAAN_WAJAH || (percobaan >= 3 && Date.now() - mulaiCari >= BATAS_CARI_WAJAH_MS)) {
         setState('tidak-ketemu');
       } else {
-        // 700ms, dulu 1200ms. Bisa dipercepat karena tiap percobaan sekarang cuma 1 inferensi
-        // ukuran 320 (dulu 3 inferensi sampai 608) - total kerjaannya tetap jauh lebih ringan
-        // dari sebelumnya, tapi wajah kedeteksi lebih cepet & nyerahnya juga nggak kelamaan.
-        timer = setTimeout(cobaKenali, 700);
+        // Jeda minimal 2x lama deteksi barusan (paling cepat 700ms). Diukur: 1 deteksi face-api
+        // makan ~2,2 detik di CPU yang dilambatin kayak HP kelas menengah - SAMA AJA di 1920x1080
+        // maupun 320x180, karena face-api ngecilin gambarnya sendiri. Dulu jedanya tetap 700ms, jadi
+        // deteksi berikutnya langsung nyambung & layar macet 66% selama sheet kebuka. Sekarang HP
+        // lambat otomatis dapet jeda lebih panjang, main thread-nya kebagian napas buat gambar layar.
+        const lama = performance.now() - mulai;
+        setPercobaanWajah(percobaan);
+        timer = setTimeout(cobaKenali, Math.max(700, lama * 2));
       }
     };
 
@@ -1353,6 +1365,7 @@ function SheetWajah({ onClose, onTambahBaru }) {
           await videoRef.current.play();
         }
         setState('mencari');
+        mulaiCari = Date.now();
         timer = setTimeout(cobaKenali, 600);
       } catch (e) {
         toast(e.message ? escapeHtml(e.message) : 'Gagal membuka kamera depan');
@@ -1381,7 +1394,12 @@ function SheetWajah({ onClose, onTambahBaru }) {
         {(state === 'memuat' || state === 'mencari') && (
           <>
             <h3>Mengenali wajah…</h3>
-            <p>Arahkan kamera depan ke pembeli</p>
+            {/* Nomor percobaan ditampilkan biar kelihatan masih jalan - di HP lambat tiap percobaan bisa
+                beberapa detik, dan layar yang diem tanpa perubahan kerasa kayak nyangkut. */}
+            <p>
+              Arahkan kamera depan ke pembeli
+              {state === 'mencari' && percobaanWajah > 0 ? ` \u00b7 percobaan ${percobaanWajah + 1}` : ''}
+            </p>
           </>
         )}
         {state === 'error' && (
@@ -1401,6 +1419,13 @@ function SheetWajah({ onClose, onTambahBaru }) {
         )}
         {state === 'hasil' && match && (
           <>
+            {match.pelanggan.foto && (
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
+                <div className="ava" style={{ width: 90, height: 90, borderRadius: 28 }}>
+                  <img src={match.pelanggan.foto} alt="" />
+                </div>
+              </div>
+            )}
             <h3>Ini {match.pelanggan.nama}?</h3>
             <p
               dangerouslySetInnerHTML={{
@@ -1454,7 +1479,8 @@ function SheetWajah({ onClose, onTambahBaru }) {
               className="btn"
               style={{ width: '100%', marginTop: 10 }}
               onClick={() => {
-                setPelangganTerpilih({ id: match.pelanggan.id, nama: match.pelanggan.nama, wa: match.pelanggan.wa, foto: null });
+                // Foto dibawa - dulu dipaksa null, jadi chip pembeli di Catat nampilin inisial walau pelanggannya punya foto.
+                setPelangganTerpilih({ id: match.pelanggan.id, nama: match.pelanggan.nama, wa: match.pelanggan.wa, foto: match.pelanggan.foto || null });
                 onClose();
               }}
             >

@@ -33,4 +33,25 @@ router.post('/', async (req, res, next) => {
   }
 });
 
+// Ganti foto pelanggan yang udah terdaftar. Dulu NGGAK ADA jalannya: foto cuma bisa diisi pas pelanggan
+// DIBUAT, jadi foto dari "+ foto wajah" di layar Pelanggan cuma jadi data pengenal wajah & fotonya
+// kebuang - pelanggannya tetap tampil inisial di mana-mana (daftar pembeli di Catat, hasil kenal wajah).
+router.post('/:id/foto', async (req, res, next) => {
+  try {
+    const { fotoUrl } = req.body;
+    // Formatnya sama kayak foto pas bikin pelanggan (data URL gambar hasil keWebp di HP).
+    if (typeof fotoUrl !== 'string' || !fotoUrl.startsWith('data:image/')) {
+      return res.status(400).json({ error: 'Foto tidak valid' });
+    }
+    const { rows } = await query(
+      'UPDATE pelanggan SET foto_url=$1 WHERE id=$2 AND warung_id=$3 RETURNING id, nama, foto_url',
+      [fotoUrl, req.params.id, req.warungId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Pelanggan tidak ditemukan' });
+    res.json(rows[0]);
+  } catch (e) {
+    next(e);
+  }
+});
+
 export default router;

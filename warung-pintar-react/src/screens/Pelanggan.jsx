@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
-import { singkat, escapeHtml } from '../lib/format';
+import { singkat, escapeHtml, inisial } from '../lib/format';
 import { api } from '../lib/api';
 import { ambilDeskriptorWajah, gambarDariDataUrl } from '../lib/wajah';
 import { keWebp } from '../lib/kamera';
@@ -30,7 +30,11 @@ export default function Pelanggan() {
           const utang = utangOf(p.nama);
           return (
             <div className="item" key={p.id}>
-              <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                {/* Foto pelanggan ditampilkan - sama kayak daftar pembeli di Catat jualan. Dulu daftar ini cuma
+                    nama, jadi foto yang diambil di sini nggak kelihatan di mana pun. */}
+                <div className="bulat">{p.foto ? <img src={p.foto} alt="" /> : inisial(p.nama)}</div>
+                <div style={{ minWidth: 0 }}>
                 <div className="nama">{p.nama}</div>
                 <div className="tgl">
                   {p.wa || 'Tanpa nomor WA'}
@@ -47,6 +51,7 @@ export default function Pelanggan() {
                       </button>
                     </>
                   )}
+                </div>
                 </div>
               </div>
               <span className={'utang-teks' + (utang ? '' : ' lunas')}>{utang ? singkat(utang) : 'lunas'}</span>
@@ -101,6 +106,10 @@ function SheetDaftarWajah({ pelanggan, onClose }) {
     setLoading(true);
     try {
       await api.wajah.daftarkan(pelanggan.id, descriptor);
+      // Fotonya ikut disimpen jadi foto pelanggan. Dulu CUMA data pengenal wajahnya yang dikirim - fotonya
+      // kebuang, jadi pelanggan yang didaftarin wajahnya dari sini tetap tampil inisial di daftar pembeli
+      // Catat jualan (padahal fotonya jelas-jelas udah diambil).
+      if (foto) await api.pelanggan.gantiFoto(pelanggan.id, foto);
       toast(`Wajah <b>${escapeHtml(pelanggan.nama)}</b> berhasil didaftarkan`);
       await refreshData();
       onClose();

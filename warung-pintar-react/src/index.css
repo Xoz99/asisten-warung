@@ -253,14 +253,18 @@ body{font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased
    target scroll-otomatis yang salah - sudah dibenerin di useEffect TanyaAI, lihat Chat.jsx.) */
 .vp:has(.chat-page--ai){overflow:hidden}
 .screen.on:has(.chat-page--ai){display:flex;flex-direction:column;height:100%;padding:0}
-.chat-page--ai{flex:1;min-height:0;display:flex;flex-direction:column;padding:20px 18px calc(132px + env(safe-area-inset-bottom))}
+/* Jarak atas dikecilin (20px + 12px margin tab -> 8px) biar tab Mang AI/Komunitas naik & area obrolan
+   dapet ruang lebih. Komunitas disamain di bawah - kalau cuma satu yang naik, tabnya loncat
+   posisi tiap pindah tab. */
+.chat-page--ai{flex:1;min-height:0;display:flex;flex-direction:column;padding:8px 18px calc(132px + env(safe-area-inset-bottom))}
+.screen.on:has(.chat-page:not(.chat-page--ai)){padding-top:8px}
 .chat-log{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column}
 .chat-log::-webkit-scrollbar{display:none}
 .chat-tail{flex:none}
 /* switcher "Tanya" (Mang AI vs Komunitas) - beda dari .seg di Lainnya.jsx (switcher tema, gaya
    netral/soft): ini versi solid/kontras kayak di warung-pintar-tanya.html, background gelap +
    teks kuning pas lagi aktif, jadi dikasih nama kelas beda (.seg-tanya) biar nggak numpuk gaya. */
-.seg-tanya{display:flex;gap:6px;background:var(--surface);border:var(--tepi);padding:6px;border-radius:999px;margin-top:12px}
+.seg-tanya{display:flex;gap:6px;background:var(--surface);border:var(--tepi);padding:6px;border-radius:999px;margin-top:0}
 .t-mono .seg-tanya,.t-dark .seg-tanya{box-shadow:inset 0 0 0 1.5px var(--garis)}
 .seg-tanya button{flex:1;border:0;background:none;font:inherit;font-size:var(--small);font-weight:700;color:var(--abu);
   padding:12px 10px;border-radius:999px;cursor:pointer;transition:background .2s,color .2s;min-height:48px}
@@ -503,7 +507,11 @@ body{font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased
 .viewfinder .frame{position:absolute;inset:16%;border:3px solid rgba(255,255,255,.35);border-radius:20px}
 .viewfinder .isi{position:absolute;inset:0;display:grid;place-items:center;color:#fff}
 .viewfinder .isi svg{width:72px;height:72px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
-.viewfinder .isi img{width:100%;height:100%;object-fit:cover}
+/* Gambar hasil jepretan dipasang ABSOLUT ke seluruh kotak, bukan height:100% biasa. .isi itu grid
+   (place-items:center buat ikon), dan Safari/iPhone sering nggak ngitung tinggi persen di dalam
+   sel grid - gambarnya jatuh ke tinggi aslinya, jadi di iPhone setengah kotak atasnya hitam
+   (kejadian beneran di hasil "2 barang paling mirip"). Absolut + inset 0 selalu penuh di mesin apa pun. */
+.viewfinder .isi img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 /* z-index PALING ATAS (100) - toast wajib kelihatan di atas APA PUN.
    Dulu 19, di BAWAH .sheet (20) & .login (40). Akibatnya pesan error justru ketutup persis di
    saat paling dibutuhin: mayoritas kegagalan kejadian PAS sheet lagi kebuka (simpan barang, ganti

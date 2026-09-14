@@ -34,7 +34,7 @@ router.post('/identifikasi', async (req, res, next) => {
     if (!Array.isArray(embedding) || !embedding.length) return res.status(400).json({ error: 'embedding wajib diisi' });
 
     const { rows } = await query(
-      `SELECT w.embedding, p.id, p.nama, p.wa
+      `SELECT w.embedding, p.id, p.nama, p.wa, p.foto_url
        FROM pelanggan_wajah w JOIN pelanggan p ON p.id = w.pelanggan_id
        WHERE p.warung_id = $1`,
       [req.warungId]
@@ -65,7 +65,9 @@ router.post('/identifikasi', async (req, res, next) => {
     res.json({
       cocok: true,
       skor: skorTerbaik,
-      pelanggan: { id: terbaik.id, nama: terbaik.nama, wa: terbaik.wa },
+      // Foto ikut dikirim: dulu nggak, jadi pelanggan yang udah punya foto tetap tampil inisial begitu
+      // kekenal lewat wajah (kartu "Ini X?" & chip pembeli di Catat).
+      pelanggan: { id: terbaik.id, nama: terbaik.nama, wa: terbaik.wa, foto: terbaik.foto_url || null },
       totalUtang: Number(utangRows[0].total),
       templateBelanjaan,
     });

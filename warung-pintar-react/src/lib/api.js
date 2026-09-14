@@ -160,6 +160,8 @@ export const api = {
   pelanggan: {
     list: () => get('/api/pelanggan'),
     tambah: (data) => post('/api/pelanggan', data),
+    // Ganti foto pelanggan yang udah ada - dipakai "+ foto wajah" di layar Pelanggan.
+    gantiFoto: (id, fotoUrl) => post(`/api/pelanggan/${id}/foto`, { fotoUrl }),
   },
 
   suara: {
