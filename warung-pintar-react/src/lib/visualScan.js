@@ -10,6 +10,18 @@
 // beneran dibuka), bukan ikut ke-bundle di halaman utama. Biar orang yang nggak pernah pakai scan
 // barang nggak ikut nunggu download library segede itu.
 let modelPromise = null;
+
+// Model disajikan dari server SENDIRI (public/models), bukan dari tfhub.dev. Sumber aslinya muter
+// dulu lewat tfhub -> kaggle -> URL storage bertanda-tangan yang kedaluwarsa, tiap kali aplikasi
+// dibuka dari nol - itu ~14 MB yang harus lolos rantai redirect lewat sinyal warung. Dari server
+// sendiri dia dapet cache "immutable" (lihat index.js backend & public/_headers), jadi cukup
+// sekali unduh.
+//
+// Isinya SAMA PERSIS sama yang dari tfhub (MobileNetV2 alpha 1.0, classification/2): diunduh dari
+// URL yang dipakai library-nya sendiri, dan jumlah byte ke-4 shard-nya dicek cocok sama manifest
+// (13.956.396 byte). Ini WAJIB sama, bukan cuma mirip - embedding foto barang yang udah tersimpan
+// di database dihitung pakai bobot ini; bobot beda = semua barang lama nggak bakal kecocokan lagi.
+const MODEL_LOKAL = '/models/mobilenet_v2_100_224/model.json';
 const TIMEOUT_MODEL_MS = 25000; // sama alasannya kayak muatModelWajah() di wajah.js - koneksi
 // lambat/tunnel kadang bikin download model nggak pernah resolve/reject, UI nyangkut selamanya
 
@@ -24,7 +36,18 @@ export function muatModelVisual() {
     modelPromise = denganTimeout(
       import('@tensorflow/tfjs')
         .then(() => import('@tensorflow-models/mobilenet'))
-        .then((mobilenetLib) => mobilenetLib.load({ version: 2, alpha: 1.0 })),
+        .then((mobilenetLib) =>
+          mobilenetLib
+            // inputRange [0,1] WAJIB ikut. Library-nya cuma nyetel rentang input yang bener kalau
+            // modelnya diambil dari tfhub (MODEL_INFO MobileNetV2: [0,1]); begitu dikasih modelUrl
+            // dia jatuh ke default [-1,1]. Bobotnya sama persis, tapi gambarnya dinormalisasi beda
+            // - kebukti waktu dites: berkas identik per byte, embedding-nya cuma mirip 72%. Tanpa
+            // ini, semua foto barang yang udah terdaftar mendadak nggak kenal lagi.
+            .load({ version: 2, alpha: 1.0, modelUrl: MODEL_LOKAL, inputRange: [0, 1] })
+            // Berkas lokal nggak ada/gagal (mis. deploy lupa nyertain public/models) - balik ke
+            // sumber aslinya daripada fitur scan foto mati total.
+            .catch(() => mobilenetLib.load({ version: 2, alpha: 1.0 }))
+        ),
       TIMEOUT_MODEL_MS,
       'Gagal memuat model pengenal barang - koneksi kelamaan/kurang stabil. Coba lagi.'
     ).catch((e) => {

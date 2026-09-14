@@ -6,8 +6,9 @@ import { rupiah, escapeHtml, angkaRingkas } from '../lib/format';
 import { MARGIN_REKOMENDASI, hargaDariMargin } from '../lib/harga';
 import { api } from '../lib/api';
 import { bukaKamera, tutupKamera, jepretFrame, keWebp } from '../lib/kamera';
-import { muatModelVisual, ambilEmbedding } from '../lib/visualScan';
-import { FORMAT_RETAIL, ambilCanvasROI, mulaiScanBarcode as mulaiScanBarcodeShared } from '../lib/barcodeScan';
+import { ambilEmbedding } from '../lib/visualScan';
+import { useModelVisual } from '../lib/useModelVisual';
+import { FORMAT_RETAIL, ambilCanvasROI, buatDekoderZxing, mulaiScanBarcode as mulaiScanBarcodeShared } from '../lib/barcodeScan';
 
 // Barang yang cuma beda ukuran/varian tapi merek sama (misal "Aqua 600ml" & "Aqua 1500ml") bisa
 // dikasih "grup" yang sama (lihat form daftar barang / opname) biar ditampilin sekelompok di sini,
@@ -426,30 +427,35 @@ function SheetBarcode({ mode, onClose, onKelola }) {
     controlsRef.current = mulaiScanBarcodeShared({ videoRef, matiRef, onDetect: handleBarcode });
   };
 
+  // Model cuma dimuat buat mode foto; scan barcode nggak butuh.
+  const model = useModelVisual(mode === 'foto');
+
   useEffect(() => {
     let batal = false;
+    // Reset tiap efek jalan - alasannya sama persis kayak SheetVisual di Catat.jsx: tanpa ini,
+    // cleanup StrictMode ninggalin matiRef = true & loop scan barcode mati sebelum sempat jalan.
+    matiRef.current = false;
     (async () => {
       try {
         setStep('memuat');
-        // Model AI (kalau mode foto) & buka kamera itu 2 proses independen yang nggak saling
-        // butuh - dulu ditunggu satu-satu (numpuk waktunya, jadi kerasa lama "menyiapkan
-        // kamera" padahal yang lama itu download model MobileNet-nya). Sekarang dijalanin
-        // BARENGAN pakai Promise.all, totalnya cuma nunggu yang paling lama di antara keduanya.
-        const [stream] = await Promise.all([bukaKamera('environment'), mode === 'foto' ? muatModelVisual() : null]);
+        // Kamera NGGAK lagi nunggu model (lihat useModelVisual & SheetVisual di Catat.jsx): dulu
+        // Promise.all bikin stream kamera bocor & nyala terus kalau modelnya gagal dimuat.
+        const stream = await bukaKamera('environment');
         if (batal) {
           tutupKamera(stream);
           return;
         }
-        streamRef.current = stream;
+        streamRef.current = stream; // disimpen DULUAN, sebelum apa pun yang bisa gagal
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
         }
+        if (batal) return;
         if (mode === 'barcode') mulaiScanBarcode();
-        if (!batal) setStep('scan');
+        setStep('scan');
       } catch (e) {
         if (!batal) {
-          setErrorMsg(e.message || 'Gagal menyiapkan kamera');
+          setErrorMsg(e.message || 'Gagal membuka kamera');
           setStep('error');
         }
       }
@@ -459,6 +465,7 @@ function SheetBarcode({ mode, onClose, onKelola }) {
       matiRef.current = true;
       controlsRef.current?.stop();
       tutupKamera(streamRef.current);
+      streamRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -568,22 +575,9 @@ function SheetBarcode({ mode, onClose, onKelola }) {
           detector = new window.BarcodeDetector();
         }
       }
-      const [{ BrowserMultiFormatReader, BarcodeFormat }, { DecodeHintType }] = await Promise.all([
-        import('@zxing/browser'),
-        import('@zxing/library'),
-      ]);
-      const hints = new Map();
-      hints.set(DecodeHintType.TRY_HARDER, true);
-      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-        BarcodeFormat.EAN_13,
-        BarcodeFormat.EAN_8,
-        BarcodeFormat.UPC_A,
-        BarcodeFormat.UPC_E,
-        BarcodeFormat.CODE_128,
-        BarcodeFormat.CODE_39,
-        BarcodeFormat.QR_CODE,
-      ]);
-      const zxingReader = new BrowserMultiFormatReader(hints);
+      // Dekoder yang sama kayak loop live (lib/barcodeScan.js) - versi lama di sini bikin canvas
+      // sementara baru tiap percobaan (6x per tap) waktu nyoba barcode yang tegak.
+      const zxing = await buatDekoderZxing();
 
       const MAKS_PERCOBAAN = 6;
       let kode = null;
@@ -606,12 +600,13 @@ function SheetBarcode({ mode, onClose, onKelola }) {
             console.log(`[barcode][jepret] percobaan #${i + 1} BarcodeDetector gagal:`, e.name, e.message);
           }
         }
-        try {
-          const result = zxingReader.decodeFromCanvas(canvas);
-          kode = result.getText();
-        } catch (e) {
+        // Posisi normal dulu, baru diputar 90 derajat buat barcode yang tegak. Beda dari loop live
+        // (yang gantian per giliran): ini tap manual dengan frame yang lagi diam, jadi dua-duanya
+        // dicoba sekaligus biar nggak ada percobaan yang kebuang.
+        kode = zxing.dekode(canvas, false) || zxing.dekode(canvas, true);
+        if (!kode) {
           // eslint-disable-next-line no-console
-          console.log(`[barcode][jepret] percobaan #${i + 1} ZXing gagal:`, e.name);
+          console.log(`[barcode][jepret] percobaan #${i + 1} ZXing belum nemu`);
         }
       }
       if (kode) return handleBarcode(kode);
@@ -1239,9 +1234,30 @@ function SheetBarcode({ mode, onClose, onKelola }) {
         )}
 
         {step === 'scan' && mode === 'foto' && (
-          <button className="btn utama brand" style={{ width: '100%', marginTop: 16 }} onClick={jepretFoto}>
-            <CameraIcon /> Jepret &amp; cocokkan
-          </button>
+          <>
+            {model.keadaan !== 'siap' && (
+              <p style={{ textAlign: 'center', fontSize: 13, marginTop: 12 }}>
+                {model.keadaan === 'gagal' ? (
+                  <>
+                    Pengenal foto barang gagal dimuat.{' '}
+                    <button type="button" className="btn kecil" style={{ marginTop: 8 }} onClick={model.cobaLagi}>
+                      Coba muat lagi
+                    </button>
+                  </>
+                ) : (
+                  'Pengenal foto barang lagi disiapin, sebentar ya...'
+                )}
+              </p>
+            )}
+            <button
+              className="btn utama brand"
+              style={{ width: '100%', marginTop: 16 }}
+              onClick={jepretFoto}
+              disabled={model.keadaan !== 'siap'}
+            >
+              <CameraIcon /> Jepret &amp; cocokkan
+            </button>
+          </>
         )}
         {step === 'scan' && mode === 'barcode' && (
           <button className="btn utama brand" style={{ width: '100%', marginTop: 16 }} onClick={ambilFotoBarcode}>

@@ -8,7 +8,8 @@ import { terpasangSebagaiApp } from '../lib/pwa';
 import { rupiah, inisial, escapeHtml } from '../lib/format';
 import { api } from '../lib/api';
 import { bukaKamera, tutupKamera, jepretFrame, keWebp } from '../lib/kamera';
-import { muatModelVisual, ambilEmbedding } from '../lib/visualScan';
+import { ambilEmbedding } from '../lib/visualScan';
+import { useModelVisual } from '../lib/useModelVisual';
 import { mulaiScanBarcode } from '../lib/barcodeScan';
 import { ambilDeskriptorWajah, gambarDariDataUrl, panaskanModelWajah } from '../lib/wajah';
 import SheetStruk from '../components/SheetStruk.jsx';
@@ -956,27 +957,38 @@ function SheetVisual({ onClose }) {
     }
   };
 
+  const model = useModelVisual();
+
   useEffect(() => {
     let batal = false;
+    // Di-reset di sini, bukan cuma diisi false pas useRef dibuat: StrictMode (dev) ngejalanin efek
+    // ini DUA KALI, dan cleanup yang pertama ngeset matiRef = true. Tanpa reset, loop scan barcode
+    // langsung berhenti di putaran pertama & nggak pernah jalan lagi - kebukti waktu diukur: 0x baca
+    // piksel selama 6 detik padahal videonya udah siap.
+    matiRef.current = false;
     (async () => {
       try {
-        // Model AI & buka kamera itu 2 proses independen yang nggak saling butuh - dulu
-        // ditunggu satu-satu (numpuk waktunya, jadi kerasa lama). Sekarang dijalanin BARENGAN
-        // pakai Promise.all, totalnya cuma nunggu yang paling lama di antara keduanya.
-        const [stream] = await Promise.all([bukaKamera('environment'), muatModelVisual()]);
+        // Kamera DIPISAH dari model pengenal foto barang (lihat useModelVisual). Dulu dua-duanya
+        // ditunggu lewat Promise.all: kalau modelnya gagal dimuat, stream kamera yang UDAH kebuka
+        // hilang referensinya & nyala terus setelah sheet ditutup - dan layarnya malah bilang
+        // "Kamera nggak bisa dibuka" padahal yang gagal modelnya. Scan barcode juga nggak butuh
+        // model, jadi sekarang langsung jalan begitu kamera siap.
+        const stream = await bukaKamera('environment');
         if (batal) {
           tutupKamera(stream);
           return;
         }
-        streamRef.current = stream;
+        streamRef.current = stream; // disimpen DULUAN, sebelum apa pun yang bisa gagal
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
         }
+        if (batal) return;
         mulaiBarcode();
         setStatus('siap');
       } catch (e) {
-        setErrorMsg(e.message || 'Gagal menyiapkan kamera/model');
+        if (batal) return;
+        setErrorMsg(e.message || 'Gagal membuka kamera');
         setStatus('error');
       }
     })();
@@ -985,6 +997,7 @@ function SheetVisual({ onClose }) {
       matiRef.current = true;
       controlsRef.current?.stop();
       tutupKamera(streamRef.current);
+      streamRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1092,7 +1105,7 @@ function SheetVisual({ onClose }) {
         {status === 'memuat' && (
           <>
             <h3 style={{ textAlign: 'center' }}>Menyiapkan kamera…</h3>
-            <p style={{ textAlign: 'center' }}>Sebentar, lagi muat model pengenal barang</p>
+            <p style={{ textAlign: 'center' }}>Sebentar ya</p>
           </>
         )}
         {status === 'error' && (
@@ -1205,7 +1218,21 @@ function SheetVisual({ onClose }) {
 
         {status === 'siap' && (
           <>
-            <button className="btn utama brand" style={{ width: '100%', marginTop: 16 }} onClick={jepret}>
+            {model.keadaan !== 'siap' && (
+              <p style={{ textAlign: 'center', fontSize: 13, marginTop: 12 }}>
+                {model.keadaan === 'gagal' ? (
+                  <>
+                    Pengenal foto barang gagal dimuat - scan barcode tetap jalan.{' '}
+                    <button type="button" className="btn kecil" style={{ marginTop: 8 }} onClick={model.cobaLagi}>
+                      Coba muat lagi
+                    </button>
+                  </>
+                ) : (
+                  'Pengenal foto barang lagi disiapin - barcode udah bisa di-scan dari sekarang.'
+                )}
+              </p>
+            )}
+            <button className="btn utama brand" style={{ width: '100%', marginTop: 16 }} onClick={jepret} disabled={model.keadaan !== 'siap'}>
               <CameraIcon /> Jepret &amp; cocokkan
             </button>
             <button className="btn" style={{ width: '100%', marginTop: 10 }} onClick={jepretBanyak}>
