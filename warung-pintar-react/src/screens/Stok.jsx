@@ -353,6 +353,7 @@ function SheetBarcode({ mode, onClose, onKelola }) {
   const [barcodeBaru, setBarcodeBaru] = useState('');
   const [kodeManual, setKodeManual] = useState('');
   const [refFotos, setRefFotos] = useState([]); // [{sudut, embedding, foto}] - bisa lebih dari 1
+  const [jepretSisi, setJepretSisi] = useState(false); // lagi ngitung embedding sisi yang barusan dijepret
   const [fotoJepretan, setFotoJepretan] = useState(null);
   const [namaBaru, setNamaBaru] = useState('');
   const [hargaBaru, setHargaBaru] = useState(0);
@@ -427,8 +428,10 @@ function SheetBarcode({ mode, onClose, onKelola }) {
     controlsRef.current = mulaiScanBarcodeShared({ videoRef, matiRef, onDetect: handleBarcode });
   };
 
-  // Model cuma dimuat buat mode foto; scan barcode nggak butuh.
-  const model = useModelVisual(mode === 'foto');
+  // Model pengenal foto dimuat buat mode foto, DAN buat mode barcode begitu masuk form barang baru -
+  // di situ pemilik bisa jepret 3 sisi barangnya (lihat "Foto dari 3 sisi" di form). Dimuat duluan di
+  // belakang biar pas tombol "+" ditap modelnya udah siap, bukan baru mulai diunduh saat itu.
+  const model = useModelVisual(mode === 'foto' || step === 'baru' || step === 'tambah-sudut');
 
   useEffect(() => {
     let batal = false;
@@ -648,6 +651,10 @@ function SheetBarcode({ mode, onClose, onKelola }) {
 
   // dipanggil dari step 'tambah-sudut' — nambah 1 foto referensi lagi buat barang yang lagi didaftarin
   const jepretSudutBaru = async () => {
+    // Ngitung embedding makan waktu (apalagi di HP lambat) - tanpa penanda ini, tap dua kali bikin
+    // sisi yang sama kesimpen dua kali & jatah 3 sisinya kebuang.
+    if (jepretSisi) return;
+    setJepretSisi(true);
     const fotoAsli = jepretFrame(videoRef.current);
     try {
       const embedding = await ambilEmbedding(videoRef.current);
@@ -660,6 +667,7 @@ function SheetBarcode({ mode, onClose, onKelola }) {
     } catch (e) {
       toast(e.message ? escapeHtml(e.message) : 'Gagal memproses foto');
     } finally {
+      setJepretSisi(false);
       setStep('baru');
     }
   };
@@ -759,10 +767,11 @@ function SheetBarcode({ mode, onClose, onKelola }) {
         grup: grupBaru.trim() || null,
         fotoUrl: fotoProdukBaru || undefined,
       });
-      if (mode === 'foto' && refFotos.length) {
+      // Dulu cuma mode foto - foto 3 sisi yang dijepret dari mode barcode kebuang diam-diam.
+      if (refFotos.length) {
         await Promise.all(refFotos.map((r) => api.scan.daftarkanReferensi(baru.id, r.sudut, r.embedding, r.foto)));
       }
-      toast(`<b>${escapeHtml(nama)}</b> terdaftar sebagai barang baru${refFotos.length > 1 ? ` (${refFotos.length} foto referensi)` : ''}`);
+      toast(`<b>${escapeHtml(nama)}</b> terdaftar sebagai barang baru${refFotos.length ? ` (${refFotos.length} foto buat dikenali)` : ''}`);
       await refreshData();
       onClose();
     } catch (e) {
@@ -875,8 +884,23 @@ function SheetBarcode({ mode, onClose, onKelola }) {
         )}
         {step === 'tambah-sudut' && (
           <>
-            <h3>Ambil foto dari sudut lain</h3>
-            <p>Coba dari sisi/miring yang beda biar makin gampang dikenali nanti</p>
+            {/* Nyebut sisi yang dimaksud (depan/miring/dekat) - tiga foto dari sisi yang SAMA nggak nambah
+                apa-apa buat pengenalannya, cuma buang jatah. */}
+            <h3>
+              Foto sisi {LABEL_SUDUT[refFotos.length] || 'lain'} ({refFotos.length + 1}/{MAKS_SUDUT})
+            </h3>
+            <p>
+              {model.keadaan === 'siap'
+                ? 'Arahkan kamera ke barangnya dari sisi ini, terus tap Jepret.'
+                : model.keadaan === 'gagal'
+                  ? 'Pengenal foto gagal dimuat.'
+                  : 'Pengenal foto lagi disiapin, sebentar ya...'}
+            </p>
+            {model.keadaan === 'gagal' && (
+              <button type="button" className="btn kecil" style={{ marginTop: 8 }} onClick={model.cobaLagi}>
+                Coba muat lagi
+              </button>
+            )}
           </>
         )}
 
@@ -1123,10 +1147,17 @@ function SheetBarcode({ mode, onClose, onKelola }) {
               )}
             </div>
 
-            {mode === 'foto' && (
+            {/* Foto referensi dari beberapa sisi. Dulu CUMA ada di mode foto - barang yang didaftarin lewat
+                barcode nggak punya foto sama sekali, jadi begitu barcode-nya susah kebaca (bungkus
+                lecek, basah, kena lipatan) barangnya nggak bisa dikenali lewat scan foto & pemilik
+                harus nyari manual. Embedding tiap sisi dihitung langsung dari kamera, sama persis
+                kayak yang dipakai scan foto buat nyocokin barang nanti. */}
+            {(mode === 'foto' || mode === 'barcode') && (
               <div className="field">
                 <label>
-                  Foto referensi ({refFotos.length}/{MAKS_SUDUT}) - makin banyak sudut, makin gampang dikenali nanti
+                  {mode === 'barcode'
+                    ? `Foto dari 3 sisi (opsional, ${refFotos.length}/${MAKS_SUDUT}) - buat jaga-jaga kalau barcode-nya nanti susah kebaca, barangnya tetap bisa dikenali lewat foto`
+                    : `Foto referensi (${refFotos.length}/${MAKS_SUDUT}) - makin banyak sudut, makin gampang dikenali nanti`}
                 </label>
                 <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
                   {refFotos.map((r, i) => (
@@ -1276,9 +1307,20 @@ function SheetBarcode({ mode, onClose, onKelola }) {
           </button>
         )}
         {step === 'tambah-sudut' && (
-          <button className="btn utama brand" style={{ width: '100%', marginTop: 16 }} onClick={jepretSudutBaru}>
-            <CameraIcon /> Jepret sudut ini
-          </button>
+          <>
+            <button
+              className="btn utama brand"
+              style={{ width: '100%', marginTop: 16 }}
+              onClick={jepretSudutBaru}
+              disabled={model.keadaan !== 'siap' || jepretSisi}
+            >
+              <CameraIcon /> {jepretSisi ? 'Memproses...' : 'Jepret sudut ini'}
+            </button>
+            {/* Balik ke form TANPA nutup sheet - tombol Tutup di bawah ngebuang semua isian form. */}
+            <button className="btn" style={{ width: '100%', marginTop: 10 }} onClick={() => setStep('baru')} disabled={jepretSisi}>
+              Balik ke form
+            </button>
+          </>
         )}
 
         <button className="btn" style={{ width: '100%', marginTop: 12 }} onClick={onClose}>
