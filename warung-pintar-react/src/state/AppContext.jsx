@@ -35,9 +35,11 @@ const AKSI_WAJIB_ONLINE = new Set([
 ]);
 
 function prefsAwal() {
-  // pinDibuat false = HP ini belum pernah bikin PIN pemilik -> SheetPin (Stok.jsx) nyuruh bikin dulu,
-  // bukan nerima PIN bawaan 1234 yang dulu bahkan dipajang di layarnya sendiri.
-  return { tema: 't-mono', warna: '#ffc001', font: 'Inter', ukuran: 'sedang', pin: '1234', pinDibuat: false };
+  // PIN pemilik sekarang disimpan di SERVER, satu per akun (lihat lib/pin.js). Yang tinggal di HP:
+  //  - pinHash: hash PIN yang terakhir dicek benar online, buat buka kunci waktu internet mati.
+  //  - pin + pinDibuat: sisa PIN LOKAL versi lama. Diunggah sekali ke server kalau akunnya belum punya PIN
+  //    (SheetPin di Stok.jsx), lalu dihapus. HP baru nggak punya PIN lokal sama sekali.
+  return { tema: 't-mono', warna: '#ffc001', font: 'Inter', ukuran: 'sedang', pin: null, pinDibuat: false, pinHash: null };
 }
 function muatPrefs() {
   try {
@@ -625,7 +627,8 @@ export function AppProvider({ children }) {
           case 'SET_UKURAN':
             return setPrefs((p) => ({ ...p, ukuran: action.ukuran }));
           case 'SET_PIN':
-            return setPrefs((p) => ({ ...p, pin: action.pin, pinDibuat: true }));
+            // PIN aslinya nggak disimpan di HP - cuma hash buat cadangan offline. PIN lokal versi lama dibuang.
+            return setPrefs((p) => ({ ...p, pinHash: action.pinHash, pin: null, pinDibuat: false }));
 
           case 'PILIH_PENJAGA': {
             const row = penjagaRows.find((p) => p.nama === action.nama);

@@ -6,6 +6,7 @@ import { escapeHtml, tampilNoHp, rupiah } from '../lib/format';
 import { mintaIzinMedia } from '../lib/mic';
 import { terpasangSebagaiApp } from '../lib/pwa';
 import { api } from '../lib/api.js';
+import { PIN_GAMPANG, hashPinLokal } from '../lib/pin';
 import KartuPaket from '../components/KartuPaket.jsx';
 import mangWarungImg from '../assets/mangwarung.webp';
 
@@ -544,10 +545,9 @@ function SheetPass({ onClose }) {
 
 // Ganti PIN — verifikasi lewat kode WhatsApp dulu, baru boleh pasang PIN baru.
 //
-// PIN itu kunci LOKAL per-HP (disimpan di prefs browser, lihat AppContext), bukan kredensial
-// server — jadi yang dikerjain server cuma MEMBUKTIKAN ini pemiliknya (kode dikirim ke nomor
-// terdaftar), penyimpanan PIN barunya tetap di sini. Gunanya: orang yang kebetulan pegang HP
-// warung yang lagi kebuka nggak bisa diam-diam ganti PIN pelindung data modal.
+// PIN berlaku buat SEMUA HP yang login pakai akun ini (disimpan di server). Kode WA membuktikan ini pemiliknya,
+// dan PIN barunya disimpan server di langkah yang sama. Gunanya: orang yang kebetulan pegang HP warung yang lagi
+// kebuka nggak bisa diam-diam ganti PIN pelindung data modal.
 function SheetGantiPin({ onClose }) {
   const { dispatch, authWarung, toast } = useApp();
   const [step, setStep] = useState(1);
@@ -575,13 +575,14 @@ function SheetGantiPin({ onClose }) {
 
   const simpan = async () => {
     if (!/^\d{4}$/.test(baru)) return toast('PIN baru harus 4 angka');
+    if (PIN_GAMPANG.has(baru)) return toast('PIN itu gampang ditebak - pilih kombinasi lain ya');
     if (baru !== ulang) return toast('Ulangi PIN belum sama');
     setLoading(true);
     try {
-      // Kode diverifikasi ke server DULU; PIN baru cuma ditulis kalau server bilang cocok.
-      await api.pinOtp.verifikasi(kode.trim());
-      dispatch({ type: 'SET_PIN', pin: baru });
-      toast('PIN berhasil diganti ✓');
+      // Server nyocokin kode & nyimpen PIN baru sekaligus.
+      await api.pinOtp.verifikasi(kode.trim(), baru);
+      dispatch({ type: 'SET_PIN', pinHash: await hashPinLokal(authWarung?.id, baru) });
+      toast('PIN berhasil diganti ✓ - berlaku di semua HP akun ini');
       onClose();
     } catch (e) {
       toast(e.message ? escapeHtml(e.message) : 'Kode salah');

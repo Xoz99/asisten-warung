@@ -41,6 +41,9 @@ ALTER TABLE warung ADD COLUMN IF NOT EXISTS ai_token_tanggal DATE NOT NULL DEFAU
 -- default-nya di-set ulang eksplisit di sini biar akun baru berikutnya tetap dapet 7 hari, bukan 14.
 ALTER TABLE warung ALTER COLUMN lisensi_berlaku_sampai SET DEFAULT (now() + INTERVAL '7 days');
 ALTER TABLE warung ADD COLUMN IF NOT EXISTS no_hp TEXT;
+-- PIN pemilik (buka detail modal & untung). Dulu disimpan LOKAL di tiap HP, jadi 1 akun bisa punya PIN beda-beda
+-- per HP. Sekarang satu PIN per akun warung, disimpan hash bcrypt (sama kayak password). NULL = belum dibuat.
+ALTER TABLE warung ADD COLUMN IF NOT EXISTS pin_hash TEXT;
 -- UNIQUE-nya partial (WHERE no_hp IS NOT NULL) - biar banyak akun lama yang nomornya masih kosong
 -- nggak saling bentrok, tapi begitu diisi tetap dijamin 1 nomor = 1 warung. Sifat unik ini yang
 -- bikin "lupa password lewat nomor HP" nggak ambigu (nggak mungkin 1 nomor nunjuk 2 akun).

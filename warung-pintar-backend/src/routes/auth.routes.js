@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { query } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
-import { loginLimiter, otpLimiter, otpIpLimiter } from '../middleware/rateLimit.js';
+import { loginLimiter, otpLimiter, otpIpLimiter, pinLimiter } from '../middleware/rateLimit.js';
 import { normalisasiNoHp, samarkanNoHp } from '../utils/noHp.js';
 import { kirimOtpWa } from '../services/wa.service.js';
 
@@ -275,11 +275,75 @@ router.post('/reset-password', otpIpLimiter, otpLimiter, async (req, res, next) 
   }
 });
 
+// ---- PIN pemilik (sudah login) ----
+// Satu PIN per AKUN warung, disimpan di server (hash bcrypt). Dulu PIN disimpan lokal di tiap HP, jadi akun
+// yang sama bisa punya PIN beda di tiap HP - bikin bingung & PIN yang diganti di satu HP nggak ngaruh ke HP lain.
+const PIN_GAMPANG = new Set(['1234', '4321', '0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999']);
+const pinValid = (pin) => typeof pin === 'string' && /^\d{4}$/.test(pin);
+
+// Kolom pin_hash ditambah otomatis kalau belum ada. Deploy di VPS cuma git pull + build + restart (nggak
+// jalanin `npm run migrate`) - tanpa ini, fitur PIN langsung error 500 sampai ada yang inget migrasi.
+let kolomPinSiap = null;
+function pastikanKolomPin() {
+  if (!kolomPinSiap) {
+    kolomPinSiap = query('ALTER TABLE warung ADD COLUMN IF NOT EXISTS pin_hash TEXT').catch((e) => {
+      kolomPinSiap = null;
+      throw e;
+    });
+  }
+  return kolomPinSiap;
+}
+
+async function ambilPinHash(warungId) {
+  await pastikanKolomPin();
+  const { rows } = await query('SELECT pin_hash FROM warung WHERE id=$1', [warungId]);
+  if (!rows.length) throw Object.assign(new Error('Akun tidak ditemukan'), { status: 404 });
+  return rows[0].pin_hash;
+}
+
+// Udah punya PIN belum? (buat nentuin layar "Masukkan PIN" atau "Bikin PIN")
+router.get('/pin', requireAuth, async (req, res, next) => {
+  try {
+    res.json({ dibuat: Boolean(await ambilPinHash(req.warungId)) });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Bikin PIN pertama kali. Cuma boleh kalau akun BELUM punya PIN - ganti PIN yang udah ada wajib lewat kode WA
+// (di bawah), biar orang yang kebetulan megang HP warung nggak bisa nimpa PIN pemilik.
+router.post('/pin/buat', requireAuth, loginLimiter, async (req, res, next) => {
+  try {
+    const { pin } = req.body;
+    if (!pinValid(pin)) return res.status(400).json({ error: 'PIN harus 4 angka' });
+    if (PIN_GAMPANG.has(pin)) return res.status(400).json({ error: 'PIN itu gampang ditebak - pilih kombinasi lain ya' });
+    await pastikanKolomPin();
+    const hash = await bcrypt.hash(pin, 10);
+    // WHERE pin_hash IS NULL: kalau dua HP bikin barengan, cuma yang pertama yang kesimpen.
+    const { rowCount } = await query('UPDATE warung SET pin_hash=$1 WHERE id=$2 AND pin_hash IS NULL', [hash, req.warungId]);
+    if (!rowCount) return res.status(409).json({ error: 'Akun ini udah punya PIN - masukkan PIN yang dipakai di HP lain' });
+    res.status(201).json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post('/pin/cek', requireAuth, pinLimiter, async (req, res, next) => {
+  try {
+    const { pin } = req.body;
+    const hash = await ambilPinHash(req.warungId);
+    if (!hash) return res.status(404).json({ error: 'PIN belum dibuat', belumDibuat: true });
+    if (!pinValid(pin) || !(await bcrypt.compare(pin, hash))) return res.status(401).json({ error: 'PIN salah, coba lagi' });
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
 // ---- OTP buat ganti PIN (sudah login) ----
-// PIN itu kunci LOKAL per-HP (disimpan di browser, lihat AppContext prefs), bukan kredensial
-// server - makanya di sini cuma sampai "verifikasi pemiliknya", penyimpanan PIN barunya tetap di
-// sisi frontend. Gunanya OTP: orang yang kebetulan pegang HP warung yang lagi kebuka nggak bisa
-// diam-diam ganti PIN pelindung data modal tanpa akses ke WA pemiliknya.
+// Gunanya OTP: orang yang kebetulan pegang HP warung yang lagi kebuka nggak bisa diam-diam ganti PIN
+// pelindung data modal tanpa akses ke WA pemiliknya. PIN barunya disimpan di server di langkah yang SAMA
+// dengan verifikasi kode - jadi nggak ada celah "kode udah lolos tapi PIN-nya diisi belakangan".
 router.post('/pin/otp/kirim', requireAuth, otpIpLimiter, otpLimiter, async (req, res, next) => {
   try {
     const { rows } = await query('SELECT * FROM warung WHERE id=$1', [req.warungId]);
@@ -297,9 +361,19 @@ router.post('/pin/otp/kirim', requireAuth, otpIpLimiter, otpLimiter, async (req,
 
 router.post('/pin/otp/verifikasi', requireAuth, otpIpLimiter, otpLimiter, async (req, res, next) => {
   try {
-    const { kode } = req.body;
+    const { kode, pinBaru } = req.body;
     if (!kode) return res.status(400).json({ error: 'Kode wajib diisi' });
+    // PIN baru dicek SEBELUM kodenya dipakai - kalau PIN-nya ditolak, kodenya masih bisa dipakai lagi.
+    if (pinBaru !== undefined) {
+      if (!pinValid(pinBaru)) return res.status(400).json({ error: 'PIN baru harus 4 angka' });
+      if (PIN_GAMPANG.has(pinBaru)) return res.status(400).json({ error: 'PIN itu gampang ditebak - pilih kombinasi lain ya' });
+    }
     await verifikasiOtp(req.warungId, 'pin', kode);
+    // Aplikasi versi lama (masih ke-cache) cuma ngirim kode tanpa pinBaru - tetap dijawab ok biar alurnya nggak rusak.
+    if (pinBaru !== undefined) {
+      await pastikanKolomPin();
+      await query('UPDATE warung SET pin_hash=$1 WHERE id=$2', [await bcrypt.hash(pinBaru, 10), req.warungId]);
+    }
     res.json({ ok: true });
   } catch (e) {
     next(e);

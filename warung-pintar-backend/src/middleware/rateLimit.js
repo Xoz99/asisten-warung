@@ -76,3 +76,16 @@ export const otpIpLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Terlalu banyak permintaan dari jaringan ini. Coba lagi nanti.' },
 });
+
+// Batas nebak PIN pemilik (/api/auth/pin/cek). PIN cuma 4 angka = 10.000 kemungkinan, jadi tanpa batas
+// gampang dicoba semua. Dihitung per AKUN (bukan IP - satu HP warung bisa ganti-ganti jaringan), dan cuma
+// percobaan SALAH yang dihitung (skipSuccessfulRequests), biar pemilik yang buka detail berkali-kali nggak ikut keblokir.
+export const pinLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 8,
+  keyGenerator: kunciAkun,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Terlalu banyak PIN salah. Coba lagi 15 menit lagi, atau pakai Lupa PIN.' },
+});

@@ -5,6 +5,7 @@ import { kritisQ, hppRata } from '../lib/voice';
 import { rupiah, escapeHtml, angkaRingkas } from '../lib/format';
 import { MARGIN_REKOMENDASI, hargaDariMargin } from '../lib/harga';
 import { api } from '../lib/api';
+import { PIN_GAMPANG, hashPinLokal, errorJaringan } from '../lib/pin';
 import { bukaKamera, tutupKamera, jepretFrame, keWebp } from '../lib/kamera';
 import { ambilEmbedding } from '../lib/visualScan';
 import { useModelVisual } from '../lib/useModelVisual';
@@ -1741,27 +1742,72 @@ function SheetOpname({ produk, onClose }) {
   );
 }
 
-// Kunci buat buka detail modal & untung. PIN-nya LOKAL per HP (prefs browser), bukan kredensial
-// server - ini pagar dari orang yang kebetulan megang HP warung, bukan pengaman data.
+// Kunci buat buka detail modal & untung. Satu PIN per AKUN warung, dicek ke server - dulu PIN disimpan lokal di
+// tiap HP, jadi akun yang sama bisa punya PIN beda di tiap HP. Ini pagar dari orang yang kebetulan megang HP
+// warung, bukan pengaman data.
 //
-// Dulu layar ini ikut nampilin PIN yang BERLAKU, apa pun isinya (termasuk yang udah diganti
-// pemilik), di layar yang justru minta PIN itu - jadi PIN-nya nggak ngunci apa-apa. Petunjuk itu
-// ada karena PIN bawaannya 1234 & nggak ada cara lain tau. Sekarang HP yang belum pernah bikin PIN
-// disuruh BIKIN sekali, jadi nggak ada PIN bawaan yang perlu dibocorin.
-const PIN_GAMPANG = new Set(['1234', '4321', '0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999']);
-
+// Mode: memuat (nanya server udah ada PIN belum) | masuk | buat | offline (nggak ada internet, dicek pakai hash
+// PIN terakhir yang benar di HP ini) | gagal (nggak ada internet & HP ini belum pernah buka pakai PIN).
 function SheetPin({ onClose, onSukses }) {
-  const { S, dispatch, toast, goTo } = useApp();
-  const buat = !S.pinDibuat;
+  const { S, dispatch, toast, goTo, authWarung } = useApp();
+  const warungId = authWarung?.id;
+  const [mode, setMode] = useState('memuat');
   const [buf, setBuf] = useState('');
   const [pertama, setPertama] = useState(null); // mode bikin: PIN ketikan pertama, nunggu diulang
+  const [sibuk, setSibuk] = useState(false);
 
-  const cek = (pin) => {
-    if (!buat) {
-      if (pin === S.pin) return onSukses();
-      toast('PIN salah, coba lagi');
-      return setBuf('');
+  const simpanCache = async (pin) => dispatch({ type: 'SET_PIN', pinHash: await hashPinLokal(warungId, pin) });
+
+  useEffect(() => {
+    let batal = false;
+    (async () => {
+      try {
+        let { dibuat } = await api.pin.status();
+        // Pindahan dari versi lama: HP ini punya PIN lokal & akunnya belum punya PIN di server -> PIN lokal itu
+        // yang jadi PIN akun (pemilik nggak perlu bikin ulang). Kalau HP lain udah duluan (409), pakai punya server.
+        if (!dibuat && S.pinDibuat && S.pin && !PIN_GAMPANG.has(S.pin)) {
+          try {
+            await api.pin.buat(S.pin);
+            await simpanCache(S.pin);
+            dibuat = true;
+          } catch (e) {
+            if (e.status === 409) dibuat = true;
+          }
+        }
+        if (!batal) setMode(dibuat ? 'masuk' : 'buat');
+      } catch {
+        if (!batal) setMode(S.pinHash ? 'offline' : 'gagal');
+      }
+    })();
+    return () => {
+      batal = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const cekOffline = async (pin) => {
+    if (S.pinHash && (await hashPinLokal(warungId, pin)) === S.pinHash) return onSukses();
+    toast(S.pinHash ? 'PIN salah, coba lagi' : 'Nggak bisa ngecek PIN - periksa internet');
+    setBuf('');
+  };
+
+  const cek = async (pin) => {
+    if (mode === 'offline') return cekOffline(pin);
+    if (mode === 'masuk') {
+      setSibuk(true);
+      try {
+        await api.pin.cek(pin);
+        await simpanCache(pin);
+        return onSukses();
+      } catch (e) {
+        if (errorJaringan(e)) return cekOffline(pin); // koneksi putus pas ngecek -> cadangan offline
+        toast(escapeHtml(e.message));
+        return setBuf('');
+      } finally {
+        setSibuk(false);
+      }
     }
+    // mode buat
     if (pertama === null) {
       // 1234 dulu PIN bawaan SEMUA akun & kepajang di layar - siapa pun yang pernah liat bakal
       // nyoba itu duluan.
@@ -1777,12 +1823,25 @@ function SheetPin({ onClose, onSukses }) {
       setPertama(null);
       return setBuf('');
     }
-    dispatch({ type: 'SET_PIN', pin });
-    toast('PIN pemilik udah dibuat');
-    onSukses();
+    setSibuk(true);
+    try {
+      await api.pin.buat(pin);
+      await simpanCache(pin);
+      toast('PIN pemilik udah dibuat - berlaku di semua HP akun ini');
+      onSukses();
+    } catch (e) {
+      setPertama(null);
+      setBuf('');
+      // HP lain barusan bikin PIN duluan -> PIN itu yang berlaku.
+      if (e.status === 409) setMode('masuk');
+      toast(escapeHtml(e.message || 'Gagal nyimpen PIN'));
+    } finally {
+      setSibuk(false);
+    }
   };
 
   const tekan = (t) => {
+    if (!bisaKetik) return;
     if (t === '\u232b') return setBuf((b) => b.slice(0, -1));
     if (!t || buf.length >= 4) return;
     const next = buf + t;
@@ -1790,12 +1849,24 @@ function SheetPin({ onClose, onSukses }) {
     if (next.length === 4) setTimeout(() => cek(next), 160);
   };
 
-  const judul = !buat ? 'Masukkan PIN' : pertama === null ? 'Bikin PIN pemilik' : 'Ulangi PIN';
-  const keterangan = !buat
-    ? 'Detail modal & untung hanya untuk pemilik.'
-    : pertama === null
-      ? 'PIN 4 angka ini ngunci detail modal & untung di HP ini. Cukup sekali - jangan dikasih tau ke penjaga ya.'
-      : 'Ketik sekali lagi PIN yang sama.';
+  const judul = {
+    memuat: 'PIN pemilik',
+    masuk: 'Masukkan PIN',
+    offline: 'Masukkan PIN',
+    buat: pertama === null ? 'Bikin PIN pemilik' : 'Ulangi PIN',
+    gagal: 'Nggak bisa ngecek PIN',
+  }[mode];
+  const keterangan = {
+    memuat: 'Sebentar…',
+    masuk: 'Detail modal & untung hanya untuk pemilik.',
+    offline: 'Detail modal & untung hanya untuk pemilik. Lagi offline - dicek pakai PIN terakhir yang dibuka di HP ini.',
+    buat:
+      pertama === null
+        ? 'PIN 4 angka ini ngunci detail modal & untung di semua HP yang login pakai akun ini. Jangan dikasih tau ke penjaga ya.'
+        : 'Ketik sekali lagi PIN yang sama.',
+    gagal: 'Butuh internet buat ngecek PIN pemilik. Coba lagi pas sinyal ada.',
+  }[mode];
+  const bisaKetik = (mode === 'masuk' || mode === 'offline' || mode === 'buat') && !sibuk;
 
   return (
     <div className="sheet tengah show">
@@ -1814,7 +1885,7 @@ function SheetPin({ onClose, onSukses }) {
             </button>
           ))}
         </div>
-        {!buat && (
+        {(mode === 'masuk' || mode === 'offline') && (
           <button
             className="btn kecil"
             style={{ width: '100%', marginTop: 14 }}

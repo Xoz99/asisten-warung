@@ -87,11 +87,16 @@ export const api = {
     reset: (token, passwordBaru) => post('/api/auth/reset-password', { token, passwordBaru }),
   },
 
-  // Ganti PIN (sudah login): OTP cuma buat MEMBUKTIKAN pemiliknya. PIN-nya sendiri tetap disimpan
-  // lokal di HP masing-masing (lihat prefs di AppContext), bukan di server.
+  // PIN pemilik - SATU per akun warung, disimpan di server (dulu lokal per HP, jadi tiap HP bisa beda).
+  pin: {
+    status: () => get('/api/auth/pin'), // { dibuat }
+    buat: (pin) => post('/api/auth/pin/buat', { pin }),
+    cek: (pin) => post('/api/auth/pin/cek', { pin }),
+  },
+  // Ganti PIN (sudah login): kode WA membuktikan pemiliknya, PIN barunya disimpan server di langkah yang sama.
   pinOtp: {
     kirimKode: () => post('/api/auth/pin/otp/kirim'),
-    verifikasi: (kode) => post('/api/auth/pin/otp/verifikasi', { kode }),
+    verifikasi: (kode, pinBaru) => post('/api/auth/pin/otp/verifikasi', { kode, pinBaru }),
   },
 
   penjaga: {
