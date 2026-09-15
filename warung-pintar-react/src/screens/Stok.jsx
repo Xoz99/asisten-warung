@@ -263,7 +263,10 @@ function SheetTambahVarian({ grup, contoh, onClose }) {
     <div className="sheet show">
       <div className="panel">
         <h3>Tambah varian {grup}</h3>
-        <p className="p-sub">Barang ini otomatis masuk grup "{grup}" - nggak perlu scan barcode/foto lagi.</p>
+        <p className="p-sub">
+          Barang ini otomatis masuk grup "{grup}" - nggak perlu scan barcode/foto. Fotonya ikut foto grup, bisa diganti kapan aja
+          lewat detail barangnya.
+        </p>
         <div className="field" style={{ marginTop: 14 }}>
           <label>Nama lengkap</label>
           <input value={nama} onChange={(e) => setNama(e.target.value)} placeholder={`Contoh: ${grup} 500ml`} autoFocus />
@@ -1343,7 +1346,8 @@ function SheetOpname({ produk, onClose }) {
   const [namaKemasan, setNamaKemasan] = useState(produk.namaKemasan || '');
   const [grup, setGrup] = useState(produk.grup || '');
   const [grupFokus, setGrupFokus] = useState(false); // dropdown saran grup lagi kebuka apa nggak
-  const [foto, setFoto] = useState(produk.foto || null);
+  // fotoSendiri, bukan foto: `foto` bisa foto pinjaman dari varian lain segrup (lihat pakaiFotoGrup di AppContext).
+  const [foto, setFoto] = useState(produk.fotoSendiri || null);
   // Dulu nama/kategori/barcode nggak bisa diubah dari mana pun di UI (padahal backend PUT
   // /api/produk/:id udah support) - jadi kalau salah ketik nama pas nambah, atau barcode kebaca
   // salah pas scan, beneran nggak ada jalan buat benerin. Ditambahin di sini (bukan layar
@@ -1489,7 +1493,7 @@ function SheetOpname({ produk, onClose }) {
       isi !== produk.isiKemasan ||
       namaKemasan.trim() !== (produk.namaKemasan || '') ||
       grup.trim() !== (produk.grup || '') ||
-      foto !== produk.foto;
+      foto !== (produk.fotoSendiri || null);
     if (berubah) {
       if (!nama.trim()) {
         return toast('Nama barang nggak boleh kosong');

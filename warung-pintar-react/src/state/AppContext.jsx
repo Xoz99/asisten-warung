@@ -104,6 +104,18 @@ function normProduk(r) {
     foto: r.foto_url || null,
   };
 }
+// Varian yang belum punya foto sendiri (misal ditambah lewat "+ Varian") tampil pakai foto varian lain di
+// grup yang sama - dulu malah tampil kotak ikon generik di tengah kartu grup yang varian lainnya berfoto.
+// `foto` = yang DITAMPILKAN, `fotoSendiri` = foto milik barang itu beneran (dipakai layar edit barang, biar
+// foto pinjaman nggak ikut kesimpen jadi foto barang ini).
+function pakaiFotoGrup(produk) {
+  const fotoGrup = new Map();
+  for (const p of produk) {
+    const key = p.grup?.trim().toLowerCase();
+    if (key && p.foto && !fotoGrup.has(key)) fotoGrup.set(key, p.foto);
+  }
+  return produk.map((p) => ({ ...p, fotoSendiri: p.foto, foto: p.foto || fotoGrup.get(p.grup?.trim().toLowerCase()) || null }));
+}
 function normKasbon(r) {
   return {
     id: r.id,
@@ -177,7 +189,7 @@ function bangunState({ produkRows, kasbonRows, pelangganRows, riwayatRows, penja
   return {
     penjagaAktif: penjagaR.find((p) => p.aktif)?.nama || null,
     penjagaList: penjagaR.map((p) => p.nama),
-    produk: produkRows.map(normProduk),
+    produk: pakaiFotoGrup(produkRows.map(normProduk)),
     kasbon: kasbonRows.map(normKasbon),
     pelanggan: pelangganRows.map(normPelanggan),
     transaksi,
