@@ -915,8 +915,9 @@ body{background:#E9E9E6}
    Dulu: post, tombol suka, & komentar nempel langsung di latar halaman tanpa kartu, avatar inisial nggak punya
    latar (warnanya sama kayak halaman), komentar dipisah garis abu tebal, dan kolom tulis kotak lebar polos.
    Sekarang: post di dalam kartu, komentar berbentuk gelembung chat dengan avatar berwarna, balasan menjorok
-   bergaris tipis, dan kolom tulis membulat dengan tombol kirim ikon. */
-.diskusi{padding-top:14px;max-width:760px}
+   bergaris tipis, dan kolom tulis membulat dengan tombol kirim ikon. Lebarnya ngikut tab Mang AI/Komunitas di atasnya
+   (sempat dibatasi 760px, di desktop jadi nyisain ruang kosong lebar di kanan). */
+.diskusi{padding-top:14px}
 .diskusi-atas{display:flex;align-items:center;gap:12px}
 .diskusi-atas b{font-family:var(--f-head),sans-serif;font-size:22px;font-weight:800;letter-spacing:-.02em}
 .diskusi-post{background:var(--surface);border:var(--tepi);border-radius:var(--r);padding:18px;margin-top:14px}
