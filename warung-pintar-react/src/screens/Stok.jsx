@@ -8,6 +8,7 @@ import { api } from '../lib/api';
 import { PIN_GAMPANG, hashPinLokal, errorJaringan } from '../lib/pin';
 import { IKON_PRODUK, tebakIkon } from '../lib/ikonProduk';
 import PilihIkon from '../components/PilihIkon.jsx';
+import KonfirmasiHapus from '../components/KonfirmasiHapus.jsx';
 import { bukaKamera, tutupKamera, jepretFrame, keWebp } from '../lib/kamera';
 import { ambilEmbedding } from '../lib/visualScan';
 import { useModelVisual } from '../lib/useModelVisual';
@@ -1357,8 +1358,9 @@ function SheetOpname({ produk, onClose }) {
   const [nama, setNama] = useState(produk.nama);
   const [kategori, setKategori] = useState(produk.kat || '');
   const [barcode, setBarcode] = useState(produk.barcode || '');
-  const [confirmHapus, setConfirmHapus] = useState(false);
+  const [confirmHapus, setConfirmHapus] = useState(false); // popup "hapus barang ini?"
   const [hapusLoading, setHapusLoading] = useState(false);
+  const [refHapus, setRefHapus] = useState(null); // foto scan yang mau dihapus (nunggu konfirmasi popup)
   // Bagian yang jarang diubah dilipat biar layar utamanya cuma stok & harga (yang dikerjain tiap opname).
   const [bukaDetail, setBukaDetail] = useState(false);
   const [bukaFoto, setBukaFoto] = useState(false);
@@ -1552,6 +1554,7 @@ function SheetOpname({ produk, onClose }) {
   const saranGrup = daftarGrupUnik(S.produk).filter((g) => g.toLowerCase().includes(grup.trim().toLowerCase()));
 
   return (
+    <>
     <div className="sheet show">
       <div className="panel ed">
         <div className="ed-kepala">
@@ -1706,7 +1709,7 @@ function SheetOpname({ produk, onClose }) {
               {refList.map((r) => (
                 <div key={r.id} className="ed-foto-ref">
                   <img src={r.foto_url} alt={r.sudut || ''} title={r.sudut || ''} />
-                  <button type="button" onClick={() => hapusReferensiSatu(r.id)} title="Hapus foto referensi ini">
+                  <button type="button" onClick={() => setRefHapus(r)} title="Hapus foto referensi ini">
                     ×
                   </button>
                 </div>
@@ -1719,26 +1722,9 @@ function SheetOpname({ produk, onClose }) {
           </div>
         )}
 
-        {!confirmHapus ? (
-          <button type="button" className="ed-hapus" onClick={() => setConfirmHapus(true)}>
-            Hapus barang ini
-          </button>
-        ) : (
-          <div className="ed-kartu">
-            <b>Yakin hapus "{produk.nama}"?</b>
-            <div className="ed-hint">
-              Ilang dari Stok, Catat Penjualan, scan, & Mang AI - tapi histori transaksi lama yang udah kejadian tetap kesimpen, nggak ikut kehapus.
-            </div>
-            <div className="ed-dua" style={{ marginTop: 12 }}>
-              <button className="btn" disabled={hapusLoading} onClick={() => setConfirmHapus(false)}>
-                Batal
-              </button>
-              <button className="btn" style={{ background: '#e5484d', color: '#fff' }} disabled={hapusLoading} onClick={hapusBarang}>
-                {hapusLoading ? 'Menghapus…' : 'Ya, hapus'}
-              </button>
-            </div>
-          </div>
-        )}
+        <button type="button" className="ed-hapus" onClick={() => setConfirmHapus(true)}>
+          Hapus barang ini
+        </button>
 
         {/* Nempel di bawah panel - form ini panjang, dulu tombol Simpan cuma ketemu kalau scroll sampai mentok. */}
         <div className="ed-aksi">
@@ -1751,6 +1737,29 @@ function SheetOpname({ produk, onClose }) {
         </div>
       </div>
     </div>
+
+    {confirmHapus && (
+      <KonfirmasiHapus
+        judul={`Hapus "${produk.nama}"?`}
+        pesan="Ilang dari Stok, Catat Penjualan, scan, & Mang AI - tapi histori transaksi lama yang udah kejadian tetap kesimpen, nggak ikut kehapus."
+        sibuk={hapusLoading}
+        onYa={hapusBarang}
+        onBatal={() => setConfirmHapus(false)}
+      />
+    )}
+    {refHapus && (
+      <KonfirmasiHapus
+        judul="Hapus foto scan ini?"
+        pesan="Barang ini jadi lebih susah dikenali pas scan kamera. Bisa ditambah lagi kapan aja."
+        onYa={() => {
+          const r = refHapus;
+          setRefHapus(null);
+          hapusReferensiSatu(r.id);
+        }}
+        onBatal={() => setRefHapus(null)}
+      />
+    )}
+    </>
   );
 }
 

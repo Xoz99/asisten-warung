@@ -8,6 +8,7 @@ import { terpasangSebagaiApp } from '../lib/pwa';
 import { api } from '../lib/api.js';
 import { PIN_GAMPANG, hashPinLokal } from '../lib/pin';
 import KartuPaket from '../components/KartuPaket.jsx';
+import KonfirmasiHapus from '../components/KonfirmasiHapus.jsx';
 import mangWarungImg from '../assets/mangwarung.webp';
 
 export default function Lainnya() {
@@ -17,8 +18,10 @@ export default function Lainnya() {
 
   const warnaAktif = WARNA.find((w) => w.h === S.warna) || WARNA[0];
 
+  // Konfirmasi keluar lewat popup app (dulu window.confirm() bawaan browser - tampilannya beda-beda tiap HP).
+  const [yakinKeluar, setYakinKeluar] = useState(false);
   const keluarAkun = () => {
-    if (!window.confirm('Keluar dari akun warung ini di HP ini?')) return;
+    setYakinKeluar(false);
     kosongkanCart();
     setPelangganTerpilih(null);
     logout();
@@ -217,7 +220,7 @@ export default function Lainnya() {
           </span>
           <span className="ar">›</span>
         </button>
-        <button className="mrow" onClick={keluarAkun}>
+        <button className="mrow" onClick={() => setYakinKeluar(true)}>
           <span className="ic">
             <svg viewBox="0 0 24 24">
               <path d="M9 4H6.5A2.5 2.5 0 0 0 4 6.5v11A2.5 2.5 0 0 0 6.5 20H9" />
@@ -248,6 +251,15 @@ export default function Lainnya() {
       {sheet === 'pass' && <SheetPass onClose={() => setSheet(null)} />}
       {sheet === 'pin' && <SheetGantiPin onClose={() => setSheet(null)} />}
       {sheet === 'memori' && <SheetMemori onClose={() => setSheet(null)} />}
+      {yakinKeluar && (
+        <KonfirmasiHapus
+          judul="Keluar dari akun?"
+          pesan="Kamu keluar dari akun warung ini di HP ini. Data warung tetap aman di server - tinggal login lagi."
+          labelYa="Ya, keluar"
+          onYa={keluarAkun}
+          onBatal={() => setYakinKeluar(false)}
+        />
+      )}
       {sheet === 'nohp' && <SheetNoHp onClose={() => setSheet(null)} />}
     </>
   );
@@ -1007,6 +1019,7 @@ function SheetMemori({ onClose }) {
   const [baru, setBaru] = useState('');
   const [sibuk, setSibuk] = useState(false);
   const [yakinHapusSemua, setYakinHapusSemua] = useState(false);
+  const [hapusTarget, setHapusTarget] = useState(null); // catatan yang mau dihapus (nunggu konfirmasi popup)
 
   useEffect(() => {
     let batal = false;
@@ -1040,6 +1053,7 @@ function SheetMemori({ onClose }) {
   };
 
   const hapus = async (id) => {
+    setHapusTarget(null);
     try {
       await api.memori.hapus(id);
       setDaftar((d) => d.filter((m) => m.id !== id));
@@ -1063,6 +1077,7 @@ function SheetMemori({ onClose }) {
   };
 
   return (
+    <>
     <div className="sheet show">
       <div className="panel">
         <h3>Memori Mang AI</h3>
@@ -1093,7 +1108,7 @@ function SheetMemori({ onClose }) {
             daftar.map((m) => (
               <div className="memori-item" key={m.id}>
                 <span>{m.isi}</span>
-                <button type="button" onClick={() => hapus(m.id)} aria-label="Hapus catatan ini" title="Hapus catatan ini">
+                <button type="button" onClick={() => setHapusTarget(m)} aria-label="Hapus catatan ini" title="Hapus catatan ini">
                   ×
                 </button>
               </div>
@@ -1101,26 +1116,36 @@ function SheetMemori({ onClose }) {
           )}
         </div>
 
-        {daftar?.length > 0 &&
-          (!yakinHapusSemua ? (
-            <button type="button" className="ed-hapus" onClick={() => setYakinHapusSemua(true)}>
-              Hapus semua memori
-            </button>
-          ) : (
-            <div className="ed-dua" style={{ marginTop: 12 }}>
-              <button className="btn" disabled={sibuk} onClick={() => setYakinHapusSemua(false)}>
-                Batal
-              </button>
-              <button className="btn" style={{ background: '#e5484d', color: '#fff' }} disabled={sibuk} onClick={hapusSemua}>
-                Ya, hapus semua
-              </button>
-            </div>
-          ))}
+        {daftar?.length > 0 && (
+          <button type="button" className="ed-hapus" onClick={() => setYakinHapusSemua(true)}>
+            Hapus semua memori
+          </button>
+        )}
 
         <button className="btn" style={{ width: '100%', marginTop: 12 }} onClick={onClose}>
           Tutup
         </button>
       </div>
     </div>
+
+    {hapusTarget && (
+      <KonfirmasiHapus
+        judul="Hapus catatan ini?"
+        pesan={`"${hapusTarget.isi}" - Mang AI nggak bakal inget ini lagi.`}
+        onYa={() => hapus(hapusTarget.id)}
+        onBatal={() => setHapusTarget(null)}
+      />
+    )}
+    {yakinHapusSemua && (
+      <KonfirmasiHapus
+        judul="Hapus semua memori?"
+        pesan="Semua catatan yang diinget Mang AI tentang warungmu bakal hilang, di semua HP akun ini."
+        labelYa="Ya, hapus semua"
+        sibuk={sibuk}
+        onYa={hapusSemua}
+        onBatal={() => setYakinHapusSemua(false)}
+      />
+    )}
+    </>
   );
 }
