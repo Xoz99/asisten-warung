@@ -849,3 +849,43 @@ body{background:#E9E9E6}
 .sz-kecil{--h1:24px;--big:42px;--body:15px;--small:13px;--sec:18px;--sub:14px}
 .sz-sedang{--h1:28px;--big:48px;--body:17px;--small:15px;--sec:21px;--sub:16px}
 .sz-besar{--h1:32px;--big:54px;--body:19px;--small:17px;--sec:23px;--sub:18px}
+
+/* ==== Layar edit barang (SheetOpname di Stok.jsx) ====
+   Dulu: 7 kotak angka + belasan kolom isian berjejer tanpa pengelompokan, harga jual & stok muncul dua kali,
+   dan tombol Simpan cuma ketemu kalau scroll sampai mentok. Sekarang: kepala (foto+nama), satu kartu ringkasan
+   berbentuk daftar, kartu Stok & kartu Harga (yang dikerjain tiap opname), bagian Detail & Foto dilipat, dan
+   tombol Tutup/Simpan nempel di bawah. Isinya sama persis, cuma disusun ulang. */
+.panel.ed{padding-bottom:0}
+.ed-kepala{display:flex;align-items:center;gap:14px}
+.ed-kepala .emo.picon.produk-ikon{width:60px;height:60px;border-radius:18px;flex:none}
+.ed-kepala h3{font-size:24px;line-height:1.15;overflow-wrap:anywhere}
+.ed-sub{margin-top:4px;font-size:14px;color:var(--abu);font-weight:600;line-height:1.4}
+.ed-kartu{background:var(--bg);border-radius:20px;padding:14px 16px;margin-top:12px}
+.ed-kartu>.field:first-child,.ed-kartu>.ed-dua:first-child .field{margin-top:0}
+.ed-kartu .field input{padding:14px 16px}
+.ed-baris{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:7px 0;font-size:15px}
+.ed-baris+.ed-baris{border-top:1px solid var(--garis)}
+.ed-baris span{color:var(--abu);font-weight:600}
+.ed-baris b{font-weight:800;text-align:right;font-variant-numeric:tabular-nums}
+.ed-hint{font-size:13.5px;color:var(--abu);font-weight:600;margin-top:8px;line-height:1.5}
+.ed-hint b{color:var(--ink)}
+.ed-hint.merah,.ed-lipat small.merah{color:#e5484d}
+.ed-label{font-size:var(--small);font-weight:700;color:var(--abu);margin-top:14px}
+.ed-kartu .reko{margin-top:8px}
+.ed-dua{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ed-dua>.field{margin-top:14px;min-width:0}
+.ed-lipat{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;margin-top:12px;padding:14px 16px;
+  border:1.5px solid var(--garis);border-radius:20px;background:var(--surface);color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.ed-lipat span{display:flex;flex-direction:column;min-width:0}
+.ed-lipat b{font-size:16px;font-weight:800}
+.ed-lipat small{font-size:13px;color:var(--abu);font-weight:600;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ed-lipat i{font-style:normal;font-size:22px;line-height:1;color:var(--abu);transition:transform .2s}
+.ed-lipat.buka i{transform:rotate(90deg)}
+.ed-foto{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:8px}
+.ed-foto img{width:56px;height:56px;object-fit:cover;border-radius:14px;display:block}
+.ed-foto-ref{position:relative}
+.ed-foto-ref button{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:0;background:#e5484d;color:#fff;
+  font-size:13px;line-height:22px;padding:0;cursor:pointer}
+.ed-hapus{display:block;width:100%;margin-top:14px;padding:10px;background:none;border:0;color:#e5484d;font:inherit;font-weight:700;cursor:pointer}
+.ed-aksi{position:sticky;bottom:0;display:grid;grid-template-columns:1fr 2fr;gap:10px;margin:12px -22px 0;padding:12px 22px 22px;
+  background:var(--surface);box-shadow:0 -10px 16px -12px rgba(0,0,0,.18)}

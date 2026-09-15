@@ -1357,6 +1357,9 @@ function SheetOpname({ produk, onClose }) {
   const [barcode, setBarcode] = useState(produk.barcode || '');
   const [confirmHapus, setConfirmHapus] = useState(false);
   const [hapusLoading, setHapusLoading] = useState(false);
+  // Bagian yang jarang diubah dilipat biar layar utamanya cuma stok & harga (yang dikerjain tiap opname).
+  const [bukaDetail, setBukaDetail] = useState(false);
+  const [bukaFoto, setBukaFoto] = useState(false);
 
   // Foto referensi visual (buat scan AI kenalin barang ini) - BEDA sama `foto` (foto tampilan) di
   // atas. Dulu foto referensi CUMA bisa didaftarin pas alur "tambah barang baru" - barang yang udah
@@ -1519,228 +1522,217 @@ function SheetOpname({ produk, onClose }) {
     onClose();
   };
 
+  // Angka-angka ringkasan dijadiin DAFTAR (label kiri, angka kanan) di satu kartu - dulu 7 kotak terpisah
+  // (termasuk harga jual & stok yang juga muncul lagi di kolom isian di bawahnya), jadi layarnya penuh kotak.
+  const ringkasan = [
+    ['Modal (HPP)', rupiah(produk.modal)],
+    ['Untung per buah', `${rupiah(margin)} · ${pct}%`],
+    ['Nilai stok (modal)', rupiah(produk.stok * produk.modal)],
+    ['Potensi omzet', rupiah(produk.stok * produk.harga)],
+    ['Perkiraan habis', habis === null ? 'belum ada data laku' : `± ${habis} hari`],
+  ];
+  const ringkasDetail = [
+    kategori.trim() || 'sembako',
+    satuan.trim() || 'pcs',
+    +isiKemasan > 1 ? `1 ${namaKemasan.trim() || 'kemasan'} = ${isiKemasan}` : null,
+    barcode.trim() ? 'ada barcode' : 'tanpa barcode',
+    grup.trim() ? `grup ${grup.trim()}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const ringkasFoto = refLoading ? '…' : `${foto ? 'ada foto' : 'belum ada foto'} · ${refList.length} foto scan`;
+  const saranGrup = daftarGrupUnik(S.produk).filter((g) => g.toLowerCase().includes(grup.trim().toLowerCase()));
+
   return (
     <div className="sheet show">
-      <div className="panel">
-        <h3>{produk.nama}</h3>
-        <p>
-          Opname &amp; edit barang · kategori {produk.kat} · terjual total {terjual}
-          {produk.isiKemasan > 1 && (
-            <>
-              {' '}
-              · 1 {produk.namaKemasan || 'kemasan'} = {produk.isiKemasan} {produk.satuan}
-            </>
-          )}
-        </p>
-        <div className="opn">
-          {[
-            ['HPP (modal)', rupiah(produk.modal)],
-            ['Harga jual', rupiah(produk.harga)],
-            ['Untung per buah', `${rupiah(margin)} (${pct}%)`],
-            ['Stok sekarang', `${produk.stok} buah`],
-          ].map(([k, v]) => (
-            <div key={k}>
-              <div className="k">{k}</div>
-              <div className="v">{v}</div>
+      <div className="panel ed">
+        <div className="ed-kepala">
+          <ProductIcon id={produk.id} foto={foto || produk.foto} />
+          <div style={{ minWidth: 0 }}>
+            <h3>{produk.nama}</h3>
+            <div className="ed-sub">
+              {produk.kat} · terjual total {terjual}
+              {produk.isiKemasan > 1 && ` · 1 ${produk.namaKemasan || 'kemasan'} = ${produk.isiKemasan} ${produk.satuan}`}
             </div>
-          ))}
-        </div>
-
-        <p className="p-sec" style={{ marginTop: 20 }}>
-          Nilai stok saat ini
-        </p>
-        <div className="opn tiga">
-          {[
-            ['Nilai stok (modal)', rupiah(produk.stok * produk.modal)],
-            ['Potensi omzet', rupiah(produk.stok * produk.harga)],
-            ['Perkiraan habis', habis === null ? '-' : `${habis} hari`],
-          ].map(([k, v]) => (
-            <div key={k}>
-              <div className="k">{k}</div>
-              <div className="v">{v}</div>
-            </div>
-          ))}
-        </div>
-
-        <div className="field">
-          <label>Hitung ulang stok fisik (opname)</label>
-          <input type="number" inputMode="numeric" value={fisik} onChange={(e) => setFisik(e.target.value)} placeholder="jumlah nyata di rak" />
-        </div>
-        <p className="opnhint" dangerouslySetInnerHTML={{ __html: selisihHtml }} />
-
-        <div className="field">
-          <label>Ubah harga jual</label>
-          <input type="number" inputMode="numeric" value={harga} onChange={(e) => setHarga(e.target.value)} />
-        </div>
-        <p className="opnhint" dangerouslySetInnerHTML={{ __html: margeHtml }} />
-
-        <p className="p-sec" style={{ marginTop: 18 }}>
-          Rekomendasi harga sehat
-        </p>
-        <div className="reko">
-          {reko.map((r) => (
-            <button key={r.m} type="button" className={hargaNum === r.h ? 'pas' : ''} onClick={() => setHarga(String(r.h))}>
-              <div className="pct">Margin {r.m}%</div>
-              <div className="hrg">{rupiah(r.h)}</div>
-            </button>
-          ))}
-        </div>
-
-        <p className="p-sec" style={{ marginTop: 18 }}>
-          Edit detail barang
-        </p>
-        <div className="field">
-          <label>Nama barang</label>
-          <input value={nama} onChange={(e) => setNama(e.target.value)} />
-        </div>
-        <div className="field">
-          <label>Kategori</label>
-          <input value={kategori} onChange={(e) => setKategori(e.target.value)} placeholder="sembako / minuman / dst" />
-        </div>
-        <div className="field">
-          <label>Barcode (opsional)</label>
-          <input value={barcode} onChange={(e) => setBarcode(e.target.value)} inputMode="numeric" placeholder="Kosongkan kalau nggak ada" />
-        </div>
-        <div className="field">
-          <label>Foto barang (opsional)</label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6 }}>
-            {foto && <img src={foto} alt="" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 14 }} />}
-            <label className="btn kecil" style={{ display: 'inline-block', cursor: 'pointer' }}>
-              {foto ? 'Ganti foto' : <><CameraIcon /> Ambil foto</>}
-              <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={pilihFoto} />
-            </label>
           </div>
         </div>
 
-        <div className="field">
-          <label>
-            Foto referensi visual ({refLoading ? '…' : refList.length}) - dipakai scan AI buat kenalin barang ini, BEDA
-            dari foto tampilan di atas
-          </label>
-          {!refLoading && refList.length === 0 && (
-            <p className="opnhint" style={{ color: '#e5484d' }}>
-              Belum ada foto referensi - barang ini nggak akan ke-detect di scan barang (non-AI) sampai ditambahin
-              minimal 1 foto.
-            </p>
-          )}
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 6 }}>
-            {refList.map((r) => (
-              <div key={r.id} style={{ position: 'relative' }}>
-                <img
-                  src={r.foto_url}
-                  alt={r.sudut || ''}
-                  title={r.sudut || ''}
-                  style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 14 }}
-                />
-                <button
-                  type="button"
-                  onClick={() => hapusReferensiSatu(r.id)}
-                  title="Hapus foto referensi ini"
-                  style={{
-                    position: 'absolute',
-                    top: -6,
-                    right: -6,
-                    width: 20,
-                    height: 20,
-                    borderRadius: '50%',
-                    border: 'none',
-                    background: '#e5484d',
-                    color: '#fff',
-                    fontSize: 12,
-                    lineHeight: '20px',
-                    padding: 0,
-                    cursor: 'pointer',
-                  }}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-            <label className="btn kecil" style={{ display: 'inline-block', cursor: refUploading ? 'default' : 'pointer' }}>
-              {refUploading ? 'Memproses…' : (<><CameraIcon /> Tambah foto</>)}
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                style={{ display: 'none' }}
-                disabled={refUploading}
-                onChange={tambahReferensi}
-              />
-            </label>
-          </div>
+        <div className="ed-kartu">
+          {ringkasan.map(([k, v]) => (
+            <div className="ed-baris" key={k}>
+              <span>{k}</span>
+              <b>{v}</b>
+            </div>
+          ))}
         </div>
 
-        <div className="field" style={{ position: 'relative' }}>
-          <label>Grup varian (opsional - CUMA nama merek, TANPA ukuran, misal "Aqua" bukan "Aqua 600ml")</label>
-          <input
-            value={grup}
-            onChange={(e) => setGrup(e.target.value)}
-            onFocus={() => setGrupFokus(true)}
-            onBlur={() => setTimeout(() => setGrupFokus(false), 150)}
-            placeholder='Kosongkan kalau nggak ada variannya - isinya cuma "Aqua", bukan "Aqua 600ml"'
-          />
-          {/* Dropdown saran custom - lihat komentar lengkap di field Grup form "tambah barang baru" */}
-          {grupFokus && daftarGrupUnik(S.produk).filter((g) => g.toLowerCase().includes(grup.trim().toLowerCase())).length > 0 && (
-            <div className="dropdown-saran">
-              {daftarGrupUnik(S.produk)
-                .filter((g) => g.toLowerCase().includes(grup.trim().toLowerCase()))
-                .map((g) => (
-                  <button key={g} type="button" onClick={() => setGrup(g)}>
-                    {g}
-                  </button>
-                ))}
-            </div>
-          )}
-        </div>
-        <div className="field">
-          <label>Satuan jual</label>
-          <input value={satuan} onChange={(e) => setSatuan(e.target.value)} placeholder="pcs / botol / butir / bungkus" />
-        </div>
-        <div className="field">
-          <label>Isi per kemasan besar (misal 1 dus isi berapa {produk.satuan})</label>
-          <input type="number" inputMode="numeric" min="1" value={isiKemasan} onChange={(e) => setIsiKemasan(e.target.value)} />
-        </div>
-        {+isiKemasan > 1 && (
+        <div className="ed-kartu">
           <div className="field">
-            <label>Nama kemasan besarnya</label>
-            <input value={namaKemasan} onChange={(e) => setNamaKemasan(e.target.value)} placeholder="dus / pack / karton" />
+            <label>
+              Stok di rak (opname) · tercatat {produk.stok} {produk.satuan}
+            </label>
+            <input type="number" inputMode="numeric" value={fisik} onChange={(e) => setFisik(e.target.value)} placeholder="jumlah nyata di rak" />
+          </div>
+          <div className="ed-hint" dangerouslySetInnerHTML={{ __html: selisihHtml }} />
+        </div>
+
+        <div className="ed-kartu">
+          <div className="field">
+            <label>Harga jual</label>
+            <input type="number" inputMode="numeric" value={harga} onChange={(e) => setHarga(e.target.value)} />
+          </div>
+          <div className="ed-hint" dangerouslySetInnerHTML={{ __html: margeHtml }} />
+          <div className="ed-label">Rekomendasi harga sehat</div>
+          <div className="reko">
+            {reko.map((r) => (
+              <button key={r.m} type="button" className={hargaNum === r.h ? 'pas' : ''} onClick={() => setHarga(String(r.h))}>
+                <div className="pct">Margin {r.m}%</div>
+                <div className="hrg">{rupiah(r.h)}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button type="button" className={'ed-lipat' + (bukaDetail ? ' buka' : '')} onClick={() => setBukaDetail((b) => !b)}>
+          <span>
+            <b>Detail barang</b>
+            <small>{ringkasDetail}</small>
+          </span>
+          <i>›</i>
+        </button>
+        {bukaDetail && (
+          <div className="ed-kartu">
+            <div className="field">
+              <label>Nama barang</label>
+              <input value={nama} onChange={(e) => setNama(e.target.value)} />
+            </div>
+            <div className="ed-dua">
+              <div className="field">
+                <label>Kategori</label>
+                <input value={kategori} onChange={(e) => setKategori(e.target.value)} placeholder="sembako / minuman" />
+              </div>
+              <div className="field">
+                <label>Satuan jual</label>
+                <input value={satuan} onChange={(e) => setSatuan(e.target.value)} placeholder="pcs / botol / bungkus" />
+              </div>
+            </div>
+            <div className="field">
+              <label>Barcode (opsional)</label>
+              <input value={barcode} onChange={(e) => setBarcode(e.target.value)} inputMode="numeric" placeholder="Kosongkan kalau nggak ada" />
+            </div>
+            <div className="ed-dua">
+              <div className="field">
+                <label>Isi per kemasan besar</label>
+                <input type="number" inputMode="numeric" min="1" value={isiKemasan} onChange={(e) => setIsiKemasan(e.target.value)} />
+              </div>
+              {+isiKemasan > 1 && (
+                <div className="field">
+                  <label>Nama kemasannya</label>
+                  <input value={namaKemasan} onChange={(e) => setNamaKemasan(e.target.value)} placeholder="dus / pack / karton" />
+                </div>
+              )}
+            </div>
+            <div className="ed-hint">Misal 1 dus isi berapa {produk.satuan}. Biarin 1 kalau nggak dijual per kemasan.</div>
+            <div className="field" style={{ position: 'relative' }}>
+              <label>Grup varian (opsional)</label>
+              <input
+                value={grup}
+                onChange={(e) => setGrup(e.target.value)}
+                onFocus={() => setGrupFokus(true)}
+                onBlur={() => setTimeout(() => setGrupFokus(false), 150)}
+                placeholder="Kosongkan kalau nggak ada variannya"
+              />
+              {/* Dropdown saran custom - lihat komentar lengkap di field Grup form "tambah barang baru" */}
+              {grupFokus && saranGrup.length > 0 && (
+                <div className="dropdown-saran">
+                  {saranGrup.map((g) => (
+                    <button key={g} type="button" onClick={() => setGrup(g)}>
+                      {g}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="ed-hint">Cuma nama merek, TANPA ukuran - misal "Aqua", bukan "Aqua 600ml".</div>
           </div>
         )}
 
-        <button className="btn utama" style={{ width: '100%', marginTop: 16 }} onClick={simpan}>
-          Simpan perubahan
+        <button type="button" className={'ed-lipat' + (bukaFoto ? ' buka' : '')} onClick={() => setBukaFoto((b) => !b)}>
+          <span>
+            <b>Foto</b>
+            <small className={!refLoading && refList.length === 0 ? 'merah' : ''}>{ringkasFoto}</small>
+          </span>
+          <i>›</i>
         </button>
-        <button className="btn" style={{ width: '100%', marginTop: 10 }} onClick={onClose}>
-          Tutup
-        </button>
+        {bukaFoto && (
+          <div className="ed-kartu">
+            <div className="ed-label" style={{ marginTop: 0 }}>
+              Foto tampilan (opsional)
+            </div>
+            <div className="ed-foto">
+              {foto && <img src={foto} alt="" />}
+              <label className="btn kecil">
+                {foto ? 'Ganti foto' : <><CameraIcon /> Ambil foto</>}
+                <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={pilihFoto} />
+              </label>
+            </div>
+
+            <div className="ed-label">Foto buat scan barang ({refLoading ? '…' : refList.length})</div>
+            <div className="ed-hint" style={{ marginTop: 0 }}>
+              Beda dari foto tampilan - dipakai scan kamera buat ngenalin barang ini. Makin banyak sudut, makin gampang dikenali.
+            </div>
+            {!refLoading && refList.length === 0 && (
+              <div className="ed-hint merah">
+                Belum ada - barang ini nggak akan ke-detect di scan barang (non-AI) sampai ditambahin minimal 1 foto.
+              </div>
+            )}
+            <div className="ed-foto">
+              {refList.map((r) => (
+                <div key={r.id} className="ed-foto-ref">
+                  <img src={r.foto_url} alt={r.sudut || ''} title={r.sudut || ''} />
+                  <button type="button" onClick={() => hapusReferensiSatu(r.id)} title="Hapus foto referensi ini">
+                    ×
+                  </button>
+                </div>
+              ))}
+              <label className="btn kecil" style={{ cursor: refUploading ? 'default' : 'pointer' }}>
+                {refUploading ? 'Memproses…' : (<><CameraIcon /> Tambah foto</>)}
+                <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} disabled={refUploading} onChange={tambahReferensi} />
+              </label>
+            </div>
+          </div>
+        )}
 
         {!confirmHapus ? (
-          <button
-            className="btn"
-            style={{ width: '100%', marginTop: 18, color: '#e5484d' }}
-            onClick={() => setConfirmHapus(true)}
-          >
+          <button type="button" className="ed-hapus" onClick={() => setConfirmHapus(true)}>
             Hapus barang ini
           </button>
         ) : (
-          <div style={{ marginTop: 18, padding: 14, borderRadius: 14, background: 'var(--bg)' }}>
-            <p style={{ margin: 0, fontWeight: 700 }}>Yakin hapus "{produk.nama}"?</p>
-            <p className="p-sub" style={{ marginTop: 6 }}>
+          <div className="ed-kartu">
+            <b>Yakin hapus "{produk.nama}"?</b>
+            <div className="ed-hint">
               Ilang dari Stok, Catat Penjualan, scan, & Mang AI - tapi histori transaksi lama yang udah kejadian tetap kesimpen, nggak ikut kehapus.
-            </p>
-            <button
-              className="btn"
-              style={{ width: '100%', marginTop: 12, background: '#e5484d', color: '#fff' }}
-              disabled={hapusLoading}
-              onClick={hapusBarang}
-            >
-              {hapusLoading ? 'Menghapus…' : 'Ya, hapus'}
-            </button>
-            <button className="btn" style={{ width: '100%', marginTop: 8 }} disabled={hapusLoading} onClick={() => setConfirmHapus(false)}>
-              Batal
-            </button>
+            </div>
+            <div className="ed-dua" style={{ marginTop: 12 }}>
+              <button className="btn" disabled={hapusLoading} onClick={() => setConfirmHapus(false)}>
+                Batal
+              </button>
+              <button className="btn" style={{ background: '#e5484d', color: '#fff' }} disabled={hapusLoading} onClick={hapusBarang}>
+                {hapusLoading ? 'Menghapus…' : 'Ya, hapus'}
+              </button>
+            </div>
           </div>
         )}
+
+        {/* Nempel di bawah panel - form ini panjang, dulu tombol Simpan cuma ketemu kalau scroll sampai mentok. */}
+        <div className="ed-aksi">
+          <button className="btn" onClick={onClose}>
+            Tutup
+          </button>
+          <button className="btn utama" onClick={simpan}>
+            Simpan
+          </button>
+        </div>
       </div>
     </div>
   );
