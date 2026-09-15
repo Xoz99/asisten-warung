@@ -118,6 +118,7 @@ function riwayatUntukGemini(log) {
 // Menu "Tanya" — 2 sub-fitur: chatbot AI (Mang Warung, jawab dari data warung sendiri) & Komunitas
 // (feed lintas-warung buat sharing harga jual/untung, PRD baru — lihat komentar di Komunitas()).
 export default function Chat() {
+  const { notifKomunitas } = useApp();
   const [tab, setTab] = useState('ai'); // ai | komunitas
   return (
     // .chat-page--ai cuma dipakai pas tab Mang AI aktif - ini beda konteks dari Komunitas (feed
@@ -140,6 +141,7 @@ export default function Chat() {
             <path d="M15 13.3c2-.3 4 .7 5 3.2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
           </svg>
           Komunitas
+          {notifKomunitas > 0 && <span className="seg-notif">{notifKomunitas > 9 ? '9+' : notifKomunitas}</span>}
         </button>
       </div>
       {tab === 'ai' ? <TanyaAI /> : <Komunitas />}
@@ -1251,8 +1253,8 @@ function SheetJepretNota({ onJepret, onClose }) {
 const MAKS_PER_HALAMAN = 20;
 
 const TOPIK = ['Dagangan', 'Kasbon', 'Supplier', 'Lainnya']; // topik postingan komunitas
-const FILTER_TABS = ['terbaru', 'ramai', ...TOPIK];
-const labelFilter = (f) => (f === 'terbaru' ? 'Terbaru' : f === 'ramai' ? 'Ramai' : f);
+const FILTER_TABS = ['terbaru', 'saya', 'ramai', ...TOPIK];
+const labelFilter = (f) => (f === 'terbaru' ? 'Terbaru' : f === 'ramai' ? 'Ramai' : f === 'saya' ? 'Postingan saya' : f);
 
 // Waktu relatif ringkas ("20 mnt lalu", "3 jam lalu") buat baris kecil di header tiap post -
 // mirip waktuLalu() di PhoneShell.jsx (badge sync), tapi disalin lokal di sini biar Komunitas()
@@ -1334,7 +1336,7 @@ function BarisKomentar({ k, milikSaya, onBalas, onHapus, onLihatFoto }) {
 }
 
 function Komunitas() {
-  const { authWarung, toast } = useApp();
+  const { authWarung, toast, notifKomunitas, cekNotifKomunitas } = useApp();
   const [feed, setFeed] = useState(null); // null = belum sempat fetch pertama kali
   const [habis, setHabis] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -1352,6 +1354,8 @@ function Komunitas() {
   const [fotoPost, setFotoPost] = useState(null); // foto lampiran postingan baru (data URL)
   const [fotoKomentar, setFotoKomentar] = useState(null); // foto lampiran komentar/balasan yang lagi ditulis
   const [lihatFoto, setLihatFoto] = useState(null); // foto yang lagi dibuka penuh
+  const [notifBuka, setNotifBuka] = useState(false);
+  const [notifDaftar, setNotifDaftar] = useState(null); // null = lagi dimuat
 
   // Foto lampiran dikecilin dulu (maks 1024px) sebelum dikirim - foto kamera HP bisa beberapa MB.
   const bacaFoto = (e, simpan) => {
@@ -1378,6 +1382,8 @@ function Komunitas() {
     let arr = feed;
     if (filter === 'ramai') {
       arr = [...feed].sort((a, b) => +b.jumlah_suka + +b.jumlah_komentar - (+a.jumlah_suka + +a.jumlah_komentar));
+    } else if (filter === 'saya') {
+      arr = feed.filter((p) => p.warung_id === authWarung?.id).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     } else if (filter !== 'terbaru') {
       arr = feed.filter((p) => p.tag === filter);
     }
@@ -1410,6 +1416,22 @@ function Komunitas() {
     muat();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Tab "Postingan saya": diambil langsung dari server (bukan cuma nyaring feed yang udah kemuat), jadi postingan
+  // lama yang belum kescroll juga ikut. Hasilnya digabung ke feed biar detail & suka tetap jalan kayak biasa.
+  const gabungKeFeed = (rows) =>
+    setFeed((f) => {
+      const ada = new Set((f || []).map((p) => p.id));
+      return [...(f || []), ...rows.filter((p) => !ada.has(p.id))];
+    });
+  useEffect(() => {
+    if (filter !== 'saya') return;
+    api.komunitas
+      .feed(null, 'saya')
+      .then(gabungKeFeed)
+      .catch((e) => toast(e.message || 'Gagal memuat postingan kamu'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter]);
 
   const muatLagi = () => {
     if (!feed?.length) return;
@@ -1479,12 +1501,14 @@ function Komunitas() {
   // dibikin buka sheet detail terpisah (kaya klik jumlah komentar di Facebook - post-nya kepajang
   // sendiri di popup, bukan numpuk mepet-mepet di tengah feed), jadi nggak toggle-close lagi -
   // sekali klik selalu buka, tutupnya lewat tombol × di sheet-nya (tutupDetail).
-  const bukaDetail = async (postId) => {
+  const bukaDetail = async (postId, paksaMuatUlang = false) => {
     setKomentarBuka(postId);
     setDraftKomentar('');
     setFotoKomentar(null);
     setBalasKe(null);
-    if (!komentarMap[postId]) {
+    // Buka postingan = notifikasi yang nyangkut postingan ini dianggap udah dibaca.
+    if (notifKomunitas > 0) api.komunitas.notif.baca({ postId }).then(cekNotifKomunitas).catch(() => {});
+    if (paksaMuatUlang || !komentarMap[postId]) {
       try {
         const list = await api.komunitas.komentar.list(postId);
         setKomentarMap((m) => ({ ...m, [postId]: list }));
@@ -1502,6 +1526,43 @@ function Komunitas() {
     }
   };
   const tutupDetail = () => setKomentarBuka(null);
+
+  const bukaNotif = async () => {
+    setNotifBuka(true);
+    setNotifDaftar(null);
+    try {
+      const { daftar } = await api.komunitas.notif.list();
+      setNotifDaftar(daftar);
+    } catch (e) {
+      setNotifDaftar([]);
+      toast(e.message || 'Gagal memuat notifikasi');
+    }
+  };
+
+  // Tap notifikasi -> langsung ke diskusinya. Komentar dimuat ulang (yang barusan masuk belum ada di cache).
+  const bukaDariNotif = async (n) => {
+    setNotifBuka(false);
+    if (!feed?.some((p) => p.id === n.post_id)) {
+      try {
+        gabungKeFeed([await api.komunitas.detail(n.post_id)]);
+      } catch (e) {
+        toast(e.message || 'Postingannya udah nggak ada');
+        return;
+      }
+    }
+    bukaDetail(n.post_id, true);
+    if (!n.dibaca) api.komunitas.notif.baca({ id: n.id }).then(cekNotifKomunitas).catch(() => {});
+  };
+
+  const bacaSemuaNotif = async () => {
+    try {
+      await api.komunitas.notif.baca({});
+      setNotifDaftar((d) => (d || []).map((n) => ({ ...n, dibaca: true })));
+      cekNotifKomunitas();
+    } catch (e) {
+      toast(e.message || 'Gagal menandai notifikasi');
+    }
+  };
 
   const kirimKomentar = async (postId) => {
     const teks = draftKomentar.trim();
@@ -1582,14 +1643,19 @@ function Komunitas() {
 
       {/* Tombol biasa (bukan FAB ngambang) - nav bar udah punya FAB "Catat" sendiri di zona
           bawah yang sama, jadi tombol tambah postingan taruh di alur feed aja biar nggak numpuk. */}
-      <button
-        type="button"
-        className="btn utama brand"
-        style={{ width: '100%', marginTop: 14 }}
-        onClick={() => setKomposerBuka(true)}
-      >
-        + Tanya ke komunitas
-      </button>
+      <div className="kom-atas">
+        <button type="button" className="btn utama brand" style={{ flex: 1 }} onClick={() => setKomposerBuka(true)}>
+          + Tanya ke komunitas
+        </button>
+        {/* Lonceng notifikasi: komentar di postingan sendiri & balasan ke komentar sendiri */}
+        <button type="button" className="kom-lonceng" onClick={bukaNotif} aria-label="Notifikasi">
+          <svg viewBox="0 0 24 24">
+            <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15Z" />
+            <path d="M10 20.5a2 2 0 0 0 4 0" />
+          </svg>
+          {notifKomunitas > 0 && <span className="badge show">{notifKomunitas > 9 ? '9+' : notifKomunitas}</span>}
+        </button>
+      </div>
 
       {feed === null && (
         <p className="p-sub" style={{ textAlign: 'center', marginTop: 30 }}>
@@ -1662,7 +1728,11 @@ function Komunitas() {
         ))}
       </div>
 
-      {feed?.length > 0 && !habis && (
+      {filter === 'saya' && daftar?.length === 0 && (
+        <div className="kosong">Kamu belum pernah posting. Tanya atau cerita soal dagangan lewat tombol di atas.</div>
+      )}
+
+      {feed?.length > 0 && !habis && filter !== 'saya' && (
         <button className="btn" style={{ width: '100%', marginTop: 14, marginBottom: 14 }} disabled={loadingMore} onClick={muatLagi}>
           {loadingMore ? 'Memuat…' : 'Muat lagi'}
         </button>
@@ -1882,6 +1952,47 @@ function Komunitas() {
             </form>
           )}
         </div>
+      )}
+
+      {notifBuka && (
+        <Sheet>
+          <div className="between">
+            <h3 style={{ fontSize: 20 }}>Notifikasi</h3>
+            <button className="hapus-mini" onClick={() => setNotifBuka(false)} aria-label="Tutup">
+              ×
+            </button>
+          </div>
+          {notifDaftar === null ? (
+            <p className="p-sub">Memuat…</p>
+          ) : notifDaftar.length === 0 ? (
+            <div className="kosong">Belum ada notifikasi. Nanti muncul di sini kalau ada yang komentar di postinganmu atau bales komentarmu.</div>
+          ) : (
+            <>
+              {notifDaftar.some((n) => !n.dibaca) && (
+                <button type="button" className="notif-baca-semua" onClick={bacaSemuaNotif}>
+                  Tandai semua dibaca
+                </button>
+              )}
+              <div className="notif-daftar">
+                {notifDaftar.map((n) => (
+                  <button key={n.id} type="button" className={'notif-item' + (n.dibaca ? '' : ' baru')} onClick={() => bukaDariNotif(n)}>
+                    <div className="bulat">{inisial(n.dari_nama)}</div>
+                    <div style={{ minWidth: 0 }}>
+                      <p>
+                        <b>{n.dari_nama}</b> {n.jenis === 'balasan' ? 'membalas komentarmu' : 'mengomentari postinganmu'}
+                        {n.teks ? `: "${n.teks}"` : n.ada_foto ? ' (kirim foto)' : ''}
+                      </p>
+                      <small>
+                        {waktuRelatif(n.created_at)}
+                        {n.post_cuplikan ? ` · di "${n.post_cuplikan}"` : ''}
+                      </small>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </Sheet>
       )}
 
       {lihatFoto && (

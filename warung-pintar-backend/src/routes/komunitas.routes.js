@@ -28,6 +28,55 @@ function pastikanKolomFoto() {
   return kolomFotoSiap;
 }
 
+const POLA_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Notifikasi Komunitas: "X mengomentari postinganmu" & "X membalas komentarmu". Tabel dibikin otomatis kalau
+// belum ada (deploy nggak jalanin migrate). Komentar/postingan dihapus = notifikasinya ikut kehapus (CASCADE).
+let tabelNotifSiap = null;
+function pastikanTabelNotif() {
+  if (!tabelNotifSiap) {
+    tabelNotifSiap = (async () => {
+      await pastikanKolomFoto();
+      await query(`CREATE TABLE IF NOT EXISTS komunitas_notif (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        warung_id UUID NOT NULL REFERENCES warung(id) ON DELETE CASCADE,
+        dari_warung_id UUID NOT NULL REFERENCES warung(id) ON DELETE CASCADE,
+        post_id UUID NOT NULL REFERENCES komunitas_post(id) ON DELETE CASCADE,
+        komentar_id UUID REFERENCES komunitas_komentar(id) ON DELETE CASCADE,
+        jenis TEXT NOT NULL,
+        dibaca BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT now()
+      )`);
+      await query('CREATE INDEX IF NOT EXISTS idx_komunitas_notif_penerima ON komunitas_notif (warung_id, dibaca, created_at DESC)');
+    })().catch((e) => {
+      tabelNotifSiap = null;
+      throw e;
+    });
+  }
+  return tabelNotifSiap;
+}
+
+// Penerima: pemilik postingan ("komentar") & pemilik komentar yang dibales ("balasan"). Nggak pernah ngirim
+// notif ke diri sendiri, dan 1 komentar = maksimal 1 notif per penerima (kalau yang dibales pemilik
+// postingannya sendiri, cukup notif "balasan").
+async function buatNotifKomentar({ postId, komentarId, dari, targetWarung }) {
+  await pastikanTabelNotif();
+  const penerima = new Map();
+  const { rows } = await query('SELECT warung_id FROM komunitas_post WHERE id=$1', [postId]);
+  const pemilikPost = rows[0]?.warung_id;
+  if (pemilikPost && pemilikPost !== dari) penerima.set(pemilikPost, 'komentar');
+  if (targetWarung && targetWarung !== dari) penerima.set(targetWarung, 'balasan');
+  for (const [warungId, jenis] of penerima) {
+    await query('INSERT INTO komunitas_notif (warung_id, dari_warung_id, post_id, komentar_id, jenis) VALUES ($1,$2,$3,$4,$5)', [
+      warungId,
+      dari,
+      postId,
+      komentarId,
+      jenis,
+    ]);
+  }
+}
+
 // Komunitas — feed NASIONAL (semua warung berlangganan lihat feed yang sama, belum dikelompokkan
 // per wilayah — fondasi dulu, filter lokasi nyusul kalau usernya udah banyak) buat saling sharing
 // harga jual & profit penjualan. Ditampilin ATAS NAMA WARUNG (bukan anonim, keputusan produk),
@@ -37,10 +86,61 @@ function pastikanKolomFoto() {
 // obrolan bebas doang (cuma isi cerita). Minimal salah satu dari cerita/nama_barang wajib diisi,
 // dicek di endpoint POST (bukan constraint DB, biar pesan errornya ramah).
 
+// ---- Notifikasi (ditaruh di atas rute /:id biar "notif" nggak kebaca sebagai id postingan) ----
+router.get('/notif/jumlah', async (req, res, next) => {
+  try {
+    await pastikanTabelNotif();
+    const { rows } = await query('SELECT COUNT(*)::int AS n FROM komunitas_notif WHERE warung_id=$1 AND NOT dibaca', [req.warungId]);
+    res.json({ belumDibaca: rows[0].n });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.get('/notif', async (req, res, next) => {
+  try {
+    await pastikanTabelNotif();
+    const { rows } = await query(
+      `SELECT n.id, n.jenis, n.dibaca, n.created_at, n.post_id, n.komentar_id, w.nama AS dari_nama,
+              left(COALESCE(kp.cerita, kp.nama_barang, ''), 80) AS post_cuplikan,
+              left(COALESCE(kk.teks, ''), 120) AS teks, (kk.foto_url IS NOT NULL) AS ada_foto
+       FROM komunitas_notif n
+       JOIN warung w ON w.id = n.dari_warung_id
+       JOIN komunitas_post kp ON kp.id = n.post_id
+       LEFT JOIN komunitas_komentar kk ON kk.id = n.komentar_id
+       WHERE n.warung_id = $1
+       ORDER BY n.created_at DESC LIMIT 50`,
+      [req.warungId]
+    );
+    res.json({ belumDibaca: rows.filter((n) => !n.dibaca).length, daftar: rows });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// { id } = satu notifikasi, { postId } = semua notifikasi postingan itu (pas postingannya dibuka), {} = semua
+router.post('/notif/baca', async (req, res, next) => {
+  try {
+    const { id = null, postId = null } = req.body || {};
+    if ((id && !POLA_UUID.test(id)) || (postId && !POLA_UUID.test(postId))) return res.status(400).json({ error: 'id nggak valid' });
+    await pastikanTabelNotif();
+    await query(
+      `UPDATE komunitas_notif SET dibaca = true
+       WHERE warung_id = $1 AND NOT dibaca AND ($2::uuid IS NULL OR id = $2) AND ($3::uuid IS NULL OR post_id = $3)`,
+      [req.warungId, id, postId]
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
 router.get('/', async (req, res, next) => {
   try {
     const limit = Math.min(50, Math.max(1, +req.query.limit || 20));
     const before = req.query.before || null; // cursor pagination: ambil yang lebih lama dari timestamp ini
+    // ?milik=saya -> cuma postingan warung sendiri (tab "Postingan saya"), sampai 50 terakhir sekaligus
+    const milikSaya = req.query.milik === 'saya';
     const { rows } = await query(
       `SELECT kp.*, w.nama AS warung_nama,
               (SELECT COUNT(*) FROM komunitas_suka s WHERE s.post_id = kp.id) AS jumlah_suka,
@@ -49,13 +149,36 @@ router.get('/', async (req, res, next) => {
        FROM komunitas_post kp
        JOIN warung w ON w.id = kp.warung_id
        WHERE ($2::timestamptz IS NULL OR kp.created_at < $2::timestamptz)
+         AND ($4::boolean IS NOT TRUE OR kp.warung_id = $1)
        ORDER BY kp.created_at DESC
        LIMIT $3`,
-      [req.warungId, before, limit]
+      [req.warungId, before, milikSaya ? 50 : limit, milikSaya]
     );
     // Postingan promosi judol yang terlanjur masuk (sebelum filter ini ada) nggak ditampilin. Filter di sini cuma
     // jaring pengaman - yang baru udah ditolak waktu dikirim (lihat POST di bawah).
     res.json(rows.filter((p) => !nilaiJudol(p.cerita, p.nama_barang).blokir));
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Satu postingan - dipakai pas dibuka dari notifikasi (postingannya belum tentu ada di feed yang udah kemuat).
+router.get('/:id', async (req, res, next) => {
+  try {
+    if (!POLA_UUID.test(req.params.id)) return res.status(404).json({ error: 'Postingan tidak ditemukan' });
+    const { rows } = await query(
+      `SELECT kp.*, w.nama AS warung_nama,
+              (SELECT COUNT(*) FROM komunitas_suka s WHERE s.post_id = kp.id) AS jumlah_suka,
+              (SELECT COUNT(*) FROM komunitas_komentar k WHERE k.post_id = kp.id) AS jumlah_komentar,
+              EXISTS(SELECT 1 FROM komunitas_suka s2 WHERE s2.post_id = kp.id AND s2.warung_id = $1) AS disukai
+       FROM komunitas_post kp JOIN warung w ON w.id = kp.warung_id
+       WHERE kp.id = $2`,
+      [req.warungId, req.params.id]
+    );
+    if (!rows.length || nilaiJudol(rows[0].cerita, rows[0].nama_barang).blokir) {
+      return res.status(404).json({ error: 'Postingannya udah nggak ada' });
+    }
+    res.json(rows[0]);
   } catch (e) {
     next(e);
   }
@@ -172,12 +295,14 @@ router.post('/:id/komentar', async (req, res, next) => {
     }
     await pastikanKolomFoto();
     let balasKe = req.body.balasKe || null;
+    let targetWarung = null; // pemilik komentar yang dibales - dapet notif "membalas komentarmu"
     if (balasKe) {
-      const { rows: target } = await query('SELECT id, post_id, balas_ke FROM komunitas_komentar WHERE id=$1', [balasKe]);
+      const { rows: target } = await query('SELECT id, post_id, balas_ke, warung_id FROM komunitas_komentar WHERE id=$1', [balasKe]);
       const t = target[0];
       if (!t || t.post_id !== req.params.id) {
         return res.status(400).json({ error: 'Komentar yang mau dibalas tidak ditemukan' });
       }
+      targetWarung = t.warung_id;
       balasKe = t.balas_ke || t.id;
     }
     const { rows } = await query(
@@ -185,6 +310,10 @@ router.post('/:id/komentar', async (req, res, next) => {
       [req.params.id, req.warungId, teks, balasKe, foto]
     );
     const { rows: w } = await query('SELECT nama FROM warung WHERE id=$1', [req.warungId]);
+    // Notif sengaja nggak di-await: gagal nyatet notif nggak boleh bikin komentarnya ikut gagal/lambat.
+    buatNotifKomentar({ postId: req.params.id, komentarId: rows[0].id, dari: req.warungId, targetWarung }).catch((e) =>
+      console.warn('[komunitas] gagal bikin notifikasi:', e.message)
+    );
     res.status(201).json({ ...rows[0], warung_nama: w[0]?.nama });
   } catch (e) {
     next(e);

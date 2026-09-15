@@ -245,7 +245,22 @@ export const api = {
 
   komunitas: {
     // cursor: ISO timestamp postingan terlama yang udah kemuat (buat "muat lagi") — kosongin buat halaman pertama
-    feed: (cursor) => get(`/api/komunitas${cursor ? `?before=${encodeURIComponent(cursor)}` : ''}`),
+    // milik 'saya' = cuma postingan warung sendiri (tab "Postingan saya")
+    feed: (cursor, milik) => {
+      const q = new URLSearchParams();
+      if (cursor) q.set('before', cursor);
+      if (milik) q.set('milik', milik);
+      const qs = q.toString();
+      return get(`/api/komunitas${qs ? `?${qs}` : ''}`);
+    },
+    detail: (id) => get(`/api/komunitas/${id}`),
+    // Notifikasi: komentar di postingan sendiri & balasan ke komentar sendiri
+    notif: {
+      list: () => get('/api/komunitas/notif'),
+      jumlah: () => get('/api/komunitas/notif/jumlah'),
+      // { id } = satu notifikasi, { postId } = semua notif postingan itu, {} = semua
+      baca: (opsi = {}) => post('/api/komunitas/notif/baca', opsi),
+    },
     posting: (data) => post('/api/komunitas', data),
     hapus: (id) => del(`/api/komunitas/${id}`),
     suka: (id) => post(`/api/komunitas/${id}/suka`),

@@ -857,8 +857,35 @@ export function AppProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed]);
 
+  // Jumlah notifikasi Komunitas yang belum dibaca (komentar di postingan sendiri / balasan ke komentar sendiri).
+  // Dicek tiap 60 detik selagi app kebuka & tiap app dibuka lagi - dipajang jadi angka di menu Tanya.
+  const [notifKomunitas, setNotifKomunitas] = useState(0);
+  const cekNotifKomunitas = useCallback(async () => {
+    try {
+      const { belumDibaca } = await api.komunitas.notif.jumlah();
+      setNotifKomunitas(Number(belumDibaca) || 0);
+    } catch {
+      /* offline / server lagi restart - angka lama dibiarin */
+    }
+  }, []);
+  useEffect(() => {
+    if (!authed) return;
+    cekNotifKomunitas();
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible' && navigator.onLine) cekNotifKomunitas();
+    }, 60000);
+    const onVisible = () => document.visibilityState === 'visible' && cekNotifKomunitas();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [authed, cekNotifKomunitas]);
+
   const value = {
     S: { ...S, ...prefs },
+    notifKomunitas: authed ? notifKomunitas : 0,
+    cekNotifKomunitas,
     dispatch,
     produkById,
     cart,

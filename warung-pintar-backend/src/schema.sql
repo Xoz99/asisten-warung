@@ -407,3 +407,17 @@ CREATE INDEX IF NOT EXISTS idx_ai_memori_warung ON ai_memori (warung_id, created
 -- Foto lampiran di Komunitas (data URL gambar yang udah dikecilin di HP). Juga ditambah otomatis di komunitas.routes.js.
 ALTER TABLE komunitas_post ADD COLUMN IF NOT EXISTS foto_url TEXT;
 ALTER TABLE komunitas_komentar ADD COLUMN IF NOT EXISTS foto_url TEXT;
+
+-- Notifikasi Komunitas: komentar di postingan sendiri ("komentar") & balasan ke komentar sendiri ("balasan").
+-- Juga dibikin otomatis di komunitas.routes.js kalau belum ada.
+CREATE TABLE IF NOT EXISTS komunitas_notif (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  warung_id UUID NOT NULL REFERENCES warung(id) ON DELETE CASCADE, -- penerima
+  dari_warung_id UUID NOT NULL REFERENCES warung(id) ON DELETE CASCADE,
+  post_id UUID NOT NULL REFERENCES komunitas_post(id) ON DELETE CASCADE,
+  komentar_id UUID REFERENCES komunitas_komentar(id) ON DELETE CASCADE,
+  jenis TEXT NOT NULL,
+  dibaca BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_komunitas_notif_penerima ON komunitas_notif (warung_id, dibaca, created_at DESC);

@@ -84,6 +84,7 @@ export default function PhoneShell() {
     return () => cancelAnimationFrame(id);
   }, [S.tema, authed, lisensi]);
 
+  const { notifKomunitas } = useApp();
   const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
   const fontFamily = FONTS.find((f) => f.n === S.font)?.f || FONTS[0].f;
 
@@ -177,6 +178,7 @@ export default function PhoneShell() {
                 <button key={n.id} className={'sn' + (screen === n.id ? ' on' : '')} onClick={() => goTo(n.id)}>
                   {n.icon}
                   {n.label}
+                  {n.id === 's-chat' && notifKomunitas > 0 && <span className="badge show">{notifKomunitas > 9 ? '9+' : notifKomunitas}</span>}
                 </button>
               )
             )}
@@ -237,6 +239,7 @@ export default function PhoneShell() {
             <button key={n.id} className={'nb' + (screen === n.id ? ' on' : '')} onClick={() => goTo(n.id)}>
               {n.icon}
               {n.label}
+              {n.id === 's-chat' && notifKomunitas > 0 && <span className="badge show">{notifKomunitas > 9 ? '9+' : notifKomunitas}</span>}
             </button>
           )
         )}
