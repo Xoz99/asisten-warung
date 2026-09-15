@@ -910,3 +910,48 @@ body{background:#E9E9E6}
 .memori-item span{flex:1;min-width:0;overflow-wrap:anywhere}
 .memori-item button{flex:none;width:28px;height:28px;border-radius:50%;border:0;background:var(--surface);color:var(--abu);
   font-size:18px;line-height:28px;padding:0;cursor:pointer}
+
+/* ==== Detail diskusi Komunitas (Chat.jsx) ====
+   Dulu: post, tombol suka, & komentar nempel langsung di latar halaman tanpa kartu, avatar inisial nggak punya
+   latar (warnanya sama kayak halaman), komentar dipisah garis abu tebal, dan kolom tulis kotak lebar polos.
+   Sekarang: post di dalam kartu, komentar berbentuk gelembung chat dengan avatar berwarna, balasan menjorok
+   bergaris tipis, dan kolom tulis membulat dengan tombol kirim ikon. */
+.diskusi{padding-top:14px;max-width:760px}
+.diskusi-atas{display:flex;align-items:center;gap:12px}
+.diskusi-atas b{font-family:var(--f-head),sans-serif;font-size:22px;font-weight:800;letter-spacing:-.02em}
+.diskusi-post{background:var(--surface);border:var(--tepi);border-radius:var(--r);padding:18px;margin-top:14px}
+.t-mono .diskusi-post,.t-dark .diskusi-post{box-shadow:inset 0 0 0 1.5px var(--garis)}
+.diskusi .bulat{background:var(--ink);color:var(--aksen);font-weight:800}
+.t-dark .diskusi .bulat{background:var(--aksen);color:#0A0A0A}
+.diskusi-post .post-q{font-size:18px}
+.diskusi-aksi{display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--garis)}
+.diskusi-aksi .aksi{background:var(--bg);color:var(--ink)}
+.diskusi-aksi .aksi.suka-on{background:var(--aksen);color:#0A0A0A}
+.diskusi-jml{font-size:13.5px;font-weight:700;color:var(--abu)}
+.diskusi-post .suka-row{margin-top:12px}
+.diskusi-judul{margin:22px 0 10px 4px;font-size:12.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--abu)}
+.kom-list{display:flex;flex-direction:column;gap:14px}
+.kom{display:flex;align-items:flex-start;gap:10px;animation:masuk .3s cubic-bezier(.2,.9,.3,1)}
+.kom .bulat{width:36px;height:36px;border-radius:50%;font-size:12px;flex:none}
+.kom-isi{flex:1;min-width:0}
+.kom-gelembung{display:inline-block;max-width:100%;background:var(--surface);border-radius:4px 18px 18px 18px;padding:10px 14px}
+.t-mono .kom-gelembung,.t-dark .kom-gelembung{box-shadow:inset 0 0 0 1.5px var(--garis)}
+.kom-gelembung b{display:block;font-size:13.5px}
+.kom-gelembung p{margin:2px 0 0;font-size:15px;font-weight:500;line-height:1.45;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere}
+.kom-bawah{display:flex;align-items:center;gap:14px;margin:5px 0 0 6px;font-size:12.5px;font-weight:700;color:var(--abu)}
+.kom-bawah button{border:0;background:none;padding:0;font:inherit;color:var(--abu);cursor:pointer}
+.kom-bawah button:hover{color:var(--ink)}
+.kom-bawah .hapus,.kom-bawah .hapus:hover{color:#e5484d}
+.kom-balasan{margin:10px 0 0 46px;padding-left:12px;border-left:2px solid var(--garis);display:flex;flex-direction:column;gap:12px}
+.kom-balasan .kom .bulat{width:28px;height:28px;font-size:10px}
+.kom-form-bawah{margin-top:18px}
+.kom-input{display:flex;align-items:center;gap:8px;background:var(--surface);border:1.5px solid var(--garis);border-radius:999px;padding:5px 5px 5px 18px}
+.kom-input:focus-within{border-color:var(--ink)}
+.kom-input input{flex:1;min-width:0;border:0;background:none;outline:none;font:inherit;font-size:15px;font-weight:600;color:var(--ink);padding:9px 0}
+.kom-input button{flex:none;width:40px;height:40px;border-radius:50%;border:0;background:var(--ink);color:var(--aksen);display:grid;place-items:center;cursor:pointer}
+.kom-input button:disabled{opacity:.35;cursor:default}
+.t-dark .kom-input button{background:var(--aksen);color:#0A0A0A}
+.kom-input svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.kom-membalas{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--abu);font-weight:600;margin-bottom:6px}
+.kom-membalas button{border:0;background:none;padding:0;font:inherit;font-weight:800;color:#e5484d;cursor:pointer}
+.kom-kosong{margin-top:16px;padding:18px;border-radius:var(--r);background:var(--surface);text-align:center;color:var(--abu);font-weight:600;font-size:14px}

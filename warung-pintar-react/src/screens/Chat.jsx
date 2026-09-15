@@ -1249,23 +1249,6 @@ function SheetJepretNota({ onJepret, onClose }) {
 
 const MAKS_PER_HALAMAN = 20;
 
-// Tombol "Balas" kecil di bawah tiap komentar - SENGAJA style inline (bukan className="linkkecil",
-// itu buat link SELEBAR LAYAR kayak "Lupa password?", `display:block;width:100%;margin-top:26px`,
-// dulu kepake keliru di sini & bikin tombolnya jadi bar lebar aneh + jarak gede ke teks komentar di
-// atasnya, berantakan banget di layar sempit) - inline-block kecil nempel pas di bawah teks.
-const GAYA_TOMBOL_BALAS = {
-  display: 'inline-block',
-  width: 'auto',
-  margin: '4px 0 0',
-  padding: 0,
-  border: 0,
-  background: 'none',
-  color: 'var(--abu)',
-  fontSize: 12,
-  fontWeight: 700,
-  cursor: 'pointer',
-};
-
 const TOPIK = ['Dagangan', 'Kasbon', 'Supplier', 'Lainnya']; // topik postingan komunitas
 const FILTER_TABS = ['terbaru', 'ramai', ...TOPIK];
 const labelFilter = (f) => (f === 'terbaru' ? 'Terbaru' : f === 'ramai' ? 'Ramai' : f);
@@ -1305,6 +1288,32 @@ function waktuRelatif(iso) {
 // bisnis kecil begini nama warung sendiri udah cukup "generik" secara lokasi, dan atribusi bikin
 // info-nya lebih bisa dipercaya). Backend-nya di komunitas.routes.js, pola query & access-control-nya
 // (WHERE warung_id=$2 pas hapus, dst) niru pola tukar_stok_post/koperasi_grup yang udah ada duluan.
+// Satu komentar/balasan di halaman detail diskusi: avatar + gelembung (nama & isi), di bawahnya waktu, Balas, Hapus.
+function BarisKomentar({ k, milikSaya, onBalas, onHapus }) {
+  return (
+    <div className="kom">
+      <div className="bulat">{inisial(k.warung_nama)}</div>
+      <div className="kom-isi">
+        <div className="kom-gelembung">
+          <b>{k.warung_nama}</b>
+          <p>{k.teks}</p>
+        </div>
+        <div className="kom-bawah">
+          {k.created_at && <span title={`${tglID(k.created_at)} · ${jamID(k.created_at)}`}>{waktuRelatif(k.created_at)}</span>}
+          <button type="button" onClick={onBalas}>
+            Balas
+          </button>
+          {milikSaya && (
+            <button type="button" className="hapus" onClick={onHapus}>
+              Hapus
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Komunitas() {
   const { authWarung, toast } = useApp();
   const [feed, setFeed] = useState(null); // null = belum sempat fetch pertama kali
@@ -1667,157 +1676,118 @@ function Komunitas() {
           "kepajang sendiri" 1 halaman, balik ke feed lewat tombol "‹ Kembali", bukan tombol × nutup
           popup. */}
       {postDetail && (
-        <div style={{ paddingTop: 14 }}>
-          <button className="btn kecil" onClick={tutupDetail}>
-            ‹ Kembali
-          </button>
-          <p className="p-h1" style={{ marginTop: 16 }}>
-            Diskusi
-          </p>
-
-          <div className="post-head" style={{ marginTop: 16 }}>
-            <div className="bulat">{inisial(postDetail.warung_nama)}</div>
-            <div className="post-id">
-              <b>{postDetail.warung_nama}</b>
-              <span title={`${tglID(postDetail.created_at)} · ${jamID(postDetail.created_at)}`}>{waktuRelatif(postDetail.created_at)}</span>
-            </div>
-            {postDetail.tag && <span className="tag">{postDetail.tag}</span>}
-          </div>
-          {postDetail.nama_barang && (
-            <p className="post-q" style={{ marginBottom: postDetail.cerita ? 0 : undefined }}>
-              <b>{postDetail.nama_barang}</b>
-              {postDetail.harga_jual != null && <> · Jual {rupiah(postDetail.harga_jual)}</>}
-              {postDetail.profit != null && <> · Untung {rupiah(postDetail.profit)}/pcs</>}
-            </p>
-          )}
-          {postDetail.cerita && (
-            <p className="post-q" style={{ marginTop: postDetail.nama_barang ? 6 : 13, whiteSpace: 'pre-wrap' }}>
-              {postDetail.cerita}
-            </p>
-          )}
-          <div className="post-meta">
-            <span>{postDetail.jumlah_komentar} komentar</span>
-            <button className={'aksi' + (postDetail.disukai ? ' suka-on' : '')} onClick={() => toggleSuka(postDetail)}>
-              <IkonSuka aktif={postDetail.disukai} /> {postDetail.jumlah_suka}
+        <div className="diskusi">
+          <div className="diskusi-atas">
+            <button className="btn kecil" onClick={tutupDetail}>
+              ‹ Kembali
             </button>
+            <b>Diskusi</b>
           </div>
 
-          {/* Badge "disukai oleh..." ala Facebook - avatar bertumpuk + nama, muncul cuma di sini
-              (bukan di kartu feed) biar feednya tetep ringkas. */}
-          {sukaMap[postDetail.id]?.length > 0 && (
-            <div className="suka-row">
-              <div className="suka-badges">
-                {sukaMap[postDetail.id].slice(0, 3).map((nama, i) => (
-                  <div key={i} className="suka-avatar">
-                    {inisial(nama)}
-                  </div>
-                ))}
+          {/* Post-nya dibungkus kartu - dulu teks post, tombol suka, & daftar komentar nempel langsung di latar
+              halaman tanpa batas, jadi nggak jelas mana pertanyaannya & mana jawabannya. */}
+          <article className="diskusi-post">
+            <div className="post-head">
+              <div className="bulat">{inisial(postDetail.warung_nama)}</div>
+              <div className="post-id">
+                <b>{postDetail.warung_nama}</b>
+                <span title={`${tglID(postDetail.created_at)} · ${jamID(postDetail.created_at)}`}>{waktuRelatif(postDetail.created_at)}</span>
               </div>
-              <span className="suka-teks">
-                Disukai {sukaMap[postDetail.id].slice(0, 3).join(', ')}
-                {postDetail.jumlah_suka > 3 ? ` dan ${postDetail.jumlah_suka - 3} lainnya` : ''}
-              </span>
+              {postDetail.tag && <span className="tag">{postDetail.tag}</span>}
             </div>
-          )}
+            {postDetail.nama_barang && (
+              <p className="post-q" style={{ marginBottom: postDetail.cerita ? 0 : undefined }}>
+                <b>{postDetail.nama_barang}</b>
+                {postDetail.harga_jual != null && <> · Jual {rupiah(postDetail.harga_jual)}</>}
+                {postDetail.profit != null && <> · Untung {rupiah(postDetail.profit)}/pcs</>}
+              </p>
+            )}
+            {postDetail.cerita && (
+              <p className="post-q" style={{ marginTop: postDetail.nama_barang ? 6 : 13, whiteSpace: 'pre-wrap' }}>
+                {postDetail.cerita}
+              </p>
+            )}
+            <div className="diskusi-aksi">
+              <button className={'aksi' + (postDetail.disukai ? ' suka-on' : '')} onClick={() => toggleSuka(postDetail)}>
+                <IkonSuka aktif={postDetail.disukai} /> {postDetail.jumlah_suka}
+              </button>
+              <span className="diskusi-jml">{postDetail.jumlah_komentar} jawaban</span>
+            </div>
 
+            {/* Badge "disukai oleh..." ala Facebook - avatar bertumpuk + nama, muncul cuma di sini
+                (bukan di kartu feed) biar feednya tetep ringkas. */}
+            {sukaMap[postDetail.id]?.length > 0 && (
+              <div className="suka-row">
+                <div className="suka-badges">
+                  {sukaMap[postDetail.id].slice(0, 3).map((nama, i) => (
+                    <div key={i} className="suka-avatar">
+                      {inisial(nama)}
+                    </div>
+                  ))}
+                </div>
+                <span className="suka-teks">
+                  Disukai {sukaMap[postDetail.id].slice(0, 3).join(', ')}
+                  {postDetail.jumlah_suka > 3 ? ` dan ${postDetail.jumlah_suka - 3} lainnya` : ''}
+                </span>
+              </div>
+            )}
+          </article>
+
+          {pohonKomentar.length > 0 && <p className="diskusi-judul">{daftarKomentar?.length || pohonKomentar.length} jawaban</p>}
           {pohonKomentar.length > 0 && (
-            <div className="balas-list">
+            <div className="kom-list">
               {pohonKomentar.map((k) => (
                 <div key={k.id}>
-                  <div className="balas-row">
-                    <div className="bulat">{inisial(k.warung_nama)}</div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <b>{k.warung_nama}</b>
-                      <p>{k.teks}</p>
-                      <button type="button" style={GAYA_TOMBOL_BALAS} onClick={() => setBalasKe(k)}>
-                        Balas
-                      </button>
-                    </div>
-                    {k.warung_id === authWarung?.id && (
-                      <button
-                        className="hapus-mini"
-                        onClick={() => setConfirmHapus({ tipe: 'komentar', postId: postDetail.id, komentarId: k.id })}
-                        aria-label="Hapus komentar"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
-                  {/* Balesan ke komentar ini - dibungkus jadi 1 kartu (background beda + garis
-                      kiri tegas pakai --abu, --garis di tema terang nyaris nggak keliatan di atas
-                      background putih) biar jelas ini area balesan yang "nempel" ke komentar di
-                      atasnya. */}
+                  <BarisKomentar
+                    k={k}
+                    milikSaya={k.warung_id === authWarung?.id}
+                    onBalas={() => setBalasKe(k)}
+                    onHapus={() => setConfirmHapus({ tipe: 'komentar', postId: postDetail.id, komentarId: k.id })}
+                  />
+                  {/* Balesan ke komentar ini - menjorok dengan garis tipis di kiri, biar kebaca "nempel" ke
+                      komentar di atasnya. Form balas MUNCUL DI SINI (langsung di bawah komentar yang lagi
+                      dibales), bukan nyorong ke form paling bawah - nggak perlu geser jauh buat liat konteksnya. */}
                   {(k.balasan.length > 0 || balasKe?.id === k.id) && (
-                    <div
-                      style={{
-                        marginLeft: 17,
-                        marginTop: 6,
-                        padding: '8px 10px 8px 13px',
-                        borderLeft: '3px solid var(--abu)',
-                        background: 'var(--bg)',
-                        borderRadius: '0 14px 14px 0',
-                      }}
-                    >
-                      {k.balasan.length > 0 && (
-                        <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 800, letterSpacing: '.02em', textTransform: 'uppercase', color: 'var(--abu)' }}>
-                          {k.balasan.length} BALASAN
-                        </p>
-                      )}
+                    <div className="kom-balasan">
                       {k.balasan.map((b) => (
-                        <div key={b.id} className="balas-row">
-                          <div className="bulat">{inisial(b.warung_nama)}</div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <b>{b.warung_nama}</b>
-                            <p>{b.teks}</p>
-                            <button type="button" style={GAYA_TOMBOL_BALAS} onClick={() => setBalasKe(k)}>
-                              Balas
-                            </button>
-                          </div>
-                          {b.warung_id === authWarung?.id && (
-                            <button
-                              className="hapus-mini"
-                              onClick={() => setConfirmHapus({ tipe: 'komentar', postId: postDetail.id, komentarId: b.id })}
-                              aria-label="Hapus komentar"
-                            >
-                              ×
-                            </button>
-                          )}
-                        </div>
+                        <BarisKomentar
+                          key={b.id}
+                          k={b}
+                          milikSaya={b.warung_id === authWarung?.id}
+                          onBalas={() => setBalasKe(k)}
+                          onHapus={() => setConfirmHapus({ tipe: 'komentar', postId: postDetail.id, komentarId: b.id })}
+                        />
                       ))}
-                      {/* Form balas MUNCUL DI SINI (nempel langsung di bawah komentar/balesan yang
-                          lagi ditarget), BUKAN nyorong ke form paling bawah - biar nggak perlu
-                          geser jauh buat liat konteks apa yang lagi dibales. Tombol batal dipisah
-                          jadi baris label kecil di atas input (bukan numpuk di 1 baris bareng
-                          input+Kirim). */}
                       {balasKe?.id === k.id && (
-                        <>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 12, color: 'var(--abu)' }}>
+                        <form
+                          className="kom-form"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            kirimKomentar(postDetail.id);
+                          }}
+                        >
+                          <div className="kom-membalas">
                             <span>
-                              Membalas <b>{escapeHtml(k.warung_nama)}</b>
+                              Membalas <b>{k.warung_nama}</b>
                             </span>
-                            <button type="button" style={{ ...GAYA_TOMBOL_BALAS, margin: 0, color: '#e5484d' }} onClick={() => setBalasKe(null)}>
+                            <button type="button" onClick={() => setBalasKe(null)}>
                               Batal
                             </button>
                           </div>
-                          <form
-                            className="balas-form"
-                            style={{ marginTop: 6 }}
-                            onSubmit={(e) => {
-                              e.preventDefault();
-                              kirimKomentar(postDetail.id);
-                            }}
-                          >
+                          <div className="kom-input">
                             <input
                               value={draftKomentar}
                               onChange={(e) => setDraftKomentar(e.target.value)}
                               placeholder={`Balas ${k.warung_nama}…`}
                               autoFocus
                             />
-                            <button type="submit" disabled={!draftKomentar.trim()}>
-                              Kirim
+                            <button type="submit" disabled={!draftKomentar.trim()} aria-label="Kirim balasan">
+                              <svg viewBox="0 0 24 24">
+                                <path d="M12 19V5M5 12l7-7 7 7" />
+                              </svg>
                             </button>
-                          </form>
-                        </>
+                          </div>
+                        </form>
                       )}
                     </div>
                   )}
@@ -1825,26 +1795,27 @@ function Komunitas() {
               ))}
             </div>
           )}
-          {daftarKomentar && !daftarKomentar.length && (
-            <p className="p-sub" style={{ fontSize: 13, marginTop: 14 }}>
-              Belum ada jawaban. Jadi yang pertama jawab!
-            </p>
-          )}
-          {/* Form komentar BARU (bukan balesan) - disembunyiin selagi lagi mode "Balas" (form
-              inline di atas yang jadi fokusnya, biar nggak ada 2 kotak ketik keliatan bareng). */}
+          {daftarKomentar && !daftarKomentar.length && <div className="kom-kosong">Belum ada jawaban. Jadi yang pertama jawab!</div>}
+          {/* Form komentar BARU (bukan balesan) - disembunyiin selagi lagi mode "Balas" (form inline di atas yang
+              jadi fokusnya, biar nggak ada 2 kotak ketik keliatan bareng). Nggak autoFocus lagi: di HP keyboard
+              langsung nongol pas buka diskusi & nutupin post yang mau dibaca. */}
           {!balasKe && (
-          <form
-            className="balas-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              kirimKomentar(postDetail.id);
-            }}
-          >
-            <input value={draftKomentar} onChange={(e) => setDraftKomentar(e.target.value)} placeholder="Tulis jawaban…" autoFocus />
-            <button type="submit" disabled={!draftKomentar.trim()}>
-              Kirim
-            </button>
-          </form>
+            <form
+              className="kom-form kom-form-bawah"
+              onSubmit={(e) => {
+                e.preventDefault();
+                kirimKomentar(postDetail.id);
+              }}
+            >
+              <div className="kom-input">
+                <input value={draftKomentar} onChange={(e) => setDraftKomentar(e.target.value)} placeholder="Tulis jawaban…" />
+                <button type="submit" disabled={!draftKomentar.trim()} aria-label="Kirim jawaban">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M12 19V5M5 12l7-7 7 7" />
+                  </svg>
+                </button>
+              </div>
+            </form>
           )}
         </div>
       )}
