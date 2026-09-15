@@ -6,6 +6,8 @@ import { requireAuth } from '../middleware/auth.js';
 import { loginLimiter, otpLimiter, otpIpLimiter, pinLimiter } from '../middleware/rateLimit.js';
 import { normalisasiNoHp, samarkanNoHp } from '../utils/noHp.js';
 import { kirimOtpWa } from '../services/wa.service.js';
+import { simpanMemori } from '../services/memori.service.js';
+import { ambilProfilUsaha, bersihkanProfil, pastikanKolomProfil } from '../services/profilUsaha.service.js';
 
 const router = Router();
 const SECRET = process.env.JWT_SECRET || 'dev-secret-ganti-ini';
@@ -375,6 +377,34 @@ router.post('/pin/otp/verifikasi', requireAuth, otpIpLimiter, otpLimiter, async 
       await query('UPDATE warung SET pin_hash=$1 WHERE id=$2', [await bcrypt.hash(pinBaru, 10), req.warungId]);
     }
     res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ---- Profil usaha ("kenalan dulu" pas pertama masuk, bisa diubah dari Lainnya) ----
+// null = belum pernah diisi -> aplikasi nampilin layar kenalan dulu sebelum masuk.
+router.get('/profil-usaha', requireAuth, async (req, res, next) => {
+  try {
+    res.json({ profil: await ambilProfilUsaha(req.warungId) });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.put('/profil-usaha', requireAuth, async (req, res, next) => {
+  try {
+    const profil = bersihkanProfil(req.body);
+    if (!profil) return res.status(400).json({ error: 'Pilih jenis usahanya dulu' });
+    await pastikanKolomProfil();
+    await query('UPDATE warung SET profil_usaha=$1 WHERE id=$2', [JSON.stringify(profil), req.warungId]);
+    // Nama panggilan langsung jadi memori Mang AI - tanpa panggilan AI, tanpa token.
+    if (profil.namaPanggilan) {
+      await simpanMemori(req.warungId, [`Pemilik minta dipanggil ${profil.namaPanggilan}`], 'profil').catch((e) =>
+        console.warn('[auth] gagal nyimpen nama panggilan ke memori:', e.message)
+      );
+    }
+    res.json({ profil });
   } catch (e) {
     next(e);
   }

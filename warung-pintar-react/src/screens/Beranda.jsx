@@ -8,7 +8,16 @@ import { api } from '../lib/api';
 import SheetStruk from '../components/SheetStruk.jsx';
 
 export default function Beranda() {
-  const { S, dispatch, goTo, openLunas, toast } = useApp();
+  const { S, dispatch, goTo, openLunas, toast, authWarung, profilUsaha } = useApp();
+  // Kartu "Langkah awal" bisa ditutup - diingat per akun di HP ini.
+  const kunciTutupLangkah = `warungpintar_langkah_awal_tutup_${authWarung?.id}`;
+  const [langkahDitutup, setLangkahDitutup] = useState(() => {
+    try {
+      return localStorage.getItem(kunciTutupLangkah) === '1';
+    } catch {
+      return false;
+    }
+  });
   const [serahOpen, setSerahOpen] = useState(false);
   const [daftarOpen, setDaftarOpen] = useState(null); // null | 'jual' | 'kasbon'
   const [strukLihat, setStrukLihat] = useState(null);
@@ -75,6 +84,49 @@ export default function Beranda() {
   const kasbonRingkas = S.kasbon.slice(0, KASBON_RINGKAS);
   const kasbonSisa = S.kasbon.length - kasbonRingkas.length;
 
+  // Langkah awal disesuaiin sama jawaban "kenalan dulu" (lib/profilUsaha.js) & data yang udah ada: yang udah
+  // dikerjain nggak ditampilin lagi, dan kartunya hilang sendiri kalau semuanya beres.
+  const profil = profilUsaha?.data && !profilUsaha.data.dilewati ? profilUsaha.data : null;
+  const langkahAwal = [];
+  if (!S.produk.length) {
+    langkahAwal.push({
+      k: 'barang',
+      judul: 'Masukin barang daganganmu',
+      ket:
+        profil?.barcode === 'banyak'
+          ? 'Scan barcode-nya satu-satu pakai kamera - paling cepet'
+          : profil?.barcode === 'jarang'
+            ? 'Foto bungkusnya atau ketik manual, nggak perlu barcode'
+            : 'Scan barcode, atau foto kalau barangnya nggak ada barcode',
+      aksi: () => goTo('s-stok'),
+    });
+  }
+  if (!S.transaksi.length) {
+    langkahAwal.push({ k: 'jual', judul: 'Catat penjualan pertama', ket: 'Tinggal sebut atau pilih barangnya', aksi: () => goTo('s-catat') });
+  }
+  if (profil?.kebutuhan?.includes('kasbon') && !S.pelanggan.length) {
+    langkahAwal.push({ k: 'kasbon', judul: 'Daftarin pelanggan langganan', ket: 'Biar kasbon & utangnya kecatat per orang', aksi: () => goTo('s-pelanggan') });
+  }
+  if (profil && profil.penjaga !== 'sendiri' && S.penjagaList.length <= 1) {
+    langkahAwal.push({
+      k: 'penjaga',
+      judul: profil.penjaga === 'karyawan' ? 'Tambahin nama karyawan' : 'Tambahin nama keluarga yang ikut jaga',
+      ket: 'Biar serah terima & uang laci kecatat per giliran',
+      aksi: () => setSerahOpen(true),
+    });
+  }
+  if (langkahAwal.length && (profil?.kebutuhan?.includes('harga') || profil?.kebutuhan?.includes('stok'))) {
+    langkahAwal.push({ k: 'ai', judul: 'Tanya Mang AI', ket: 'Soal harga jual, stok, atau mau kulakan apa', aksi: () => goTo('s-chat') });
+  }
+  const tutupLangkahAwal = () => {
+    setLangkahDitutup(true);
+    try {
+      localStorage.setItem(kunciTutupLangkah, '1');
+    } catch {
+      /* mode privat - cuma nggak keinget */
+    }
+  };
+
   const bukaLunasi = (k) => {
     openLunas(`${k.nama} mau bayar?`, `Sisa utang <b style="color:var(--ink)">${rupiah(k.jml)}</b> (${k.hari}). Tandai lunas sekarang?`, (metode) => {
       dispatch({ type: 'LUNASI_KASBON', id: k.id, metode });
@@ -102,7 +154,7 @@ export default function Beranda() {
           <p className="p-h1">
             {sapa}, {nama}
           </p>
-          <p className="p-sub">Warung Berkah</p>
+          <p className="p-sub">{authWarung?.nama || 'Warungku'}</p>
         </div>
         <div className="jamcuaca">
           <span className="jc-jam">{jamTeks}</span>
@@ -147,6 +199,28 @@ export default function Beranda() {
           <p className="v p-num">{sisaKasbon ? singkat(sisaKasbon) : '0'}</p>
         </div>
       </div>
+
+      {langkahAwal.length > 0 && !langkahDitutup && (
+        <div className="langkah-awal">
+          <div className="between">
+            <b>Langkah awal</b>
+            <button className="hapus-mini" onClick={tutupLangkahAwal} aria-label="Sembunyikan langkah awal">
+              ×
+            </button>
+          </div>
+          <p>Biar aplikasinya langsung kepake buat usahamu.</p>
+          {langkahAwal.map((l, i) => (
+            <button key={l.k} type="button" className="langkah-item" onClick={l.aksi}>
+              <span className="nomor">{i + 1}</span>
+              <span>
+                <b>{l.judul}</b>
+                <small>{l.ket}</small>
+              </span>
+              <span className="ar">›</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="menu" style={{ marginTop: 16 }}>
         <button className="mrow" onClick={() => setSerahOpen(true)}>

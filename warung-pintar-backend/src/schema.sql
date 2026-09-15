@@ -421,3 +421,7 @@ CREATE TABLE IF NOT EXISTS komunitas_notif (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_komunitas_notif_penerima ON komunitas_notif (warung_id, dibaca, created_at DESC);
+
+-- Profil usaha dari layar "kenalan dulu" (jenis usaha, penjaga, kebutuhan, barcode, nama panggilan) - lihat
+-- services/profilUsaha.service.js. NULL = belum diisi. Juga ditambah otomatis di sana kalau belum ada.
+ALTER TABLE warung ADD COLUMN IF NOT EXISTS profil_usaha JSONB;

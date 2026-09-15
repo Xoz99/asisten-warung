@@ -13,6 +13,7 @@ import Chat from '../screens/Chat.jsx';
 import Pelanggan from '../screens/Pelanggan.jsx';
 import Riwayat from '../screens/Riwayat.jsx';
 import Lainnya from '../screens/Lainnya.jsx';
+import Onboarding from '../screens/Onboarding.jsx';
 import SharedSheets from './SharedSheets.jsx';
 
 const NAV = [
@@ -84,7 +85,7 @@ export default function PhoneShell() {
     return () => cancelAnimationFrame(id);
   }, [S.tema, authed, lisensi]);
 
-  const { notifKomunitas } = useApp();
+  const { notifKomunitas, profilUsaha } = useApp();
   const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
   const fontFamily = FONTS.find((f) => f.n === S.font)?.f || FONTS[0].f;
 
@@ -132,6 +133,18 @@ export default function PhoneShell() {
     return (
       <div className={`phone ${S.tema} sz-${S.ukuran || 'sedang'}`} style={{ '--brand': S.warna, '--f-body': fontFamily }}>
         <LisensiHabis />
+      </div>
+    );
+  }
+
+  // Akun yang belum pernah ngisi profil usaha (akun baru, atau akun lama sebelum fitur ini ada): kenalan dulu
+  // sebelum masuk halaman utama. Kalau profilnya gagal diambil (offline), langsung masuk - jangan nahan user.
+  if (profilUsaha.status === 'kosong') {
+    return (
+      <div className={`phone ${S.tema} sz-${S.ukuran || 'sedang'}`} style={{ '--brand': S.warna, '--f-body': fontFamily }}>
+        <div className="login kenalan">
+          <Onboarding />
+        </div>
       </div>
     );
   }

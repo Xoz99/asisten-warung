@@ -993,3 +993,33 @@ body{background:#E9E9E6}
 .t-dark .notif-item .bulat{background:var(--aksen);color:#0A0A0A}
 .notif-item p{margin:0;font-size:14.5px;font-weight:600;line-height:1.4;color:var(--ink);overflow-wrap:anywhere}
 .notif-item small{display:block;margin-top:3px;font-size:12.5px;color:var(--abu);font-weight:600}
+
+/* ==== Kenalan dulu (Onboarding.jsx) & Langkah awal di Beranda ==== */
+.login.kenalan{justify-content:flex-start;overflow-y:auto;padding-block:40px}
+.kenalan-isi{width:100%;max-width:460px;margin:auto 0}
+.kenalan-progres{height:6px;border-radius:3px;background:var(--garis);overflow:hidden;margin-bottom:10px}
+.kenalan-progres i{display:block;height:100%;background:var(--aksen);border-radius:3px;transition:width .25s}
+.kenalan-langkah{font-size:13px;font-weight:700;color:var(--abu)}
+.kenalan-judul{font-family:var(--f-head),sans-serif;font-size:26px;font-weight:800;letter-spacing:-.03em;line-height:1.15;margin-top:6px;color:var(--ink)}
+.kenalan-sub{margin-top:8px;color:var(--abu);font-weight:600;font-size:15px;line-height:1.45}
+.kenalan-opsi{display:flex;flex-direction:column;gap:8px;margin-top:18px}
+.kenalan-opsi button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:14px 16px;border-radius:18px;
+  border:1.5px solid var(--garis);background:var(--surface);color:var(--ink);font:inherit;cursor:pointer}
+.kenalan-opsi button.pas{border-color:var(--aksen);background:color-mix(in oklab,var(--aksen) 14%,var(--surface))}
+.kenalan-opsi b{display:block;font-size:16px}
+.kenalan-opsi small{display:block;margin-top:2px;font-size:13px;color:var(--abu);font-weight:600}
+.kenalan-opsi .cek{margin-left:auto;flex:none;width:24px;height:24px;border-radius:50%;border:2px solid var(--garis);display:grid;place-items:center;
+  font-size:13px;font-weight:900;color:#0A0A0A}
+.kenalan-opsi button.pas .cek{background:var(--aksen);border-color:var(--aksen)}
+.kenalan-aksi{display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-top:22px}
+.kenalan-aksi.satu{grid-template-columns:1fr}
+.langkah-awal{background:var(--surface);border-radius:var(--r);padding:16px 18px 6px;margin-top:16px}
+.t-mono .langkah-awal,.t-dark .langkah-awal{box-shadow:inset 0 0 0 1.5px var(--garis)}
+.langkah-awal>.between b{font-size:17px}
+.langkah-awal>p{margin:4px 0 8px;font-size:13.5px;color:var(--abu);font-weight:600}
+.langkah-item{display:flex;align-items:center;gap:12px;width:100%;padding:11px 0;border:0;border-top:1px solid var(--garis);background:none;
+  text-align:left;font:inherit;color:var(--ink);cursor:pointer}
+.langkah-item .nomor{flex:none;width:28px;height:28px;border-radius:50%;background:var(--aksen);color:#0A0A0A;display:grid;place-items:center;font-weight:800;font-size:13px}
+.langkah-item b{display:block;font-size:15px}
+.langkah-item small{display:block;font-size:13px;color:var(--abu);font-weight:600;margin-top:1px}
+.langkah-item .ar{margin-left:auto;color:var(--abu);font-size:20px}

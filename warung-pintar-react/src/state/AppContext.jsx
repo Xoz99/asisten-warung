@@ -857,6 +857,26 @@ export function AppProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed]);
 
+  // Profil usaha (layar "kenalan dulu"): status 'memuat' | 'kosong' (belum pernah diisi -> tampil layar kenalan) |
+  // 'ada' | 'gagal' (offline/server error - JANGAN nahan user di layar kenalan, langsung masuk app aja).
+  const [profilUsaha, setProfilUsaha] = useState({ status: 'memuat', data: null });
+  useEffect(() => {
+    if (!authed) return;
+    let batal = false;
+    api.profilUsaha
+      .ambil()
+      .then(({ profil }) => !batal && setProfilUsaha({ status: profil ? 'ada' : 'kosong', data: profil }))
+      .catch(() => !batal && setProfilUsaha({ status: 'gagal', data: null }));
+    return () => {
+      batal = true;
+    };
+  }, [authed, authWarung?.id]);
+  const simpanProfilUsaha = useCallback(async (profil) => {
+    const { profil: tersimpan } = await api.profilUsaha.simpan(profil);
+    setProfilUsaha({ status: 'ada', data: tersimpan });
+    return tersimpan;
+  }, []);
+
   // Jumlah notifikasi Komunitas yang belum dibaca (komentar di postingan sendiri / balasan ke komentar sendiri).
   // Dicek tiap 60 detik selagi app kebuka & tiap app dibuka lagi - dipajang jadi angka di menu Tanya.
   const [notifKomunitas, setNotifKomunitas] = useState(0);
@@ -886,6 +906,8 @@ export function AppProvider({ children }) {
     S: { ...S, ...prefs },
     notifKomunitas: authed ? notifKomunitas : 0,
     cekNotifKomunitas,
+    profilUsaha,
+    simpanProfilUsaha,
     dispatch,
     produkById,
     cart,

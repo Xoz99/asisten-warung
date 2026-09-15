@@ -87,6 +87,12 @@ export const api = {
     reset: (token, passwordBaru) => post('/api/auth/reset-password', { token, passwordBaru }),
   },
 
+  // Profil usaha dari layar "kenalan dulu" - { profil } (null = belum pernah diisi)
+  profilUsaha: {
+    ambil: () => get('/api/auth/profil-usaha'),
+    simpan: (profil) => put('/api/auth/profil-usaha', profil),
+  },
+
   // PIN pemilik - SATU per akun warung, disimpan di server (dulu lokal per HP, jadi tiap HP bisa beda).
   pin: {
     status: () => get('/api/auth/pin'), // { dibuat }

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query } from '../db.js';
 import { tanyaGemini } from '../services/gemini.service.js';
 import { tanyaOpenRouter } from '../services/openrouter.service.js';
+import { ambilProfilUsaha, profilUntukKonteks } from '../services/profilUsaha.service.js';
 import { ambilMemori, simpanMemori, hapusMemori, hapusSemuaMemori, memoriUntukKonteks, perintahIngat } from '../services/memori.service.js';
 
 const router = Router();
@@ -511,14 +512,15 @@ router.post('/tanya', async (req, res, next) => {
     // pelanggan/kasbon perlu ikut apa nggak (lihat KATA_KUNCI_ORANG di sana).
     // Memori per akun (lihat memori.service.js) ditaruh PALING ATAS konteks. Gagal baca memori nggak boleh bikin
     // chat ikut gagal - jalan terus tanpa memori.
-    const [{ teks: konteksData, ...idSet }, memoriRows] = await Promise.all([
+    const [{ teks: konteksData, ...idSet }, memoriRows, profilUsaha] = await Promise.all([
       bangunKonteks(wid, teks), // idSet = {produkIds, kasbonIds, pelangganIds} buat validasiAksi
       ambilMemori(wid).catch((e) => {
         console.warn('[asisten] gagal baca memori:', e.message);
         return [];
       }),
+      ambilProfilUsaha(wid).catch(() => null), // profil usaha (jenis, kebutuhan) - lihat profilUsaha.service.js
     ]);
-    const konteks = `${memoriUntukKonteks(memoriRows)}\n\n${konteksData}`;
+    const konteks = `${profilUntukKonteks(profilUsaha)}\n\n${memoriUntukKonteks(memoriRows)}\n\n${konteksData}`;
     const idMemori = new Set(memoriRows.map((r) => r.id));
     const isiPerintahIngat = perintahIngat(teksAsli);
     // Simpan/hapus catatan yang diusulin model. Id "lupakan" dicocokin ke memori warung ini dulu (model bisa

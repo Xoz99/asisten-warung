@@ -9,10 +9,12 @@ import { api } from '../lib/api.js';
 import { PIN_GAMPANG, hashPinLokal } from '../lib/pin';
 import KartuPaket from '../components/KartuPaket.jsx';
 import KonfirmasiHapus from '../components/KonfirmasiHapus.jsx';
+import Onboarding from './Onboarding.jsx';
+import { labelJenisUsaha } from '../lib/profilUsaha';
 import mangWarungImg from '../assets/mangwarung.webp';
 
 export default function Lainnya() {
-  const { S, dispatch, goTo, kosongkanCart, setPelangganTerpilih, logout, authWarung } = useApp();
+  const { S, dispatch, goTo, kosongkanCart, setPelangganTerpilih, logout, authWarung, profilUsaha } = useApp();
   const [sheet, setSheet] = useState(null); // 'warna' | 'font' | 'ukuran' | 'pass' | 'pin' | 'nohp' | null
   const ukuranAktif = UKURAN.find((u) => u.k === S.ukuran) || UKURAN[1];
 
@@ -83,6 +85,20 @@ export default function Lainnya() {
           <span className="tx">
             <b>Memori Mang AI</b>
             <span>Hal yang diinget Mang AI tentang warungmu</span>
+          </span>
+          <span className="ar">›</span>
+        </button>
+        <button className="mrow" onClick={() => setSheet('profil')}>
+          <span className="ic">
+            <svg viewBox="0 0 24 24">
+              <path d="M4 9.3 5 4h14l1 5.3" />
+              <path d="M5 9.8V20h14V9.8" />
+              <path d="M10 20v-5a2 2 0 0 1 4 0v5" />
+            </svg>
+          </span>
+          <span className="tx">
+            <b>Profil usaha</b>
+            <span>{labelJenisUsaha(profilUsaha?.data) || 'Belum diisi - biar saran Mang AI pas sama usahamu'}</span>
           </span>
           <span className="ar">›</span>
         </button>
@@ -251,6 +267,13 @@ export default function Lainnya() {
       {sheet === 'pass' && <SheetPass onClose={() => setSheet(null)} />}
       {sheet === 'pin' && <SheetGantiPin onClose={() => setSheet(null)} />}
       {sheet === 'memori' && <SheetMemori onClose={() => setSheet(null)} />}
+      {sheet === 'profil' && (
+        <div className="sheet show">
+          <div className="panel">
+            <Onboarding modeUbah onTutup={() => setSheet(null)} />
+          </div>
+        </div>
+      )}
       {yakinKeluar && (
         <KonfirmasiHapus
           judul="Keluar dari akun?"
