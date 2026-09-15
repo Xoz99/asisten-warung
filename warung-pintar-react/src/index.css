@@ -648,7 +648,9 @@ body{background:#E9E9E6}
   box-shadow:0 10px 24px -6px color-mix(in oklab,var(--aksen) 65%,transparent),0 6px 14px rgba(20,20,25,.18),inset 0 1px 0 rgba(255,255,255,.5)}
 .fab svg{width:27px;height:27px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .fab:active{transform:translateY(-16px) scale(.92)}
-.badge{background:var(--ink);color:#fff;border:2px solid var(--surface)}
+/* Warna angka ngikut --bg (kebalikan --ink), bukan #fff: di tema gelap --ink itu hampir putih, jadi dulu
+   angka jumlah keranjang putih di atas latar putih & nggak kelihatan sama sekali. */
+.badge{background:var(--ink);color:var(--bg);border:2px solid var(--surface)}
 
 /* ================= LAINNYA / PENGATURAN ================= */
 .menu{background:var(--surface);border-radius:var(--r);margin-top:14px;overflow:hidden;
