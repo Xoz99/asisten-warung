@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { query } from '../db.js';
+import { nilaiJudol, PESAN_DIBLOKIR } from '../utils/filterJudol.js';
 
 const router = Router();
 
@@ -52,7 +53,9 @@ router.get('/', async (req, res, next) => {
        LIMIT $3`,
       [req.warungId, before, limit]
     );
-    res.json(rows);
+    // Postingan promosi judol yang terlanjur masuk (sebelum filter ini ada) nggak ditampilin. Filter di sini cuma
+    // jaring pengaman - yang baru udah ditolak waktu dikirim (lihat POST di bawah).
+    res.json(rows.filter((p) => !nilaiJudol(p.cerita, p.nama_barang).blokir));
   } catch (e) {
     next(e);
   }
@@ -67,6 +70,11 @@ router.post('/', async (req, res, next) => {
     if (foto && !fotoValid(foto)) return res.status(400).json({ error: 'Fotonya nggak bisa dipakai (bukan gambar atau kegedean)' });
     // Foto doang tanpa tulisan juga boleh (misal pamer display dagangan).
     if (!nb && !ct && !foto) return res.status(400).json({ error: 'Isi tulisan atau lampirkan foto dulu' });
+    const cekJudol = nilaiJudol(ct, nb);
+    if (cekJudol.blokir) {
+      console.warn(`[komunitas] postingan diblokir (judol) warung ${req.warungId}:`, cekJudol.alasan.join(', '));
+      return res.status(422).json({ error: PESAN_DIBLOKIR, diblokir: true });
+    }
     await pastikanKolomFoto();
     const { rows } = await query(
       `INSERT INTO komunitas_post (warung_id, nama_barang, harga_jual, profit, cerita, tag, foto_url)
@@ -141,7 +149,7 @@ router.get('/:id/komentar', async (req, res, next) => {
        WHERE kk.post_id = $1 ORDER BY kk.created_at ASC LIMIT 200`,
       [req.params.id]
     );
-    res.json(rows);
+    res.json(rows.filter((k) => !nilaiJudol(k.teks).blokir));
   } catch (e) {
     next(e);
   }
@@ -157,6 +165,11 @@ router.post('/:id/komentar', async (req, res, next) => {
     const foto = req.body.foto || null;
     if (foto && !fotoValid(foto)) return res.status(400).json({ error: 'Fotonya nggak bisa dipakai (bukan gambar atau kegedean)' });
     if (!teks && !foto) return res.status(400).json({ error: 'Komentar belum diisi' });
+    const cekJudol = nilaiJudol(teks);
+    if (cekJudol.blokir) {
+      console.warn(`[komunitas] komentar diblokir (judol) warung ${req.warungId}:`, cekJudol.alasan.join(', '));
+      return res.status(422).json({ error: PESAN_DIBLOKIR, diblokir: true });
+    }
     await pastikanKolomFoto();
     let balasKe = req.body.balasKe || null;
     if (balasKe) {
