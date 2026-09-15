@@ -1,5 +1,6 @@
 import { Jimp, JimpMime } from 'jimp';
 import { cekJatahAi, catatPemakaianAi } from './aiQuota.service.js';
+import { ATURAN_MEMORI } from './memori.service.js';
 
 // Panggilan ke Gemini API (Google) buat jawaban "Mang Warung" yang lebih natural/luwes dari
 // rule-based. Sengaja pakai fetch polos (bukan SDK) - sama gayanya kayak midtrans.service.js -
@@ -189,6 +190,8 @@ tebak (lihat aturan tiap tipe di bawah).
   angka yang wajar - TAPI di "jawaban" kasih tau terus terang kalau harga/stoknya masih perkiraan
   dan perlu disesuaikan sama harga kulakan dia.
 ${fotoBase64 ? '- User ngirim FOTO bareng pesan ini (dilampirkan di bawah) - kalau dia minta nambahin barang dari foto ini, baca detailnya dari foto (merek/kemasan/perkiraan isi/kategori), dan set "fotoDipakai": true di "aksi" biar foto itu ikut kesimpen jadi foto barangnya.\n' : ''}
+${ATURAN_MEMORI}
+
 Data warung saat ini (real-time - "id" di daftar barang di bawah itu yang WAJIB disalin persis buat produkId di atas):
 ${konteks}`;
 
@@ -222,6 +225,9 @@ ${konteks}`;
         type: 'OBJECT',
         properties: {
           jawaban: { type: 'STRING' },
+          // Memori per akun (lihat ATURAN_MEMORI) - catatan baru & id catatan yang dilupakan. Biasanya kosong.
+          ingat: { type: 'ARRAY', items: { type: 'STRING' } },
+          lupakan: { type: 'ARRAY', items: { type: 'STRING' } },
           aksi: {
             type: 'OBJECT',
             nullable: true,
@@ -306,7 +312,8 @@ ${konteks}`;
   const aksi = hasil.aksi?.tipe
     ? { ...hasil.aksi, produkId: tanpaProdukId.includes(hasil.aksi.tipe) ? null : hasil.aksi.produkId || null }
     : null;
-  return { jawaban: String(hasil.jawaban).trim(), aksi };
+  const daftarTeks = (x) => (Array.isArray(x) ? x.filter((v) => typeof v === 'string') : []);
+  return { jawaban: String(hasil.jawaban).trim(), aksi, ingat: daftarTeks(hasil.ingat), lupakan: daftarTeks(hasil.lupakan) };
 }
 
 // Parse data URL base64 + kecilin ke maks `maxSisi` px di sisi terpanjang - dipakai bareng sama

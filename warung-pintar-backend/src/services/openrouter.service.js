@@ -17,6 +17,7 @@
 // fungsi scan/nota/suara/referensi di bawah SEMUA nerima `warungId` (chat/tanyaOpenRouter SENGAJA
 // TIDAK - obrolan nggak kena batasan ini sama sekali, lihat komentar di aiQuota.service.js).
 import { cekJatahAi, catatPemakaianAi } from './aiQuota.service.js';
+import { ATURAN_MEMORI } from './memori.service.js';
 
 const MODEL = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini';
 const TIMEOUT_MS = 12000;
@@ -212,9 +213,11 @@ MENENTUKAN BARANG MANA yang dimaksud (produkId) kamu WAJIB yakin dulu, jangan as
   dan perlu disesuaikan sama harga kulakan dia.
 ${fotoBase64 ? '- User ngirim FOTO bareng pesan ini (dilampirkan di bawah) - kalau dia minta nambahin barang dari foto ini, baca detailnya dari foto (merek/kemasan/perkiraan isi/kategori), dan set "fotoDipakai": true di "aksi" biar foto itu ikut kesimpen jadi foto barangnya.\n' : ''}
 Balas SATU objek JSON PERSIS bentuk ini, JANGAN ada teks lain di luar JSON-nya:
-{"jawaban": "<balasan chat kamu di sini>", "aksi": null ATAU {"tipe": "tambah"|"ubah"|"hapus"|"catat_modal"|"belanja_banyak"|"target_penjualan", "produkId": "<id atau null>", "data": {"nama":"...", "kategori":"...", "barcode":"...", "harga":0, "modal":0, "stok":0, "satuan":"...", "isiKemasan":1, "namaKemasan":"...", "grup":"...", "jumlah":0, "keterangan":"...", "barang":[{"nama":"...","kategori":"...","harga":0,"modal":0,"stok":0,"satuan":"..."}]}}}
+{"jawaban": "<balasan chat kamu di sini>", "ingat": [], "lupakan": [], "aksi": null ATAU {"tipe": "tambah"|"ubah"|"hapus"|"catat_modal"|"belanja_banyak"|"target_penjualan", "produkId": "<id atau null>", "data": {"nama":"...", "kategori":"...", "barcode":"...", "harga":0, "modal":0, "stok":0, "satuan":"...", "isiKemasan":1, "namaKemasan":"...", "grup":"...", "jumlah":0, "keterangan":"...", "barang":[{"nama":"...","kategori":"...","harga":0,"modal":0,"stok":0,"satuan":"..."}]}}}
 Field "jumlah"/"keterangan" CUMA buat "catat_modal", field "barang" CUMA buat "belanja_banyak" - tipe lain kosongin.
 (field di "data" yang nggak relevan boleh diilangin/dikosongin, nggak wajib semua ke-isi)
+
+${ATURAN_MEMORI}
 
 Data warung saat ini (real-time - "id" di daftar barang di bawah itu yang WAJIB disalin persis buat produkId di atas):
 ${konteks}`;
@@ -246,7 +249,8 @@ ${konteks}`;
   const aksi = hasil.aksi?.tipe
     ? { ...hasil.aksi, produkId: tanpaProdukId.includes(hasil.aksi.tipe) ? null : hasil.aksi.produkId || null }
     : null;
-  return { jawaban: String(hasil.jawaban).trim(), aksi };
+  const daftarTeks = (x) => (Array.isArray(x) ? x.filter((v) => typeof v === 'string') : []);
+  return { jawaban: String(hasil.jawaban).trim(), aksi, ingat: daftarTeks(hasil.ingat), lupakan: daftarTeks(hasil.lupakan) };
 }
 
 // Cadangan buat bacaNotaGemini (lihat komentar lengkap di gemini.service.js/nota.routes.js) - baca

@@ -226,6 +226,14 @@ export const api = {
     tanya: (teks, riwayat = [], fotoBase64 = null) => post('/api/asisten/tanya', { teks, riwayat, fotoBase64 }),
   },
 
+  // Memori Mang AI per akun warung - catatan jangka panjang yang diinget lintas obrolan & HP.
+  memori: {
+    list: () => get('/api/asisten/memori'),
+    tambah: (isi) => post('/api/asisten/memori', { isi }),
+    hapus: (id) => del(`/api/asisten/memori/${id}`),
+    hapusSemua: () => del('/api/asisten/memori'),
+  },
+
   lisensi: {
     status: () => get('/api/lisensi/status'),
     checkout: (plan) => post('/api/lisensi/checkout', { plan }),

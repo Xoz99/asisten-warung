@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query } from '../db.js';
 import { tanyaGemini } from '../services/gemini.service.js';
 import { tanyaOpenRouter } from '../services/openrouter.service.js';
+import { ambilMemori, simpanMemori, hapusMemori, hapusSemuaMemori, memoriUntukKonteks, perintahIngat } from '../services/memori.service.js';
 
 const router = Router();
 
@@ -508,12 +509,39 @@ router.post('/tanya', async (req, res, next) => {
 
     // `teks` = pertanyaan huruf kecil - dipakai bangunKonteks buat mutusin daftar rinci
     // pelanggan/kasbon perlu ikut apa nggak (lihat KATA_KUNCI_ORANG di sana).
-    const { teks: konteks, ...idSet } = await bangunKonteks(wid, teks); // idSet = {produkIds, kasbonIds, pelangganIds} buat validasiAksi
+    // Memori per akun (lihat memori.service.js) ditaruh PALING ATAS konteks. Gagal baca memori nggak boleh bikin
+    // chat ikut gagal - jalan terus tanpa memori.
+    const [{ teks: konteksData, ...idSet }, memoriRows] = await Promise.all([
+      bangunKonteks(wid, teks), // idSet = {produkIds, kasbonIds, pelangganIds} buat validasiAksi
+      ambilMemori(wid).catch((e) => {
+        console.warn('[asisten] gagal baca memori:', e.message);
+        return [];
+      }),
+    ]);
+    const konteks = `${memoriUntukKonteks(memoriRows)}\n\n${konteksData}`;
+    const idMemori = new Set(memoriRows.map((r) => r.id));
+    const isiPerintahIngat = perintahIngat(teksAsli);
+    // Simpan/hapus catatan yang diusulin model. Id "lupakan" dicocokin ke memori warung ini dulu (model bisa
+    // ngarang id). Perintah eksplisit "ingat ..." tetap kesimpen walau model lupa ngisi "ingat".
+    // Kegagalan di sini cuma dicatat - jawaban chat-nya tetap dikirim.
+    const terapkanMemori = async ({ ingat = [], lupakan = [] } = {}) => {
+      try {
+        const idLupakan = (Array.isArray(lupakan) ? lupakan : []).filter((id) => idMemori.has(id));
+        const memoriDihapus = idLupakan.length ? await hapusMemori(wid, idLupakan) : 0;
+        const calon = Array.isArray(ingat) ? ingat.slice(0, 3) : [];
+        let baru = await simpanMemori(wid, calon, 'ai');
+        if (!baru.length && !calon.length && isiPerintahIngat) baru = await simpanMemori(wid, [isiPerintahIngat], 'perintah');
+        return { memoriBaru: baru.map((r) => r.isi), memoriDihapus };
+      } catch (e) {
+        console.warn('[asisten] gagal nyimpen memori:', e.message);
+        return { memoriBaru: [], memoriDihapus: 0 };
+      }
+    };
     let jatahHabis = false;
 
     try {
-      const { jawaban, aksi } = await tanyaGemini({ pertanyaan: teksAsli, konteks, riwayat, fotoBase64, warungId: wid });
-      return res.json({ jawaban, aksi: validasiAksi(aksi, idSet), sumber: 'gemini' });
+      const { jawaban, aksi, ingat, lupakan } = await tanyaGemini({ pertanyaan: teksAsli, konteks, riwayat, fotoBase64, warungId: wid });
+      return res.json({ jawaban, aksi: validasiAksi(aksi, idSet), sumber: 'gemini', ...(await terapkanMemori({ ingat, lupakan })) });
     } catch (e) {
       // gagal manggil Gemini (bukan error server kita) - log biar ketauan pas debug (status HTTP
       // ikut dicatat: 429=kena quota/rate-limit, 403=key bermasalah, 502=timeout/nggak nyambung).
@@ -532,19 +560,64 @@ router.post('/tanya', async (req, res, next) => {
       // OpenRouter juga bisa ngusulin `aksi` (tambah/ubah/hapus barang) DAN baca foto (fotoBase64
       // ikut dikirim, model OpenRouter-nya vision-capable - lihat openrouter.service.js) - jadi
       // kalau user lampirin foto pas Gemini lagi down, tetap kebaca, nggak "buta".
-      const { jawaban, aksi } = await tanyaOpenRouter({ pertanyaan: teksAsli, konteks, riwayat, fotoBase64, warungId: wid });
-      return res.json({ jawaban, aksi: validasiAksi(aksi, idSet), sumber: 'openrouter' });
+      const { jawaban, aksi, ingat, lupakan } = await tanyaOpenRouter({ pertanyaan: teksAsli, konteks, riwayat, fotoBase64, warungId: wid });
+      return res.json({ jawaban, aksi: validasiAksi(aksi, idSet), sumber: 'openrouter', ...(await terapkanMemori({ ingat, lupakan })) });
     } catch (e) {
       // OpenRouter juga gagal (atau belum diisi key-nya - itu normal/opsional, bukan error harus
       // dikhawatirin) - baru jatuh ke rule-based, biar fiturnya nggak pernah mati total.
       console.warn(`[asisten] OpenRouter gagal (status ${e.status || '?'}), fallback ke rule-based:`, e.message);
       if (e.jatahAiHabis) jatahHabis = true;
+      // Perintah "ingat ..." tetap dilayanin tanpa AI - catatannya kesimpen, dijawab singkat.
+      if (isiPerintahIngat) {
+        const memori = await terapkanMemori();
+        const jawaban = memori.memoriBaru.length
+          ? `Siap, Mang Warung inget: **${memori.memoriBaru[0]}**`
+          : 'Itu udah ada di memori Mang Warung, atau isinya nggak bisa disimpen (PIN/kata sandi nggak disimpen ya).';
+        return res.json({ jawaban, aksi: null, sumber: 'rule-based', jatahAiHabis: jatahHabis, ...memori });
+      }
       const jawaban = await jawabRuleBased(teks, wid);
       // `jatahAiHabis` di sini BUKAN error (statusnya tetap 200 & user tetap dapet jawaban) -
       // cuma penanda buat frontend nampilin keterangan "lagi mode hemat", biar user ngerti
       // kenapa jawabannya mendadak kaku dan tau apa yang bisa dia lakuin.
       return res.json({ jawaban, aksi: null, sumber: 'rule-based', jatahAiHabis: jatahHabis });
     }
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ---- Memori Mang AI (layar Lainnya > Memori Mang AI) ----
+router.get('/memori', async (req, res, next) => {
+  try {
+    res.json(await ambilMemori(req.warungId));
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post('/memori', async (req, res, next) => {
+  try {
+    const [baru] = await simpanMemori(req.warungId, [req.body.isi], 'manual');
+    if (!baru) return res.status(400).json({ error: 'Catatannya kosong, udah ada, atau berisi data rahasia (PIN/kata sandi)' });
+    res.status(201).json(baru);
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.delete('/memori/:id', async (req, res, next) => {
+  try {
+    const n = await hapusMemori(req.warungId, [req.params.id]);
+    if (!n) return res.status(404).json({ error: 'Catatan nggak ditemukan' });
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.delete('/memori', async (req, res, next) => {
+  try {
+    res.json({ dihapus: await hapusSemuaMemori(req.warungId) });
   } catch (e) {
     next(e);
   }

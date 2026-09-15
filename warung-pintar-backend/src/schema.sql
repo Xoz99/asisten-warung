@@ -392,3 +392,14 @@ CREATE TABLE IF NOT EXISTS target_harian (
   updated_at TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (warung_id, tanggal)
 );
+
+-- Memori jangka panjang Mang AI per akun warung (lihat services/memori.service.js - tabel ini juga dibikin otomatis
+-- di sana kalau belum ada). Isinya fakta pendek dari obrolan (nama panggilan, supplier langganan, dst).
+CREATE TABLE IF NOT EXISTS ai_memori (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  warung_id UUID NOT NULL REFERENCES warung(id) ON DELETE CASCADE,
+  isi TEXT NOT NULL,
+  sumber TEXT NOT NULL DEFAULT 'ai', -- ai | perintah | manual
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_ai_memori_warung ON ai_memori (warung_id, created_at DESC);

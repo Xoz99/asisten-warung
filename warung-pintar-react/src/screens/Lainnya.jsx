@@ -70,6 +70,19 @@ export default function Lainnya() {
           </span>
           <span className="ar">›</span>
         </button>
+        <button className="mrow" onClick={() => setSheet('memori')}>
+          <span className="ic">
+            <svg viewBox="0 0 24 24">
+              <path d="M9 18h6M10 21h4" />
+              <path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3Z" />
+            </svg>
+          </span>
+          <span className="tx">
+            <b>Memori Mang AI</b>
+            <span>Hal yang diinget Mang AI tentang warungmu</span>
+          </span>
+          <span className="ar">›</span>
+        </button>
       </div>
 
       <p className="p-sec">Aplikasi</p>
@@ -234,6 +247,7 @@ export default function Lainnya() {
       {sheet === 'ukuran' && <SheetUkuran onClose={() => setSheet(null)} />}
       {sheet === 'pass' && <SheetPass onClose={() => setSheet(null)} />}
       {sheet === 'pin' && <SheetGantiPin onClose={() => setSheet(null)} />}
+      {sheet === 'memori' && <SheetMemori onClose={() => setSheet(null)} />}
       {sheet === 'nohp' && <SheetNoHp onClose={() => setSheet(null)} />}
     </>
   );
@@ -978,6 +992,133 @@ function SheetCaraPasang({ iOS, onClose }) {
         )}
         <button className="btn utama" style={{ width: '100%', marginTop: 18 }} onClick={onClose}>
           Mengerti
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Memori Mang AI - catatan jangka panjang per akun warung (disimpan server, lihat memori.service.js di backend).
+// Diisi otomatis dari obrolan ("ingat ya ..."), dan di sini pemilik bisa lihat, nambah, & hapus - biar jelas apa
+// aja yang diinget & ikut kekirim ke AI tiap chat, bukan kotak hitam.
+function SheetMemori({ onClose }) {
+  const { toast } = useApp();
+  const [daftar, setDaftar] = useState(null); // null = lagi dimuat
+  const [baru, setBaru] = useState('');
+  const [sibuk, setSibuk] = useState(false);
+  const [yakinHapusSemua, setYakinHapusSemua] = useState(false);
+
+  useEffect(() => {
+    let batal = false;
+    api.memori
+      .list()
+      .then((rows) => !batal && setDaftar(rows))
+      .catch((e) => {
+        if (batal) return;
+        setDaftar([]);
+        toast(escapeHtml(e.message || 'Gagal memuat memori'));
+      });
+    return () => {
+      batal = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const tambah = async () => {
+    const isi = baru.trim();
+    if (!isi || sibuk) return;
+    setSibuk(true);
+    try {
+      const r = await api.memori.tambah(isi);
+      setDaftar((d) => [r, ...(d || [])]);
+      setBaru('');
+    } catch (e) {
+      toast(escapeHtml(e.message || 'Gagal nyimpen catatan'));
+    } finally {
+      setSibuk(false);
+    }
+  };
+
+  const hapus = async (id) => {
+    try {
+      await api.memori.hapus(id);
+      setDaftar((d) => d.filter((m) => m.id !== id));
+    } catch (e) {
+      toast(escapeHtml(e.message || 'Gagal hapus catatan'));
+    }
+  };
+
+  const hapusSemua = async () => {
+    setSibuk(true);
+    try {
+      await api.memori.hapusSemua();
+      setDaftar([]);
+      setYakinHapusSemua(false);
+      toast('Memori Mang AI dikosongkan');
+    } catch (e) {
+      toast(escapeHtml(e.message || 'Gagal hapus memori'));
+    } finally {
+      setSibuk(false);
+    }
+  };
+
+  return (
+    <div className="sheet show">
+      <div className="panel">
+        <h3>Memori Mang AI</h3>
+        <p>
+          Hal-hal yang diinget Mang AI tentang warungmu dari obrolan sebelumnya. Berlaku di semua HP akun ini. Bilang aja
+          di chat "ingat ya ...", atau tulis sendiri di bawah.
+        </p>
+        <div className="field">
+          <label>Tambah catatan</label>
+          <input
+            value={baru}
+            onChange={(e) => setBaru(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && tambah()}
+            maxLength={200}
+            placeholder="Misal: supplier beras langganan Toko Makmur"
+          />
+        </div>
+        <button className="btn utama" style={{ width: '100%', marginTop: 10 }} disabled={sibuk || !baru.trim()} onClick={tambah}>
+          Simpan catatan
+        </button>
+
+        <div className="memori-daftar">
+          {daftar === null ? (
+            <div className="kosong">Memuat…</div>
+          ) : daftar.length === 0 ? (
+            <div className="kosong">Belum ada yang diinget.</div>
+          ) : (
+            daftar.map((m) => (
+              <div className="memori-item" key={m.id}>
+                <span>{m.isi}</span>
+                <button type="button" onClick={() => hapus(m.id)} aria-label="Hapus catatan ini" title="Hapus catatan ini">
+                  ×
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        {daftar?.length > 0 &&
+          (!yakinHapusSemua ? (
+            <button type="button" className="ed-hapus" onClick={() => setYakinHapusSemua(true)}>
+              Hapus semua memori
+            </button>
+          ) : (
+            <div className="ed-dua" style={{ marginTop: 12 }}>
+              <button className="btn" disabled={sibuk} onClick={() => setYakinHapusSemua(false)}>
+                Batal
+              </button>
+              <button className="btn" style={{ background: '#e5484d', color: '#fff' }} disabled={sibuk} onClick={hapusSemua}>
+                Ya, hapus semua
+              </button>
+            </div>
+          ))}
+
+        <button className="btn" style={{ width: '100%', marginTop: 12 }} onClick={onClose}>
+          Tutup
         </button>
       </div>
     </div>

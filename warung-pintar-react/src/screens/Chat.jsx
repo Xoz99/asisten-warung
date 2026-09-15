@@ -379,8 +379,15 @@ function TanyaAI() {
     setFotoTerlampir(null);
     setTyping(true);
     try {
-      const { jawaban, aksi, jatahAiHabis } = await api.asisten.tanya(q || 'Tolong lihat foto ini.', riwayat, fotoKirim);
-      setLog((l) => [...l, { id: idBaru(), who: 'bot', html: formatBot(jawaban), saran: saranLanjutan(q, jawaban) }]);
+      const { jawaban, aksi, jatahAiHabis, memoriBaru, memoriDihapus } = await api.asisten.tanya(q || 'Tolong lihat foto ini.', riwayat, fotoKirim);
+      // Catatan memori yang barusan disimpen/dilupakan ditempel kecil di bawah balasan - biar pemilik tau apa aja
+      // yang diinget Mang AI (dan bisa dihapus di Lainnya > Memori Mang AI), bukan diem-diem nyimpen.
+      const catatanMemori = [
+        ...(memoriBaru || []).map((m) => `Diingat: ${escapeHtml(m)}`),
+        ...(memoriDihapus ? [`${memoriDihapus} catatan lama dilupakan`] : []),
+      ];
+      const htmlMemori = catatanMemori.length ? `<div class="memori-catat">${catatanMemori.join('<br>')}</div>` : '';
+      setLog((l) => [...l, { id: idBaru(), who: 'bot', html: formatBot(jawaban) + htmlMemori, saran: saranLanjutan(q, jawaban) }]);
       // Jatah AI habis: jawabannya TETAP dikasih (versi rule-based, kaku), tapi user wajib dikasih
       // tau kenapa - tanpa ini dia cuma liat Mang Warung tiba-tiba jawab "aku belum paham" dan
       // ngiranya aplikasinya rusak, bukan jatahnya yang abis. Ditaruh sebagai gelembung terpisah
