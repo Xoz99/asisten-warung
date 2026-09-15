@@ -6,6 +6,8 @@ import { rupiah, escapeHtml, angkaRingkas } from '../lib/format';
 import { MARGIN_REKOMENDASI, hargaDariMargin } from '../lib/harga';
 import { api } from '../lib/api';
 import { PIN_GAMPANG, hashPinLokal, errorJaringan } from '../lib/pin';
+import { IKON_PRODUK, tebakIkon } from '../lib/ikonProduk';
+import PilihIkon from '../components/PilihIkon.jsx';
 import { bukaKamera, tutupKamera, jepretFrame, keWebp } from '../lib/kamera';
 import { ambilEmbedding } from '../lib/visualScan';
 import { useModelVisual } from '../lib/useModelVisual';
@@ -1360,6 +1362,7 @@ function SheetOpname({ produk, onClose }) {
   // Bagian yang jarang diubah dilipat biar layar utamanya cuma stok & harga (yang dikerjain tiap opname).
   const [bukaDetail, setBukaDetail] = useState(false);
   const [bukaFoto, setBukaFoto] = useState(false);
+  const [ikon, setIkon] = useState(produk.ikon || ''); // '' = otomatis (ditebak dari nama)
 
   // Foto referensi visual (buat scan AI kenalin barang ini) - BEDA sama `foto` (foto tampilan) di
   // atas. Dulu foto referensi CUMA bisa didaftarin pas alur "tambah barang baru" - barang yang udah
@@ -1496,7 +1499,8 @@ function SheetOpname({ produk, onClose }) {
       isi !== produk.isiKemasan ||
       namaKemasan.trim() !== (produk.namaKemasan || '') ||
       grup.trim() !== (produk.grup || '') ||
-      foto !== (produk.fotoSendiri || null);
+      foto !== (produk.fotoSendiri || null) ||
+      ikon !== (produk.ikon || '');
     if (berubah) {
       if (!nama.trim()) {
         return toast('Nama barang nggak boleh kosong');
@@ -1516,6 +1520,7 @@ function SheetOpname({ produk, onClose }) {
           namaKemasan: isi > 1 ? namaKemasan.trim() : '',
           grup: grup.trim(),
           fotoUrl: foto || undefined,
+          ikon,
         },
       });
     }
@@ -1540,14 +1545,17 @@ function SheetOpname({ produk, onClose }) {
   ]
     .filter(Boolean)
     .join(' · ');
-  const ringkasFoto = refLoading ? '…' : `${foto ? 'ada foto' : 'belum ada foto'} · ${refList.length} foto scan`;
+  const tebakan = tebakIkon(nama, kategori);
+  const ringkasFoto = refLoading
+    ? '…'
+    : `${foto ? 'ada foto' : `ikon ${IKON_PRODUK[ikon || tebakan].label.toLowerCase()}`} · ${refList.length} foto scan`;
   const saranGrup = daftarGrupUnik(S.produk).filter((g) => g.toLowerCase().includes(grup.trim().toLowerCase()));
 
   return (
     <div className="sheet show">
       <div className="panel ed">
         <div className="ed-kepala">
-          <ProductIcon id={produk.id} foto={foto || produk.foto} />
+          <ProductIcon id={produk.id} foto={foto || produk.foto} ikon={ikon} />
           <div style={{ minWidth: 0 }}>
             <h3>{produk.nama}</h3>
             <div className="ed-sub">
@@ -1659,7 +1667,7 @@ function SheetOpname({ produk, onClose }) {
 
         <button type="button" className={'ed-lipat' + (bukaFoto ? ' buka' : '')} onClick={() => setBukaFoto((b) => !b)}>
           <span>
-            <b>Foto</b>
+            <b>Foto &amp; ikon</b>
             <small className={!refLoading && refList.length === 0 ? 'merah' : ''}>{ringkasFoto}</small>
           </span>
           <i>›</i>
@@ -1667,6 +1675,14 @@ function SheetOpname({ produk, onClose }) {
         {bukaFoto && (
           <div className="ed-kartu">
             <div className="ed-label" style={{ marginTop: 0 }}>
+              Ikon barang
+            </div>
+            <div className="ed-hint" style={{ marginTop: 0 }}>
+              Tampil kalau barang ini nggak punya foto{foto ? ' (sekarang fotonya yang tampil)' : ''}. "Otomatis" = ditebak dari namanya.
+            </div>
+            <PilihIkon nilai={ikon} tebakan={tebakan} onPilih={setIkon} />
+
+            <div className="ed-label" style={{ marginTop: 18 }}>
               Foto tampilan (opsional)
             </div>
             <div className="ed-foto">

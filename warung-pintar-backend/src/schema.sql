@@ -114,6 +114,8 @@ ALTER TABLE produk ADD COLUMN IF NOT EXISTS nama_kemasan TEXT;
 ALTER TABLE produk ADD COLUMN IF NOT EXISTS foto_url TEXT;
 ALTER TABLE produk ADD COLUMN IF NOT EXISTS grup TEXT;
 ALTER TABLE produk ADD COLUMN IF NOT EXISTS aktif BOOLEAN NOT NULL DEFAULT true;
+-- Ikon pilihan pemilik buat barang tanpa foto (kunci dari src/lib/ikonProduk.js di frontend). NULL/'' = ditebak dari nama.
+ALTER TABLE produk ADD COLUMN IF NOT EXISTS ikon TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_produk_grup ON produk(warung_id, grup);
 CREATE INDEX IF NOT EXISTS idx_produk_barcode ON produk(barcode);

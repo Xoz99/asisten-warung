@@ -1,3 +1,6 @@
+import { useApp } from '../state/AppContext.jsx';
+import { IKON_PRODUK, cariProduk, ikonValid, tebakIkon } from './ikonProduk';
+
 // Ikon produk (dulunya emoji) — dipetakan dari id barang.
 export const PRODUCT_ICONS = {
   mie: '<svg viewBox="0 0 24 24"><path d="M4 12h16a8 8 0 0 1-16 0Z"/><path d="M6.5 12c.4-2 .9-3 .8-5M12 12c.4-2.5.8-4 .3-6M17.5 12c-.3-2 .2-3 .7-4.5"/></svg>',
@@ -21,11 +24,16 @@ export const PRODUCT_ICONS = {
 // foto (opsional): kalau barangnya udah punya foto beneran (bukan cuma ikon generik), tampilin itu.
 // 'produk-ikon' = bingkai membulat 44px (lihat index.css) - dulu ikon & foto produk sama-sama dikunci 26x26
 // tanpa sudut bulat kayak ikon UI biasa, jadi foto barang cuma jadi kotak kecil tajam yang isinya nggak kebaca.
-export function ProductIcon({ id, foto, className = 'emo picon produk-ikon' }) {
+// `ikon` (opsional): paksa ikon tertentu - dipakai pratinjau di layar edit barang sebelum disimpan. Kalau nggak
+// dikasih, ikon diambil dari data barang (S.produk, dicari lewat id): pilihan pemilik -> ditebak dari nama barang.
+export function ProductIcon({ id, foto, ikon, className = 'emo picon produk-ikon' }) {
+  const { S } = useApp();
   if (foto) return <img className={className} src={foto} alt="" style={{ objectFit: 'cover' }} />;
-  return (
-    <span className={className} dangerouslySetInnerHTML={{ __html: PRODUCT_ICONS[id] || PRODUCT_ICONS.default }} />
-  );
+  const p = cariProduk(S?.produk, id);
+  const pilihan = ikon !== undefined ? ikon : p?.ikon;
+  const kunci = ikonValid(pilihan) ? pilihan : PRODUCT_ICONS[id] ? null : p ? tebakIkon(p.nama, p.kat) : 'default';
+  const html = kunci ? IKON_PRODUK[kunci].svg : PRODUCT_ICONS[id];
+  return <span className={className} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 // Dipakai di tiap tombol "jepret/ambil foto" (nota, produk, wajah, dsb) - gantiin emoji 📷/📸

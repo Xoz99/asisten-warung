@@ -133,6 +133,18 @@ router.post('/', async (req, res, next) => {
   }
 });
 
+// Kolom ikon ditambah otomatis kalau belum ada - deploy di VPS nggak jalanin `npm run migrate`.
+let kolomIkonSiap = null;
+function pastikanKolomIkon() {
+  if (!kolomIkonSiap) {
+    kolomIkonSiap = query('ALTER TABLE produk ADD COLUMN IF NOT EXISTS ikon TEXT').catch((e) => {
+      kolomIkonSiap = null;
+      throw e;
+    });
+  }
+  return kolomIkonSiap;
+}
+
 router.put('/:id', async (req, res, next) => {
   try {
     // default null (bukan undefined) buat field yang nggak dikirim — node-postgres nolak undefined
@@ -149,14 +161,20 @@ router.put('/:id', async (req, res, next) => {
       namaKemasan = null,
       grup = null,
       fotoUrl = null,
+      // kunci ikon (misal "botol"), '' = balik ke tebakan otomatis, null/nggak dikirim = jangan diubah
+      ikon = null,
     } = req.body;
+    if (ikon !== null && (typeof ikon !== 'string' || !/^[a-z0-9-]{0,40}$/.test(ikon))) {
+      return res.status(400).json({ error: 'ikon nggak valid' });
+    }
+    await pastikanKolomIkon();
     const { rows } = await query(
       `UPDATE produk SET nama=COALESCE($1,nama), kategori=COALESCE($2,kategori), barcode=COALESCE($3,barcode),
         harga=COALESCE($4,harga), modal=COALESCE($5,modal), laku_per_hari=COALESCE($6,laku_per_hari),
         satuan=COALESCE($7,satuan), isi_kemasan=COALESCE($8,isi_kemasan), nama_kemasan=COALESCE($9,nama_kemasan),
-        grup=COALESCE($10,grup), foto_url=COALESCE($11,foto_url), updated_at=now()
-       WHERE id=$12 AND warung_id=$13 RETURNING *`,
-      [nama, kategori, barcode, harga, modal, lakuPerHari, satuan, isiKemasan, namaKemasan, grup, fotoUrl, req.params.id, req.warungId]
+        grup=COALESCE($10,grup), foto_url=COALESCE($11,foto_url), ikon=COALESCE($12,ikon), updated_at=now()
+       WHERE id=$13 AND warung_id=$14 RETURNING *`,
+      [nama, kategori, barcode, harga, modal, lakuPerHari, satuan, isiKemasan, namaKemasan, grup, fotoUrl, ikon, req.params.id, req.warungId]
     );
     if (!rows.length) return res.status(404).json({ error: 'Produk tidak ditemukan' });
     res.json(rows[0]);

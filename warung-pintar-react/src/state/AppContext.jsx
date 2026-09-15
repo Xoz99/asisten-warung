@@ -102,6 +102,7 @@ function normProduk(r) {
     namaKemasan: r.nama_kemasan || null,
     grup: r.grup || null,
     foto: r.foto_url || null,
+    ikon: r.ikon || null, // ikon pilihan pemilik buat barang tanpa foto (lib/ikonProduk.js)
   };
 }
 // Varian yang belum punya foto sendiri (misal ditambah lewat "+ Varian") tampil pakai foto varian lain di
