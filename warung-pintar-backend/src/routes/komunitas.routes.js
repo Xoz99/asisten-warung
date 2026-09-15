@@ -7,6 +7,26 @@ const router = Router();
 // nullable (postingan lama / obrolan bebas boleh nggak milih topik sama sekali).
 const TOPIK_VALID = ['Dagangan', 'Kasbon', 'Supplier', 'Lainnya'];
 
+// Foto lampiran post/komentar: data URL gambar yang udah dikecilin di HP (maks 1024px). Dibatasi ~1MB
+// biar satu foto nggak bikin feed berat / database bengkak. Bukan gambar (atau kegedean) = ditolak.
+const FOTO_MAKS_HURUF = 1_400_000;
+const fotoValid = (f) => typeof f === 'string' && f.length <= FOTO_MAKS_HURUF && /^data:image\/(png|jpe?g|webp);base64,[a-z0-9+/=]+$/i.test(f);
+
+// Kolom foto ditambah otomatis kalau belum ada - deploy di VPS nggak jalanin `npm run migrate`.
+let kolomFotoSiap = null;
+function pastikanKolomFoto() {
+  if (!kolomFotoSiap) {
+    kolomFotoSiap = (async () => {
+      await query('ALTER TABLE komunitas_post ADD COLUMN IF NOT EXISTS foto_url TEXT');
+      await query('ALTER TABLE komunitas_komentar ADD COLUMN IF NOT EXISTS foto_url TEXT');
+    })().catch((e) => {
+      kolomFotoSiap = null;
+      throw e;
+    });
+  }
+  return kolomFotoSiap;
+}
+
 // Komunitas — feed NASIONAL (semua warung berlangganan lihat feed yang sama, belum dikelompokkan
 // per wilayah — fondasi dulu, filter lokasi nyusul kalau usernya udah banyak) buat saling sharing
 // harga jual & profit penjualan. Ditampilin ATAS NAMA WARUNG (bukan anonim, keputusan produk),
@@ -40,15 +60,18 @@ router.get('/', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
   try {
-    const { namaBarang, hargaJual, profit, cerita, tag } = req.body;
+    const { namaBarang, hargaJual, profit, cerita, tag, foto } = req.body;
     const nb = namaBarang?.trim() || null;
     const ct = cerita?.trim() || null;
     const tg = TOPIK_VALID.includes(tag) ? tag : null;
-    if (!nb && !ct) return res.status(400).json({ error: 'Isi minimal nama barang atau ceritanya dulu' });
+    if (foto && !fotoValid(foto)) return res.status(400).json({ error: 'Fotonya nggak bisa dipakai (bukan gambar atau kegedean)' });
+    // Foto doang tanpa tulisan juga boleh (misal pamer display dagangan).
+    if (!nb && !ct && !foto) return res.status(400).json({ error: 'Isi tulisan atau lampirkan foto dulu' });
+    await pastikanKolomFoto();
     const { rows } = await query(
-      `INSERT INTO komunitas_post (warung_id, nama_barang, harga_jual, profit, cerita, tag)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [req.warungId, nb, hargaJual || null, profit || null, ct, tg]
+      `INSERT INTO komunitas_post (warung_id, nama_barang, harga_jual, profit, cerita, tag, foto_url)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [req.warungId, nb, hargaJual || null, profit || null, ct, tg, foto || null]
     );
     // Ikutin bentuk respons GET / (nama warung sendiri, suka/komentar masih 0) biar frontend bisa
     // langsung nempelin postingan baru ke atas feed tanpa perlu fetch ulang.
@@ -130,8 +153,11 @@ router.get('/:id/komentar', async (req, res, next) => {
 // tingkat kedalaman baru) - biar thread-nya nggak berlapis-lapis susah dibaca di HP.
 router.post('/:id/komentar', async (req, res, next) => {
   try {
-    const teks = req.body.teks?.trim();
-    if (!teks) return res.status(400).json({ error: 'Komentar belum diisi' });
+    const teks = req.body.teks?.trim() || '';
+    const foto = req.body.foto || null;
+    if (foto && !fotoValid(foto)) return res.status(400).json({ error: 'Fotonya nggak bisa dipakai (bukan gambar atau kegedean)' });
+    if (!teks && !foto) return res.status(400).json({ error: 'Komentar belum diisi' });
+    await pastikanKolomFoto();
     let balasKe = req.body.balasKe || null;
     if (balasKe) {
       const { rows: target } = await query('SELECT id, post_id, balas_ke FROM komunitas_komentar WHERE id=$1', [balasKe]);
@@ -142,8 +168,8 @@ router.post('/:id/komentar', async (req, res, next) => {
       balasKe = t.balas_ke || t.id;
     }
     const { rows } = await query(
-      'INSERT INTO komunitas_komentar (post_id, warung_id, teks, balas_ke) VALUES ($1,$2,$3,$4) RETURNING *',
-      [req.params.id, req.warungId, teks, balasKe]
+      'INSERT INTO komunitas_komentar (post_id, warung_id, teks, balas_ke, foto_url) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+      [req.params.id, req.warungId, teks, balasKe, foto]
     );
     const { rows: w } = await query('SELECT nama FROM warung WHERE id=$1', [req.warungId]);
     res.status(201).json({ ...rows[0], warung_nama: w[0]?.nama });

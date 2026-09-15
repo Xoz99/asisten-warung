@@ -403,3 +403,7 @@ CREATE TABLE IF NOT EXISTS ai_memori (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_ai_memori_warung ON ai_memori (warung_id, created_at DESC);
+
+-- Foto lampiran di Komunitas (data URL gambar yang udah dikecilin di HP). Juga ditambah otomatis di komunitas.routes.js.
+ALTER TABLE komunitas_post ADD COLUMN IF NOT EXISTS foto_url TEXT;
+ALTER TABLE komunitas_komentar ADD COLUMN IF NOT EXISTS foto_url TEXT;

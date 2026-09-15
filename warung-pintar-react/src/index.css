@@ -956,3 +956,17 @@ body{background:#E9E9E6}
 .kom-membalas{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--abu);font-weight:600;margin-bottom:6px}
 .kom-membalas button{border:0;background:none;padding:0;font:inherit;font-weight:800;color:#e5484d;cursor:pointer}
 .kom-kosong{margin-top:16px;padding:18px;border-radius:var(--r);background:var(--surface);text-align:center;color:var(--abu);font-weight:600;font-size:14px}
+
+/* ==== Link & foto di Komunitas ==== */
+.tautan{color:inherit;font-weight:700;text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
+.post-foto{display:block;width:100%;max-height:420px;object-fit:cover;border-radius:16px;margin-top:12px;background:var(--bg)}
+.diskusi-post .post-foto{max-height:70vh;object-fit:contain;cursor:zoom-in}
+.kom-foto{display:block;max-width:min(100%,280px);max-height:280px;object-fit:cover;border-radius:12px;margin-top:8px;cursor:zoom-in}
+.lampiran-foto{display:flex;align-items:center;gap:10px;margin:10px 0 8px;padding:6px 8px;border-radius:14px;background:var(--bg)}
+.lampiran-foto img{width:44px;height:44px;object-fit:cover;border-radius:10px}
+.lampiran-foto span{flex:1;font-size:13px;font-weight:700;color:var(--abu)}
+.lampiran-foto button{border:0;background:none;color:var(--abu);font-size:22px;line-height:1;cursor:pointer;padding:4px 8px}
+.kom-lampir{flex:none;width:36px;height:36px;margin-left:-10px;border-radius:50%;display:grid;place-items:center;color:var(--abu);cursor:pointer}
+.kom-lampir:hover{color:var(--ink)}
+.kom-lampir-post{display:grid;place-items:center;cursor:pointer}
+.foto-penuh{display:block;width:100%;max-height:70vh;object-fit:contain;border-radius:16px}

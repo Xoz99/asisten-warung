@@ -11,6 +11,7 @@ import { perangkatIOS } from '../lib/mic';
 import { mulaiRekam, rekamanDidukung } from '../lib/rekam';
 import { terpasangSebagaiApp } from '../lib/pwa';
 import mangWarungImg from '../assets/mangwarung.webp';
+import TeksBerlink from '../components/TeksBerlink.jsx';
 
 // formatBot & saranLanjutan ada di lib/formatChat.js (dipisah biar bisa diuji langsung).
 
@@ -1288,15 +1289,33 @@ function waktuRelatif(iso) {
 // bisnis kecil begini nama warung sendiri udah cukup "generik" secara lokasi, dan atribusi bikin
 // info-nya lebih bisa dipercaya). Backend-nya di komunitas.routes.js, pola query & access-control-nya
 // (WHERE warung_id=$2 pas hapus, dst) niru pola tukar_stok_post/koperasi_grup yang udah ada duluan.
+// Foto yang udah dilampirin tapi belum dikirim - bisa dibatalin sebelum kirim.
+function PratinjauFoto({ foto, onHapus }) {
+  return (
+    <div className="lampiran-foto">
+      <img src={foto} alt="" />
+      <span>Foto terlampir</span>
+      <button type="button" onClick={onHapus} aria-label="Batal lampirkan foto">
+        ×
+      </button>
+    </div>
+  );
+}
+
 // Satu komentar/balasan di halaman detail diskusi: avatar + gelembung (nama & isi), di bawahnya waktu, Balas, Hapus.
-function BarisKomentar({ k, milikSaya, onBalas, onHapus }) {
+function BarisKomentar({ k, milikSaya, onBalas, onHapus, onLihatFoto }) {
   return (
     <div className="kom">
       <div className="bulat">{inisial(k.warung_nama)}</div>
       <div className="kom-isi">
         <div className="kom-gelembung">
           <b>{k.warung_nama}</b>
-          <p>{k.teks}</p>
+          {k.teks && (
+            <p>
+              <TeksBerlink teks={k.teks} />
+            </p>
+          )}
+          {k.foto_url && <img className="kom-foto" src={k.foto_url} alt="" loading="lazy" onClick={() => onLihatFoto?.(k.foto_url)} />}
         </div>
         <div className="kom-bawah">
           {k.created_at && <span title={`${tglID(k.created_at)} · ${jamID(k.created_at)}`}>{waktuRelatif(k.created_at)}</span>}
@@ -1330,6 +1349,25 @@ function Komunitas() {
   const [topikPilih, setTopikPilih] = useState(TOPIK[0]); // topik yang dipilih buat postingan BARU
   const [komposerBuka, setKomposerBuka] = useState(false); // sheet "nanya ke komunitas" - kebuka pas tombol + dipencet
   const [confirmHapus, setConfirmHapus] = useState(null); // null | {tipe:'post', post} | {tipe:'komentar', postId, komentarId}
+  const [fotoPost, setFotoPost] = useState(null); // foto lampiran postingan baru (data URL)
+  const [fotoKomentar, setFotoKomentar] = useState(null); // foto lampiran komentar/balasan yang lagi ditulis
+  const [lihatFoto, setLihatFoto] = useState(null); // foto yang lagi dibuka penuh
+
+  // Foto lampiran dikecilin dulu (maks 1024px) sebelum dikirim - foto kamera HP bisa beberapa MB.
+  const bacaFoto = (e, simpan) => {
+    const f = e.target.files?.[0];
+    e.target.value = ''; // biar file yang sama bisa dipilih lagi
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = async () => {
+      try {
+        simpan(await keWebp(r.result, 1024));
+      } catch {
+        toast('Gagal memproses foto');
+      }
+    };
+    r.readAsDataURL(f);
+  };
 
   // Urutan tampil dibekukan (cuma dihitung ulang pas filter ganti / jumlah postingan berubah -
   // post baru masuk atau dihapus), BUKAN tiap kali ada yang suka/komentar. Alasannya: dulu "Ramai"
@@ -1387,11 +1425,13 @@ function Komunitas() {
   // tampil lengkap (lihat render post-q di bawah), cuma jalur bikin postingan BARU yang disederhanain.
   const kirimPost = async (teks) => {
     const ct = teks.trim();
-    if (!ct) return;
+    const foto = fotoPost;
+    if (!ct && !foto) return;
     setDraf('');
+    setFotoPost(null);
     setKirimLoading(true);
     try {
-      const baru = await api.komunitas.posting({ cerita: ct, tag: topikPilih });
+      const baru = await api.komunitas.posting({ cerita: ct, tag: topikPilih, foto });
       setFeed((f) => [baru, ...(f || [])]);
     } catch (e) {
       toast(e.message || 'Gagal ngirim postingan');
@@ -1442,6 +1482,7 @@ function Komunitas() {
   const bukaDetail = async (postId) => {
     setKomentarBuka(postId);
     setDraftKomentar('');
+    setFotoKomentar(null);
     setBalasKe(null);
     if (!komentarMap[postId]) {
       try {
@@ -1464,12 +1505,14 @@ function Komunitas() {
 
   const kirimKomentar = async (postId) => {
     const teks = draftKomentar.trim();
-    if (!teks) return;
+    const foto = fotoKomentar;
+    if (!teks && !foto) return;
     setDraftKomentar('');
+    setFotoKomentar(null);
     const targetId = balasKe?.id || null;
     setBalasKe(null);
     try {
-      const baru = await api.komunitas.komentar.tambah(postId, teks, targetId);
+      const baru = await api.komunitas.komentar.tambah(postId, teks, targetId, foto);
       setKomentarMap((m) => ({ ...m, [postId]: [...(m[postId] || []), baru] }));
       setFeed((f) => f.map((p) => (p.id === postId ? { ...p, jumlah_komentar: +p.jumlah_komentar + 1 } : p)));
     } catch (e) {
@@ -1594,9 +1637,10 @@ function Komunitas() {
             )}
             {post.cerita && (
               <p className="post-q" style={{ marginTop: post.nama_barang ? 6 : 13, whiteSpace: 'pre-wrap' }}>
-                {post.cerita}
+                <TeksBerlink teks={post.cerita} />
               </p>
             )}
+            {post.foto_url && <img className="post-foto" src={post.foto_url} alt="" loading="lazy" />}
 
             <div className="post-meta">
               <span>{post.jumlah_komentar} komentar</span>
@@ -1645,6 +1689,7 @@ function Komunitas() {
             ))}
           </div>
 
+          {fotoPost && <PratinjauFoto foto={fotoPost} onHapus={() => setFotoPost(null)} />}
           <form
             className="tanya"
             style={{ marginTop: 14 }}
@@ -1654,6 +1699,10 @@ function Komunitas() {
               setKomposerBuka(false);
             }}
           >
+            <label className="tanya-samping kom-lampir-post" aria-label="Lampirkan foto" title="Lampirkan foto">
+              <CameraIcon style={{ width: 21, height: 21, marginRight: 0, verticalAlign: 'middle' }} />
+              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => bacaFoto(e, setFotoPost)} />
+            </label>
             <input
               type="text"
               placeholder="Nanya ke sesama juragan…"
@@ -1662,7 +1711,7 @@ function Komunitas() {
               disabled={kirimLoading}
               autoFocus
             />
-            <button type="submit" className="mic" disabled={!draf.trim() || kirimLoading} aria-label="Kirim">
+            <button type="submit" className="mic" disabled={(!draf.trim() && !fotoPost) || kirimLoading} aria-label="Kirim">
               <svg viewBox="0 0 24 24">
                 <path d="M12 19V5M5 12l7-7 7 7" />
               </svg>
@@ -1704,8 +1753,11 @@ function Komunitas() {
             )}
             {postDetail.cerita && (
               <p className="post-q" style={{ marginTop: postDetail.nama_barang ? 6 : 13, whiteSpace: 'pre-wrap' }}>
-                {postDetail.cerita}
+                <TeksBerlink teks={postDetail.cerita} />
               </p>
+            )}
+            {postDetail.foto_url && (
+              <img className="post-foto" src={postDetail.foto_url} alt="" onClick={() => setLihatFoto(postDetail.foto_url)} />
             )}
             <div className="diskusi-aksi">
               <button className={'aksi' + (postDetail.disukai ? ' suka-on' : '')} onClick={() => toggleSuka(postDetail)}>
@@ -1742,6 +1794,7 @@ function Komunitas() {
                     k={k}
                     milikSaya={k.warung_id === authWarung?.id}
                     onBalas={() => setBalasKe(k)}
+                    onLihatFoto={setLihatFoto}
                     onHapus={() => setConfirmHapus({ tipe: 'komentar', postId: postDetail.id, komentarId: k.id })}
                   />
                   {/* Balesan ke komentar ini - menjorok dengan garis tipis di kiri, biar kebaca "nempel" ke
@@ -1755,6 +1808,7 @@ function Komunitas() {
                           k={b}
                           milikSaya={b.warung_id === authWarung?.id}
                           onBalas={() => setBalasKe(k)}
+                          onLihatFoto={setLihatFoto}
                           onHapus={() => setConfirmHapus({ tipe: 'komentar', postId: postDetail.id, komentarId: b.id })}
                         />
                       ))}
@@ -1774,14 +1828,19 @@ function Komunitas() {
                               Batal
                             </button>
                           </div>
+                          {fotoKomentar && <PratinjauFoto foto={fotoKomentar} onHapus={() => setFotoKomentar(null)} />}
                           <div className="kom-input">
+                            <label className="kom-lampir" aria-label="Lampirkan foto" title="Lampirkan foto">
+                              <CameraIcon style={{ width: 20, height: 20, marginRight: 0 }} />
+                              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => bacaFoto(e, setFotoKomentar)} />
+                            </label>
                             <input
                               value={draftKomentar}
                               onChange={(e) => setDraftKomentar(e.target.value)}
                               placeholder={`Balas ${k.warung_nama}…`}
                               autoFocus
                             />
-                            <button type="submit" disabled={!draftKomentar.trim()} aria-label="Kirim balasan">
+                            <button type="submit" disabled={!draftKomentar.trim() && !fotoKomentar} aria-label="Kirim balasan">
                               <svg viewBox="0 0 24 24">
                                 <path d="M12 19V5M5 12l7-7 7 7" />
                               </svg>
@@ -1807,9 +1866,14 @@ function Komunitas() {
                 kirimKomentar(postDetail.id);
               }}
             >
-              <div className="kom-input">
+              {fotoKomentar && <PratinjauFoto foto={fotoKomentar} onHapus={() => setFotoKomentar(null)} />}
+                          <div className="kom-input">
+                            <label className="kom-lampir" aria-label="Lampirkan foto" title="Lampirkan foto">
+                              <CameraIcon style={{ width: 20, height: 20, marginRight: 0 }} />
+                              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => bacaFoto(e, setFotoKomentar)} />
+                            </label>
                 <input value={draftKomentar} onChange={(e) => setDraftKomentar(e.target.value)} placeholder="Tulis jawaban…" />
-                <button type="submit" disabled={!draftKomentar.trim()} aria-label="Kirim jawaban">
+                <button type="submit" disabled={!draftKomentar.trim() && !fotoKomentar} aria-label="Kirim jawaban">
                   <svg viewBox="0 0 24 24">
                     <path d="M12 19V5M5 12l7-7 7 7" />
                   </svg>
@@ -1818,6 +1882,15 @@ function Komunitas() {
             </form>
           )}
         </div>
+      )}
+
+      {lihatFoto && (
+        <Sheet center mid>
+          <img className="foto-penuh" src={lihatFoto} alt="" />
+          <button className="btn" style={{ width: '100%', marginTop: 12 }} onClick={() => setLihatFoto(null)}>
+            Tutup
+          </button>
+        </Sheet>
       )}
 
       {/* Popup konfirmasi hapus - gantiin window.confirm() bawaan browser biar tampilannya nyatu

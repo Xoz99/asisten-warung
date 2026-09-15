@@ -254,7 +254,8 @@ export const api = {
       list: (postId) => get(`/api/komunitas/${postId}/komentar`),
       // balasKe (opsional): id komentar yang mau dibales - nempel jadi sub-balesan di bawahnya
       // (server otomatis ratain ke akar kalau target yang dibales itu sendiri sebuah balesan).
-      tambah: (postId, teks, balasKe) => post(`/api/komunitas/${postId}/komentar`, { teks, balasKe }),
+      // foto (opsional): data URL gambar yang udah dikecilin - komentar boleh foto doang tanpa tulisan.
+      tambah: (postId, teks, balasKe, foto = null) => post(`/api/komunitas/${postId}/komentar`, { teks, balasKe, foto }),
       hapus: (id) => del(`/api/komunitas/komentar/${id}`),
     },
   },
