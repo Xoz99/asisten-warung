@@ -12,6 +12,7 @@ import { mulaiRekam, rekamanDidukung } from '../lib/rekam';
 import { terpasangSebagaiApp } from '../lib/pwa';
 import mangWarungImg from '../assets/mangwarung.webp';
 import TeksBerlink from '../components/TeksBerlink.jsx';
+import { labelJenisUsaha } from '../lib/profilUsaha';
 
 // formatBot & saranLanjutan ada di lib/formatChat.js (dipisah biar bisa diuji langsung).
 
@@ -1253,8 +1254,9 @@ function SheetJepretNota({ onJepret, onClose }) {
 const MAKS_PER_HALAMAN = 20;
 
 const TOPIK = ['Dagangan', 'Kasbon', 'Supplier', 'Lainnya']; // topik postingan komunitas
-const FILTER_TABS = ['terbaru', 'saya', 'ramai', ...TOPIK];
-const labelFilter = (f) => (f === 'terbaru' ? 'Terbaru' : f === 'ramai' ? 'Ramai' : f === 'saya' ? 'Postingan saya' : f);
+const FILTER_TABS = ['terbaru', 'ikuti', 'saya', 'ramai', ...TOPIK];
+const LABEL_FILTER = { terbaru: 'Terbaru', ikuti: 'Mengikuti', saya: 'Postingan saya', ramai: 'Ramai' };
+const labelFilter = (f) => LABEL_FILTER[f] || f;
 
 // Waktu relatif ringkas ("20 mnt lalu", "3 jam lalu") buat baris kecil di header tiap post -
 // mirip waktuLalu() di PhoneShell.jsx (badge sync), tapi disalin lokal di sini biar Komunitas()
@@ -1304,14 +1306,40 @@ function PratinjauFoto({ foto, onHapus }) {
   );
 }
 
+// Satu baris warung (hasil cari, daftar pengikut/mengikuti): avatar + nama + jenis usaha, tombol Ikuti di kanan.
+function BarisWarung({ w, idSaya, onBuka, onIkuti }) {
+  const jenis = labelJenisUsaha({ jenis: w.jenis, jenisLain: w.jenis_lain });
+  const info = [jenis, w.jumlah_pengikut != null ? `${w.jumlah_pengikut} pengikut` : null].filter(Boolean).join(' · ');
+  return (
+    <div className="baris-warung">
+      <button type="button" className="baris-warung-info" onClick={onBuka}>
+        <span className="bulat">{inisial(w.nama)}</span>
+        <span style={{ minWidth: 0 }}>
+          <b>{w.nama}</b>
+          {info && <small>{info}</small>}
+        </span>
+      </button>
+      {w.id !== idSaya && (
+        <button type="button" className={'btn kecil' + (w.diikuti ? '' : ' utama')} onClick={onIkuti}>
+          {w.diikuti ? 'Mengikuti' : 'Ikuti'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // Satu komentar/balasan di halaman detail diskusi: avatar + gelembung (nama & isi), di bawahnya waktu, Balas, Hapus.
-function BarisKomentar({ k, milikSaya, onBalas, onHapus, onLihatFoto }) {
+function BarisKomentar({ k, milikSaya, onBalas, onHapus, onLihatFoto, onBukaProfil }) {
   return (
     <div className="kom">
-      <div className="bulat">{inisial(k.warung_nama)}</div>
+      <div className="bulat kom-ke-profil" onClick={() => onBukaProfil?.(k.warung_id)}>
+        {inisial(k.warung_nama)}
+      </div>
       <div className="kom-isi">
         <div className="kom-gelembung">
-          <b>{k.warung_nama}</b>
+          <b className="kom-ke-profil" onClick={() => onBukaProfil?.(k.warung_id)}>
+            {k.warung_nama}
+          </b>
           {k.teks && (
             <p>
               <TeksBerlink teks={k.teks} />
@@ -1336,7 +1364,7 @@ function BarisKomentar({ k, milikSaya, onBalas, onHapus, onLihatFoto }) {
 }
 
 function Komunitas() {
-  const { authWarung, toast, notifKomunitas, cekNotifKomunitas } = useApp();
+  const { authWarung, toast, goTo, notifKomunitas, cekNotifKomunitas } = useApp();
   const [feed, setFeed] = useState(null); // null = belum sempat fetch pertama kali
   const [habis, setHabis] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -1356,6 +1384,17 @@ function Komunitas() {
   const [lihatFoto, setLihatFoto] = useState(null); // foto yang lagi dibuka penuh
   const [notifBuka, setNotifBuka] = useState(false);
   const [notifDaftar, setNotifDaftar] = useState(null); // null = lagi dimuat
+  // Profil warung (halaman sendiri, gantian sama feed & detail diskusi)
+  const [profilBuka, setProfilBuka] = useState(null); // id warung yang profilnya lagi dibuka
+  const [profilData, setProfilData] = useState(null);
+  const [postProfilIds, setPostProfilIds] = useState(null);
+  const [daftarIkuti, setDaftarIkuti] = useState(null); // { tipe: 'pengikut'|'mengikuti', rows }
+  const profilAktif = useRef(null);
+  // Cari warung & postingan
+  const [cari, setCari] = useState('');
+  const [hasilCari, setHasilCari] = useState(null); // { q, warung, postIds }
+  // Tab "Mengikuti": id postingan dari warung yang diikuti (null = belum/perlu dimuat ulang)
+  const [postIkuti, setPostIkuti] = useState(null);
 
   // Foto lampiran dikecilin dulu (maks 1024px) sebelum dikirim - foto kamera HP bisa beberapa MB.
   const bacaFoto = (e, simpan) => {
@@ -1382,6 +1421,9 @@ function Komunitas() {
     let arr = feed;
     if (filter === 'ramai') {
       arr = [...feed].sort((a, b) => +b.jumlah_suka + +b.jumlah_komentar - (+a.jumlah_suka + +a.jumlah_komentar));
+    } else if (filter === 'ikuti') {
+      const map = new Map(feed.map((p) => [p.id, p]));
+      arr = (postIkuti || []).map((id) => map.get(id)).filter(Boolean);
     } else if (filter === 'saya') {
       arr = feed.filter((p) => p.warung_id === authWarung?.id).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     } else if (filter !== 'terbaru') {
@@ -1389,7 +1431,7 @@ function Komunitas() {
     }
     return arr.map((p) => p.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, feed?.length]);
+  }, [filter, feed?.length, postIkuti]);
 
   // Objek post-nya sendiri tetap diambil FRESH dari `feed` tiap render (biar angka suka/komentar
   // di kartu selalu update langsung), cuma URUTANnya yang ngikutin urutanIds yang dibekukan di atas.
@@ -1432,6 +1474,37 @@ function Komunitas() {
       .catch((e) => toast(e.message || 'Gagal memuat postingan kamu'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
+
+  useEffect(() => {
+    if (filter !== 'ikuti' || postIkuti !== null) return;
+    api.komunitas
+      .feed(null, { ikuti: true })
+      .then((rows) => {
+        gabungKeFeed(rows);
+        setPostIkuti(rows.map((p) => p.id));
+      })
+      .catch((e) => toast(e.message || 'Gagal memuat postingan yang kamu ikuti'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, postIkuti]);
+
+  // Cari: nunggu user berhenti ngetik sebentar, lalu cari warung (nama) & postingan (isi) sekaligus.
+  const kataCari = cari.trim();
+  const sedangCari = kataCari.length >= 2;
+  useEffect(() => {
+    if (kataCari.length < 2) return;
+    const q = kataCari;
+    const t = setTimeout(async () => {
+      try {
+        const [warung, posts] = await Promise.all([api.komunitas.warung.cari(q), api.komunitas.feed(null, { q })]);
+        gabungKeFeed(posts);
+        setHasilCari({ q, warung, postIds: posts.map((p) => p.id) });
+      } catch (e) {
+        toast(escapeHtml(e.message || 'Gagal mencari'));
+      }
+    }, 350);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kataCari]);
 
   const muatLagi = () => {
     if (!feed?.length) return;
@@ -1527,6 +1600,66 @@ function Komunitas() {
   };
   const tutupDetail = () => setKomentarBuka(null);
 
+  const muatProfil = async (id) => {
+    profilAktif.current = id;
+    try {
+      const [d, posts] = await Promise.all([api.komunitas.warung.profil(id), api.komunitas.feed(null, { warung: id })]);
+      if (profilAktif.current !== id) return; // keburu pindah ke profil lain
+      gabungKeFeed(posts);
+      setProfilData(d);
+      setPostProfilIds(posts.map((p) => p.id));
+    } catch (e) {
+      if (profilAktif.current !== id) return;
+      toast(escapeHtml(e.message || 'Gagal memuat profil'));
+      setProfilBuka(null);
+    }
+  };
+  const bukaProfil = (id) => {
+    if (!id) return;
+    setKomentarBuka(null);
+    setNotifBuka(false);
+    setDaftarIkuti(null);
+    setProfilBuka(id);
+    setProfilData(null);
+    setPostProfilIds(null);
+    muatProfil(id);
+  };
+  const tutupProfil = () => {
+    profilAktif.current = null;
+    setProfilBuka(null);
+  };
+
+  // Status ikuti satu warung bisa nongol di beberapa tempat sekaligus (profil, hasil cari, daftar pengikut) - semua disamain.
+  const perbaruiWarung = (id, ubah) => {
+    setProfilData((d) => (d && d.id === id ? ubah(d) : d));
+    setHasilCari((h) => (h ? { ...h, warung: h.warung.map((w) => (w.id === id ? ubah(w) : w)) } : h));
+    setDaftarIkuti((d) => (d?.rows ? { ...d, rows: d.rows.map((w) => (w.id === id ? ubah(w) : w)) } : d));
+  };
+  const toggleIkuti = async (id) => {
+    perbaruiWarung(id, (w) => ({ ...w, diikuti: !w.diikuti, jumlah_pengikut: Math.max(0, +(w.jumlah_pengikut || 0) + (w.diikuti ? -1 : 1)) }));
+    try {
+      const { diikuti, jumlahPengikut } = await api.komunitas.warung.ikuti(id);
+      perbaruiWarung(id, (w) => ({ ...w, diikuti, jumlah_pengikut: jumlahPengikut }));
+      // Lagi buka profil sendiri: angka "mengikuti"-nya ikut berubah
+      setProfilData((d) => (d?.milik_saya ? { ...d, jumlah_mengikuti: Math.max(0, +d.jumlah_mengikuti + (diikuti ? 1 : -1)) } : d));
+      setPostIkuti(null); // tab Mengikuti dimuat ulang pas dibuka
+    } catch (e) {
+      toast(escapeHtml(e.message || 'Gagal nyimpen'));
+      if (profilBuka) muatProfil(profilBuka);
+    }
+  };
+  const bukaDaftarIkuti = async (tipe) => {
+    const id = profilBuka;
+    setDaftarIkuti({ tipe, rows: null });
+    try {
+      const rows = await api.komunitas.warung[tipe](id);
+      setDaftarIkuti((d) => (d && d.tipe === tipe ? { ...d, rows } : d));
+    } catch (e) {
+      setDaftarIkuti(null);
+      toast(escapeHtml(e.message || 'Gagal memuat daftar'));
+    }
+  };
+
   const bukaNotif = async () => {
     setNotifBuka(true);
     setNotifDaftar(null);
@@ -1542,6 +1675,11 @@ function Komunitas() {
   // Tap notifikasi -> langsung ke diskusinya. Komentar dimuat ulang (yang barusan masuk belum ada di cache).
   const bukaDariNotif = async (n) => {
     setNotifBuka(false);
+    if (n.jenis === 'ikuti') {
+      bukaProfil(n.dari_warung_id);
+      if (!n.dibaca) api.komunitas.notif.baca({ id: n.id }).then(cekNotifKomunitas).catch(() => {});
+      return;
+    }
     if (!feed?.some((p) => p.id === n.post_id)) {
       try {
         gabungKeFeed([await api.komunitas.detail(n.post_id)]);
@@ -1621,61 +1759,14 @@ function Komunitas() {
     return root.map((k) => ({ ...k, balasan: balasanMap.get(k.id) || [] }));
   }, [daftarKomentar]);
 
-  return (
-    <>
-      {/* Feed & detail postingan sekarang SALING GANTIAN (bukan detail numpuk di ATAS feed lewat
-          Sheet/modal kayak sebelumnya) - tap postingan "pindah halaman" beneran (kayak Facebook),
-          balik ke feed lewat tombol "‹ Kembali", sama pola navigasi yang dipakai layar lain di app
-          ini (lihat Pelanggan.jsx/Riwayat.jsx). Ini navigasi LOKAL (state komentarBuka di komponen
-          ini, bukan lewat goTo() global) - tab Komunitas sendiri masih 1 dari 2 tab di Chat.jsx,
-          nggak perlu daftar sebagai screen `s-*` terpisah di PhoneShell. */}
-      {!postDetail && (
-      <div className="komunitas-feed">
-      {feed?.length > 0 && (
-        <div className="tabs">
-          {FILTER_TABS.map((f) => (
-            <button key={f} className={'tab' + (filter === f ? ' act' : '')} onClick={() => setFilter(f)}>
-              {labelFilter(f)}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Tombol biasa (bukan FAB ngambang) - nav bar udah punya FAB "Catat" sendiri di zona
-          bawah yang sama, jadi tombol tambah postingan taruh di alur feed aja biar nggak numpuk. */}
-      <div className="kom-atas">
-        <button type="button" className="btn utama brand" style={{ flex: 1 }} onClick={() => setKomposerBuka(true)}>
-          + Tanya ke komunitas
-        </button>
-        {/* Lonceng notifikasi: komentar di postingan sendiri & balasan ke komentar sendiri */}
-        <button type="button" className="kom-lonceng" onClick={bukaNotif} aria-label="Notifikasi">
-          <svg viewBox="0 0 24 24">
-            <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15Z" />
-            <path d="M10 20.5a2 2 0 0 0 4 0" />
-          </svg>
-          {notifKomunitas > 0 && <span className="badge show">{notifKomunitas > 9 ? '9+' : notifKomunitas}</span>}
-        </button>
-      </div>
-
-      {feed === null && (
-        <p className="p-sub" style={{ textAlign: 'center', marginTop: 30 }}>
-          Memuat komunitas…
-        </p>
-      )}
-      {feed?.length === 0 && (
-        <div className="kosong">
-          Belum ada postingan.
-          <br />
-          Jadi yang pertama share!
-        </div>
-      )}
-
-      <div className="posts">
-        {daftar?.map((post) => (
+  // Satu kartu postingan - dipakai di feed, hasil cari, & halaman profil warung.
+  const kartuPost = (post) => (
           <article key={post.id} className="post" onClick={() => bukaDetail(post.id)}>
             <div className="post-head">
-              <div className="bulat">{inisial(post.warung_nama)}</div>
-              <div className="post-id">
+              <div className="bulat kom-ke-profil" onClick={(e) => { e.stopPropagation(); bukaProfil(post.warung_id); }}>
+                {inisial(post.warung_nama)}
+              </div>
+              <div className="post-id kom-ke-profil" onClick={(e) => { e.stopPropagation(); bukaProfil(post.warung_id); }}>
                 <b>{post.warung_nama}</b>
                 <span title={`${tglID(post.created_at)} · ${jamID(post.created_at)}`}>{waktuRelatif(post.created_at)}</span>
               </div>
@@ -1725,19 +1816,200 @@ function Komunitas() {
               <span className="lihat">Lihat detail →</span>
             </div>
           </article>
-        ))}
+  );
+
+  // Postingan hasil cari & di halaman profil diambil dari `feed` (angka suka/komentar selalu yang terbaru)
+  const cariDiFeed = (ids) => (ids || []).map((id) => feed?.find((p) => p.id === id)).filter(Boolean);
+  const postHasilCari = hasilCari?.q === kataCari ? cariDiFeed(hasilCari.postIds) : [];
+  const postProfil = postProfilIds ? cariDiFeed(postProfilIds) : null;
+  const labelJenisProfil = profilData ? labelJenisUsaha({ jenis: profilData.jenis, jenisLain: profilData.jenis_lain }) : null;
+
+  return (
+    <>
+      {/* Feed & detail postingan sekarang SALING GANTIAN (bukan detail numpuk di ATAS feed lewat
+          Sheet/modal kayak sebelumnya) - tap postingan "pindah halaman" beneran (kayak Facebook),
+          balik ke feed lewat tombol "‹ Kembali", sama pola navigasi yang dipakai layar lain di app
+          ini (lihat Pelanggan.jsx/Riwayat.jsx). Ini navigasi LOKAL (state komentarBuka di komponen
+          ini, bukan lewat goTo() global) - tab Komunitas sendiri masih 1 dari 2 tab di Chat.jsx,
+          nggak perlu daftar sebagai screen `s-*` terpisah di PhoneShell. */}
+      {!postDetail && !profilBuka && (
+      <div className="komunitas-feed">
+      <div className="kom-cari">
+        <svg viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="6.5" />
+          <path d="m20 20-4.2-4.2" />
+        </svg>
+        <input
+          value={cari}
+          onChange={(e) => {
+            setCari(e.target.value);
+            if (e.target.value.trim().length < 2) setHasilCari(null);
+          }}
+          placeholder="Cari warung atau postingan…"
+          aria-label="Cari warung atau postingan"
+        />
+        {cari && (
+          <button type="button" onClick={() => { setCari(''); setHasilCari(null); }} aria-label="Hapus pencarian">
+            ×
+          </button>
+        )}
+      </div>
+      {!sedangCari && feed?.length > 0 && (
+        <div className="tabs">
+          {FILTER_TABS.map((f) => (
+            <button key={f} className={'tab' + (filter === f ? ' act' : '')} onClick={() => setFilter(f)}>
+              {labelFilter(f)}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Tombol biasa (bukan FAB ngambang) - nav bar udah punya FAB "Catat" sendiri di zona
+          bawah yang sama, jadi tombol tambah postingan taruh di alur feed aja biar nggak numpuk. */}
+      <div className="kom-atas">
+        <button type="button" className="btn utama brand" style={{ flex: 1 }} onClick={() => setKomposerBuka(true)}>
+          + Tanya ke komunitas
+        </button>
+        {/* Lonceng notifikasi: komentar di postingan sendiri & balasan ke komentar sendiri */}
+        <button type="button" className="kom-lonceng" onClick={bukaNotif} aria-label="Notifikasi">
+          <svg viewBox="0 0 24 24">
+            <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15Z" />
+            <path d="M10 20.5a2 2 0 0 0 4 0" />
+          </svg>
+          {notifKomunitas > 0 && <span className="badge show">{notifKomunitas > 9 ? '9+' : notifKomunitas}</span>}
+        </button>
+        <button type="button" className="kom-lonceng kom-saya" onClick={() => bukaProfil(authWarung?.id)} aria-label="Profil saya">
+          <span className="bulat">{inisial(authWarung?.nama || '')}</span>
+        </button>
+      </div>
+
+      {sedangCari && (
+        <div className="kom-hasil">
+          {hasilCari?.q !== kataCari ? (
+            <p className="p-sub" style={{ textAlign: 'center', marginTop: 24 }}>
+              Mencari…
+            </p>
+          ) : (
+            <>
+              <p className="diskusi-judul">Warung</p>
+              {hasilCari.warung.length === 0 ? (
+                <div className="kom-kosong">Nggak ada warung yang namanya mirip "{kataCari}".</div>
+              ) : (
+                <div className="kom-daftar-warung">
+                  {hasilCari.warung.map((w) => (
+                    <BarisWarung key={w.id} w={w} idSaya={authWarung?.id} onBuka={() => bukaProfil(w.id)} onIkuti={() => toggleIkuti(w.id)} />
+                  ))}
+                </div>
+              )}
+              <p className="diskusi-judul">Postingan</p>
+              {postHasilCari.length === 0 ? (
+                <div className="kom-kosong">Nggak ada postingan yang nyebut "{kataCari}".</div>
+              ) : (
+                <div className="posts">{postHasilCari.map(kartuPost)}</div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {!sedangCari && (
+      <>
+      {feed === null && (
+        <p className="p-sub" style={{ textAlign: 'center', marginTop: 30 }}>
+          Memuat komunitas…
+        </p>
+      )}
+      {feed?.length === 0 && (
+        <div className="kosong">
+          Belum ada postingan.
+          <br />
+          Jadi yang pertama share!
+        </div>
+      )}
+
+      <div className="posts">
+        {daftar?.map(kartuPost)}
       </div>
 
       {filter === 'saya' && daftar?.length === 0 && (
         <div className="kosong">Kamu belum pernah posting. Tanya atau cerita soal dagangan lewat tombol di atas.</div>
       )}
 
-      {feed?.length > 0 && !habis && filter !== 'saya' && (
+      {filter === 'ikuti' && postIkuti !== null && daftar?.length === 0 && (
+        <div className="kosong">Belum ada postingan dari warung yang kamu ikuti. Cari warung lewat kolom cari di atas, lalu ketuk Ikuti.</div>
+      )}
+
+      {feed?.length > 0 && !habis && filter !== 'saya' && filter !== 'ikuti' && (
         <button className="btn" style={{ width: '100%', marginTop: 14, marginBottom: 14 }} disabled={loadingMore} onClick={muatLagi}>
           {loadingMore ? 'Memuat…' : 'Muat lagi'}
         </button>
       )}
+      </>
+      )}
       </div>
+      )}
+
+      {/* Halaman profil warung - gantian sama feed (kayak detail diskusi). Buka postingan dari sini -> detail,
+          balik dari detail -> balik ke profil ini lagi. */}
+      {!postDetail && profilBuka && (
+        <div className="diskusi">
+          <div className="diskusi-atas">
+            <button className="btn kecil" onClick={tutupProfil}>
+              ‹ Kembali
+            </button>
+            <b>Profil</b>
+          </div>
+          <div className="profil-kartu">
+            {profilData === null ? (
+              <p className="p-sub">Memuat…</p>
+            ) : (
+              <>
+                <div className="profil-kepala">
+                  <div className="bulat">{inisial(profilData.nama)}</div>
+                  <div style={{ minWidth: 0 }}>
+                    <b>{profilData.nama}</b>
+                    {labelJenisProfil && <span>{labelJenisProfil}</span>}
+                    <small>
+                      Gabung sejak {new Date(profilData.bergabung).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
+                      {profilData.mengikuti_saya && !profilData.milik_saya ? ' · Mengikuti kamu' : ''}
+                    </small>
+                  </div>
+                </div>
+                <div className="profil-angka">
+                  <div>
+                    <b>{profilData.jumlah_postingan}</b>
+                    <span>Postingan</span>
+                  </div>
+                  <button type="button" onClick={() => bukaDaftarIkuti('pengikut')}>
+                    <b>{profilData.jumlah_pengikut}</b>
+                    <span>Pengikut</span>
+                  </button>
+                  <button type="button" onClick={() => bukaDaftarIkuti('mengikuti')}>
+                    <b>{profilData.jumlah_mengikuti}</b>
+                    <span>Mengikuti</span>
+                  </button>
+                </div>
+                {profilData.milik_saya ? (
+                  <button className="btn" style={{ width: '100%' }} onClick={() => goTo('s-lainnya')}>
+                    Ubah profil usaha
+                  </button>
+                ) : (
+                  <button className={'btn' + (profilData.diikuti ? '' : ' utama')} style={{ width: '100%' }} onClick={() => toggleIkuti(profilData.id)}>
+                    {profilData.diikuti ? 'Mengikuti ✓' : profilData.mengikuti_saya ? 'Ikuti balik' : 'Ikuti'}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+          <p className="diskusi-judul">Postingan</p>
+          {postProfil === null ? (
+            <p className="p-sub">Memuat…</p>
+          ) : postProfil.length === 0 ? (
+            <div className="kom-kosong">Belum ada postingan.</div>
+          ) : (
+            <div className="posts">{postProfil.map(kartuPost)}</div>
+          )}
+        </div>
       )}
 
       {komposerBuka && (
@@ -1807,8 +2079,10 @@ function Komunitas() {
               halaman tanpa batas, jadi nggak jelas mana pertanyaannya & mana jawabannya. */}
           <article className="diskusi-post">
             <div className="post-head">
-              <div className="bulat">{inisial(postDetail.warung_nama)}</div>
-              <div className="post-id">
+              <div className="bulat kom-ke-profil" onClick={() => bukaProfil(postDetail.warung_id)}>
+                {inisial(postDetail.warung_nama)}
+              </div>
+              <div className="post-id kom-ke-profil" onClick={() => bukaProfil(postDetail.warung_id)}>
                 <b>{postDetail.warung_nama}</b>
                 <span title={`${tglID(postDetail.created_at)} · ${jamID(postDetail.created_at)}`}>{waktuRelatif(postDetail.created_at)}</span>
               </div>
@@ -1865,6 +2139,7 @@ function Komunitas() {
                     milikSaya={k.warung_id === authWarung?.id}
                     onBalas={() => setBalasKe(k)}
                     onLihatFoto={setLihatFoto}
+                    onBukaProfil={bukaProfil}
                     onHapus={() => setConfirmHapus({ tipe: 'komentar', postId: postDetail.id, komentarId: k.id })}
                   />
                   {/* Balesan ke komentar ini - menjorok dengan garis tipis di kiri, biar kebaca "nempel" ke
@@ -1879,6 +2154,7 @@ function Komunitas() {
                           milikSaya={b.warung_id === authWarung?.id}
                           onBalas={() => setBalasKe(k)}
                           onLihatFoto={setLihatFoto}
+                          onBukaProfil={bukaProfil}
                           onHapus={() => setConfirmHapus({ tipe: 'komentar', postId: postDetail.id, komentarId: b.id })}
                         />
                       ))}
@@ -1954,6 +2230,28 @@ function Komunitas() {
         </div>
       )}
 
+      {daftarIkuti && (
+        <Sheet>
+          <div className="between">
+            <h3 style={{ fontSize: 20 }}>{daftarIkuti.tipe === 'pengikut' ? 'Pengikut' : 'Mengikuti'}</h3>
+            <button className="hapus-mini" onClick={() => setDaftarIkuti(null)} aria-label="Tutup">
+              ×
+            </button>
+          </div>
+          {daftarIkuti.rows === null ? (
+            <p className="p-sub">Memuat…</p>
+          ) : daftarIkuti.rows.length === 0 ? (
+            <div className="kosong">{daftarIkuti.tipe === 'pengikut' ? 'Belum ada pengikut.' : 'Belum ngikutin warung mana pun.'}</div>
+          ) : (
+            <div className="kom-daftar-warung notif-daftar">
+              {daftarIkuti.rows.map((w) => (
+                <BarisWarung key={w.id} w={w} idSaya={authWarung?.id} onBuka={() => bukaProfil(w.id)} onIkuti={() => toggleIkuti(w.id)} />
+              ))}
+            </div>
+          )}
+        </Sheet>
+      )}
+
       {notifBuka && (
         <Sheet>
           <div className="between">
@@ -1965,7 +2263,7 @@ function Komunitas() {
           {notifDaftar === null ? (
             <p className="p-sub">Memuat…</p>
           ) : notifDaftar.length === 0 ? (
-            <div className="kosong">Belum ada notifikasi. Nanti muncul di sini kalau ada yang komentar di postinganmu atau bales komentarmu.</div>
+            <div className="kosong">Belum ada notifikasi. Nanti muncul di sini kalau ada yang komentar, bales komentarmu, atau mulai ngikutin kamu.</div>
           ) : (
             <>
               {notifDaftar.some((n) => !n.dibaca) && (
@@ -1979,7 +2277,7 @@ function Komunitas() {
                     <div className="bulat">{inisial(n.dari_nama)}</div>
                     <div style={{ minWidth: 0 }}>
                       <p>
-                        <b>{n.dari_nama}</b> {n.jenis === 'balasan' ? 'membalas komentarmu' : 'mengomentari postinganmu'}
+                        <b>{n.dari_nama}</b> {n.jenis === 'balasan' ? 'membalas komentarmu' : n.jenis === 'ikuti' ? 'mulai mengikuti kamu' : 'mengomentari postinganmu'}
                         {n.teks ? `: "${n.teks}"` : n.ada_foto ? ' (kirim foto)' : ''}
                       </p>
                       <small>

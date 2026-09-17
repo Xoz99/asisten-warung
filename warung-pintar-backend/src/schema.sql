@@ -425,3 +425,15 @@ CREATE INDEX IF NOT EXISTS idx_komunitas_notif_penerima ON komunitas_notif (waru
 -- Profil usaha dari layar "kenalan dulu" (jenis usaha, penjaga, kebutuhan, barcode, nama panggilan) - lihat
 -- services/profilUsaha.service.js. NULL = belum diisi. Juga ditambah otomatis di sana kalau belum ada.
 ALTER TABLE warung ADD COLUMN IF NOT EXISTS profil_usaha JSONB;
+
+-- Ikuti antar warung di Komunitas (followers/following). Juga dibikin otomatis di komunitas.routes.js.
+CREATE TABLE IF NOT EXISTS komunitas_ikuti (
+  pengikut_id UUID NOT NULL REFERENCES warung(id) ON DELETE CASCADE,
+  diikuti_id UUID NOT NULL REFERENCES warung(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (pengikut_id, diikuti_id),
+  CHECK (pengikut_id <> diikuti_id)
+);
+CREATE INDEX IF NOT EXISTS idx_komunitas_ikuti_diikuti ON komunitas_ikuti (diikuti_id);
+-- notif "mulai mengikuti kamu" nggak nyangkut postingan mana pun
+ALTER TABLE komunitas_notif ALTER COLUMN post_id DROP NOT NULL;

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { query } from '../db.js';
 import { nilaiJudol, PESAN_DIBLOKIR } from '../utils/filterJudol.js';
+import { pastikanKolomProfil } from '../services/profilUsaha.service.js';
 
 const router = Router();
 
@@ -56,6 +57,36 @@ function pastikanTabelNotif() {
   return tabelNotifSiap;
 }
 
+// Ikuti antar warung (followers/following). Notifikasi "mulai mengikuti kamu" nggak nyangkut postingan mana pun,
+// jadi kolom post_id di komunitas_notif dilonggarin jadi boleh kosong.
+let tabelIkutiSiap = null;
+function pastikanTabelIkuti() {
+  if (!tabelIkutiSiap) {
+    tabelIkutiSiap = (async () => {
+      await pastikanTabelNotif();
+      await query(`CREATE TABLE IF NOT EXISTS komunitas_ikuti (
+        pengikut_id UUID NOT NULL REFERENCES warung(id) ON DELETE CASCADE,
+        diikuti_id UUID NOT NULL REFERENCES warung(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ DEFAULT now(),
+        PRIMARY KEY (pengikut_id, diikuti_id),
+        CHECK (pengikut_id <> diikuti_id)
+      )`);
+      await query('CREATE INDEX IF NOT EXISTS idx_komunitas_ikuti_diikuti ON komunitas_ikuti (diikuti_id)');
+      await query('ALTER TABLE komunitas_notif ALTER COLUMN post_id DROP NOT NULL');
+    })().catch((e) => {
+      tabelIkutiSiap = null;
+      throw e;
+    });
+  }
+  return tabelIkutiSiap;
+}
+
+// Data warung yang AMAN ditampilin ke warung lain: nama, jenis usaha, sejak kapan gabung. Nomor HP, username,
+// & isi profil lain (kebutuhan, penjaga) sengaja nggak ikut.
+const KOLOM_WARUNG = `w.id, w.nama, w.created_at AS bergabung, w.profil_usaha->>'jenis' AS jenis, w.profil_usaha->>'jenisLain' AS jenis_lain`;
+// Pola ILIKE dari ketikan user - % & _ di-escape biar nggak jadi wildcard
+const polaIlike = (teks) => `%${teks.replace(/[\\%_]/g, (c) => '\\' + c)}%`;
+
 // Penerima: pemilik postingan ("komentar") & pemilik komentar yang dibales ("balasan"). Nggak pernah ngirim
 // notif ke diri sendiri, dan 1 komentar = maksimal 1 notif per penerima (kalau yang dibales pemilik
 // postingannya sendiri, cukup notif "balasan").
@@ -101,12 +132,12 @@ router.get('/notif', async (req, res, next) => {
   try {
     await pastikanTabelNotif();
     const { rows } = await query(
-      `SELECT n.id, n.jenis, n.dibaca, n.created_at, n.post_id, n.komentar_id, w.nama AS dari_nama,
+      `SELECT n.id, n.jenis, n.dibaca, n.created_at, n.post_id, n.komentar_id, n.dari_warung_id, w.nama AS dari_nama,
               left(COALESCE(kp.cerita, kp.nama_barang, ''), 80) AS post_cuplikan,
               left(COALESCE(kk.teks, ''), 120) AS teks, (kk.foto_url IS NOT NULL) AS ada_foto
        FROM komunitas_notif n
        JOIN warung w ON w.id = n.dari_warung_id
-       JOIN komunitas_post kp ON kp.id = n.post_id
+       LEFT JOIN komunitas_post kp ON kp.id = n.post_id
        LEFT JOIN komunitas_komentar kk ON kk.id = n.komentar_id
        WHERE n.warung_id = $1
        ORDER BY n.created_at DESC LIMIT 50`,
@@ -141,6 +172,12 @@ router.get('/', async (req, res, next) => {
     const before = req.query.before || null; // cursor pagination: ambil yang lebih lama dari timestamp ini
     // ?milik=saya -> cuma postingan warung sendiri (tab "Postingan saya"), sampai 50 terakhir sekaligus
     const milikSaya = req.query.milik === 'saya';
+    // ?warung=<id> -> postingan satu warung (halaman profil) · ?ikuti=1 -> dari warung yang diikuti · ?q= -> cari isi postingan
+    const warungFilter = POLA_UUID.test(req.query.warung || '') ? req.query.warung : null;
+    const ikuti = req.query.ikuti === '1';
+    const cari = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 60) : '';
+    const banyak = milikSaya || warungFilter || ikuti || cari;
+    await pastikanTabelIkuti(); // query di bawah nyebut tabel komunitas_ikuti, jadi tabelnya harus udah ada
     const { rows } = await query(
       `SELECT kp.*, w.nama AS warung_nama,
               (SELECT COUNT(*) FROM komunitas_suka s WHERE s.post_id = kp.id) AS jumlah_suka,
@@ -150,9 +187,12 @@ router.get('/', async (req, res, next) => {
        JOIN warung w ON w.id = kp.warung_id
        WHERE ($2::timestamptz IS NULL OR kp.created_at < $2::timestamptz)
          AND ($4::boolean IS NOT TRUE OR kp.warung_id = $1)
+         AND ($5::uuid IS NULL OR kp.warung_id = $5)
+         AND ($6::boolean IS NOT TRUE OR kp.warung_id IN (SELECT diikuti_id FROM komunitas_ikuti WHERE pengikut_id = $1))
+         AND ($7::text IS NULL OR kp.cerita ILIKE $7 OR kp.nama_barang ILIKE $7)
        ORDER BY kp.created_at DESC
        LIMIT $3`,
-      [req.warungId, before, milikSaya ? 50 : limit, milikSaya]
+      [req.warungId, before, banyak ? 50 : limit, milikSaya, warungFilter, ikuti, cari ? polaIlike(cari) : null]
     );
     // Postingan promosi judol yang terlanjur masuk (sebelum filter ini ada) nggak ditampilin. Filter di sini cuma
     // jaring pengaman - yang baru udah ditolak waktu dikirim (lihat POST di bawah).
@@ -161,6 +201,99 @@ router.get('/', async (req, res, next) => {
     next(e);
   }
 });
+
+// ---- Profil warung, cari warung, & ikuti ----
+router.get('/warung/cari', async (req, res, next) => {
+  try {
+    const q = String(req.query.q || '').trim().slice(0, 60);
+    if (q.length < 2) return res.json([]);
+    await pastikanTabelIkuti();
+    await pastikanKolomProfil();
+    const { rows } = await query(
+      `SELECT ${KOLOM_WARUNG},
+              (SELECT COUNT(*)::int FROM komunitas_ikuti i WHERE i.diikuti_id = w.id) AS jumlah_pengikut,
+              (SELECT COUNT(*)::int FROM komunitas_post p WHERE p.warung_id = w.id) AS jumlah_postingan,
+              EXISTS(SELECT 1 FROM komunitas_ikuti i2 WHERE i2.pengikut_id = $1 AND i2.diikuti_id = w.id) AS diikuti
+       FROM warung w
+       WHERE w.nama ILIKE $2 AND w.id <> $1
+       ORDER BY jumlah_pengikut DESC, jumlah_postingan DESC, w.nama
+       LIMIT 20`,
+      [req.warungId, polaIlike(q)]
+    );
+    res.json(rows);
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.get('/warung/:id', async (req, res, next) => {
+  try {
+    if (!POLA_UUID.test(req.params.id)) return res.status(404).json({ error: 'Warung tidak ditemukan' });
+    await pastikanTabelIkuti();
+    await pastikanKolomProfil();
+    const { rows } = await query(
+      `SELECT ${KOLOM_WARUNG},
+              (SELECT COUNT(*)::int FROM komunitas_post p WHERE p.warung_id = w.id) AS jumlah_postingan,
+              (SELECT COUNT(*)::int FROM komunitas_ikuti i WHERE i.diikuti_id = w.id) AS jumlah_pengikut,
+              (SELECT COUNT(*)::int FROM komunitas_ikuti i WHERE i.pengikut_id = w.id) AS jumlah_mengikuti,
+              EXISTS(SELECT 1 FROM komunitas_ikuti i WHERE i.pengikut_id = $1 AND i.diikuti_id = w.id) AS diikuti,
+              EXISTS(SELECT 1 FROM komunitas_ikuti i WHERE i.pengikut_id = w.id AND i.diikuti_id = $1) AS mengikuti_saya
+       FROM warung w WHERE w.id = $2`,
+      [req.warungId, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Warung tidak ditemukan' });
+    res.json({ ...rows[0], milik_saya: rows[0].id === req.warungId });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Toggle: belum ngikutin -> ikuti (+ notif ke warung itu), udah -> berhenti ngikutin.
+router.post('/warung/:id/ikuti', async (req, res, next) => {
+  try {
+    const target = req.params.id;
+    if (!POLA_UUID.test(target)) return res.status(404).json({ error: 'Warung tidak ditemukan' });
+    if (target === req.warungId) return res.status(400).json({ error: 'Nggak bisa ngikutin warung sendiri' });
+    await pastikanTabelIkuti();
+    const { rows: ada } = await query('SELECT id FROM warung WHERE id=$1', [target]);
+    if (!ada.length) return res.status(404).json({ error: 'Warung tidak ditemukan' });
+    const { rowCount: dihapus } = await query('DELETE FROM komunitas_ikuti WHERE pengikut_id=$1 AND diikuti_id=$2', [req.warungId, target]);
+    // Notif "mulai mengikuti" lama dari pasangan ini dibuang dulu - biar ikuti/batal bolak-balik nggak nyepam.
+    await query("DELETE FROM komunitas_notif WHERE warung_id=$1 AND dari_warung_id=$2 AND jenis='ikuti'", [target, req.warungId]);
+    if (!dihapus) {
+      await query('INSERT INTO komunitas_ikuti (pengikut_id, diikuti_id) VALUES ($1,$2) ON CONFLICT DO NOTHING', [req.warungId, target]);
+      await query("INSERT INTO komunitas_notif (warung_id, dari_warung_id, jenis) VALUES ($1,$2,'ikuti')", [target, req.warungId]);
+    }
+    const { rows: jumlah } = await query('SELECT COUNT(*)::int AS n FROM komunitas_ikuti WHERE diikuti_id=$1', [target]);
+    res.json({ diikuti: !dihapus, jumlahPengikut: jumlah[0].n });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Daftar pengikut / yang diikuti sebuah warung (100 terakhir), plus apakah AKU ngikutin masing-masing.
+async function daftarIkutan(req, res, next, arah) {
+  try {
+    if (!POLA_UUID.test(req.params.id)) return res.status(404).json({ error: 'Warung tidak ditemukan' });
+    await pastikanTabelIkuti();
+    await pastikanKolomProfil();
+    const [kolomWarung, kolomFilter] = arah === 'pengikut' ? ['i.pengikut_id', 'i.diikuti_id'] : ['i.diikuti_id', 'i.pengikut_id'];
+    const { rows } = await query(
+      `SELECT ${KOLOM_WARUNG},
+              (SELECT COUNT(*)::int FROM komunitas_ikuti x WHERE x.diikuti_id = w.id) AS jumlah_pengikut,
+              EXISTS(SELECT 1 FROM komunitas_ikuti x2 WHERE x2.pengikut_id = $1 AND x2.diikuti_id = w.id) AS diikuti
+       FROM komunitas_ikuti i JOIN warung w ON w.id = ${kolomWarung}
+       WHERE ${kolomFilter} = $2
+       ORDER BY i.created_at DESC LIMIT 100`,
+      [req.warungId, req.params.id]
+    );
+    res.json(rows);
+  } catch (e) {
+    next(e);
+  }
+}
+router.get('/warung/:id/pengikut', (req, res, next) => daftarIkutan(req, res, next, 'pengikut'));
+router.get('/warung/:id/mengikuti', (req, res, next) => daftarIkutan(req, res, next, 'mengikuti'));
 
 // Satu postingan - dipakai pas dibuka dari notifikasi (postingannya belum tentu ada di feed yang udah kemuat).
 router.get('/:id', async (req, res, next) => {

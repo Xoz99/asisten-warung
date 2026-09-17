@@ -252,14 +252,27 @@ export const api = {
   komunitas: {
     // cursor: ISO timestamp postingan terlama yang udah kemuat (buat "muat lagi") — kosongin buat halaman pertama
     // milik 'saya' = cuma postingan warung sendiri (tab "Postingan saya")
-    feed: (cursor, milik) => {
+    // opsi: 'saya' | { milik:'saya', ikuti:true, warung:<id>, q:<kata cari> }
+    feed: (cursor, opsi) => {
+      const o = typeof opsi === 'string' ? { milik: opsi } : opsi || {};
       const q = new URLSearchParams();
       if (cursor) q.set('before', cursor);
-      if (milik) q.set('milik', milik);
+      if (o.milik) q.set('milik', o.milik);
+      if (o.ikuti) q.set('ikuti', '1');
+      if (o.warung) q.set('warung', o.warung);
+      if (o.q) q.set('q', o.q);
       const qs = q.toString();
       return get(`/api/komunitas${qs ? `?${qs}` : ''}`);
     },
     detail: (id) => get(`/api/komunitas/${id}`),
+    // Profil warung, cari warung, & ikuti (followers/following)
+    warung: {
+      cari: (q) => get(`/api/komunitas/warung/cari?q=${encodeURIComponent(q)}`),
+      profil: (id) => get(`/api/komunitas/warung/${id}`),
+      ikuti: (id) => post(`/api/komunitas/warung/${id}/ikuti`),
+      pengikut: (id) => get(`/api/komunitas/warung/${id}/pengikut`),
+      mengikuti: (id) => get(`/api/komunitas/warung/${id}/mengikuti`),
+    },
     // Notifikasi: komentar di postingan sendiri & balasan ke komentar sendiri
     notif: {
       list: () => get('/api/komunitas/notif'),

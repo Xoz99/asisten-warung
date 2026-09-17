@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Ikon } from '../lib/icons.jsx';
 import { useApp } from '../state/AppContext.jsx';
 import { WARNA, FONTS, UKURAN } from '../lib/data';
-import { escapeHtml, tampilNoHp, rupiah } from '../lib/format';
+import { escapeHtml, tampilNoHp, rupiah, inisial } from '../lib/format';
 import { mintaIzinMedia } from '../lib/mic';
 import { terpasangSebagaiApp } from '../lib/pwa';
 import { api } from '../lib/api.js';
@@ -10,7 +10,7 @@ import { PIN_GAMPANG, hashPinLokal } from '../lib/pin';
 import KartuPaket from '../components/KartuPaket.jsx';
 import KonfirmasiHapus from '../components/KonfirmasiHapus.jsx';
 import Onboarding from './Onboarding.jsx';
-import { labelJenisUsaha } from '../lib/profilUsaha';
+import { BARCODE, KEBUTUHAN, PENJAGA, labelJenisUsaha } from '../lib/profilUsaha';
 import mangWarungImg from '../assets/mangwarung.webp';
 
 export default function Lainnya() {
@@ -267,13 +267,7 @@ export default function Lainnya() {
       {sheet === 'pass' && <SheetPass onClose={() => setSheet(null)} />}
       {sheet === 'pin' && <SheetGantiPin onClose={() => setSheet(null)} />}
       {sheet === 'memori' && <SheetMemori onClose={() => setSheet(null)} />}
-      {sheet === 'profil' && (
-        <div className="sheet show">
-          <div className="panel">
-            <Onboarding modeUbah onTutup={() => setSheet(null)} />
-          </div>
-        </div>
-      )}
+      {sheet === 'profil' && <SheetProfilUsaha onClose={() => setSheet(null)} />}
       {yakinKeluar && (
         <KonfirmasiHapus
           judul="Keluar dari akun?"
@@ -1170,5 +1164,104 @@ function SheetMemori({ onClose }) {
       />
     )}
     </>
+  );
+}
+
+// Profil usaha: tampil PROFIL-nya dulu (nama warung, jenis usaha, jawaban kenalan, angka komunitas), baru tombol
+// "Ubah" yang buka pertanyaan kenalan. Dulu barisnya langsung loncat ke pertanyaan nomor 1 - nggak bisa sekadar lihat.
+function SheetProfilUsaha({ onClose }) {
+  const { authWarung, profilUsaha } = useApp();
+  const [mode, setMode] = useState('lihat'); // lihat | ubah
+  const [komunitas, setKomunitas] = useState(null);
+
+  useEffect(() => {
+    if (!authWarung?.id) return;
+    let batal = false;
+    api.komunitas.warung
+      .profil(authWarung.id)
+      .then((d) => !batal && setKomunitas(d))
+      .catch(() => {
+        /* offline - angka komunitas cuma nggak ditampilin */
+      });
+    return () => {
+      batal = true;
+    };
+  }, [authWarung?.id]);
+
+  if (mode === 'ubah') {
+    return (
+      <div className="sheet show">
+        <div className="panel">
+          <Onboarding modeUbah onTutup={() => setMode('lihat')} />
+        </div>
+      </div>
+    );
+  }
+
+  const p = profilUsaha?.data && !profilUsaha.data.dilewati ? profilUsaha.data : null;
+  const label = (daftar, k) => daftar.find((x) => x.k === k)?.label || '-';
+
+  return (
+    <div className="sheet show">
+      <div className="panel profil-usaha">
+        <div className="profil-kepala">
+          <div className="bulat">{inisial(authWarung?.nama || '')}</div>
+          <div style={{ minWidth: 0 }}>
+            <b>{authWarung?.nama}</b>
+            <span>{labelJenisUsaha(p) || 'Jenis usaha belum diisi'}</span>
+            {authWarung?.username && <small>@{authWarung.username}</small>}
+          </div>
+        </div>
+
+        {komunitas && (
+          <div className="profil-angka">
+            <div>
+              <b>{komunitas.jumlah_postingan}</b>
+              <span>Postingan</span>
+            </div>
+            <div>
+              <b>{komunitas.jumlah_pengikut}</b>
+              <span>Pengikut</span>
+            </div>
+            <div>
+              <b>{komunitas.jumlah_mengikuti}</b>
+              <span>Mengikuti</span>
+            </div>
+          </div>
+        )}
+
+        {p ? (
+          <div className="profil-detail">
+            <div className="ed-baris">
+              <span>Yang jaga</span>
+              <b>{label(PENJAGA, p.penjaga)}</b>
+            </div>
+            <div className="ed-baris">
+              <span>Barang ber-barcode</span>
+              <b>{label(BARCODE, p.barcode)}</b>
+            </div>
+            <div className="ed-baris">
+              <span>Mang AI manggil</span>
+              <b>{p.namaPanggilan || '-'}</b>
+            </div>
+            <div className="profil-sub">Paling butuh bantuan</div>
+            <div className="profil-chip">
+              {p.kebutuhan?.length ? p.kebutuhan.map((k) => <span key={k} className="tag">{label(KEBUTUHAN, k)}</span>) : <span className="tag">-</span>}
+            </div>
+          </div>
+        ) : (
+          <div className="kom-kosong" style={{ marginTop: 14 }}>
+            Profil usaha belum diisi. Isi biar saran Mang AI & langkah awal di Beranda pas sama usahamu.
+          </div>
+        )}
+
+        <button className="btn utama" style={{ width: '100%', marginTop: 16 }} onClick={() => setMode('ubah')}>
+          {p ? 'Ubah profil usaha' : 'Isi profil usaha'}
+        </button>
+        <button className="btn" style={{ width: '100%', marginTop: 10 }} onClick={onClose}>
+          Tutup
+        </button>
+      </div>
+    </div>
   );
 }

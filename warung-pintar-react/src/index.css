@@ -1023,3 +1023,40 @@ body{background:#E9E9E6}
 .langkah-item b{display:block;font-size:15px}
 .langkah-item small{display:block;font-size:13px;color:var(--abu);font-weight:600;margin-top:1px}
 .langkah-item .ar{margin-left:auto;color:var(--abu);font-size:20px}
+
+/* ==== Komunitas: cari, profil warung, ikuti & Profil usaha di Lainnya ==== */
+.kom-cari{display:flex;align-items:center;gap:10px;margin-top:14px;padding:0 6px 0 16px;border-radius:999px;background:var(--surface);border:1.5px solid var(--garis)}
+.kom-cari:focus-within{border-color:var(--ink)}
+.kom-cari svg{flex:none;width:20px;height:20px;stroke:var(--abu);fill:none;stroke-width:2;stroke-linecap:round}
+.kom-cari input{flex:1;min-width:0;border:0;background:none;outline:none;font:inherit;font-size:15px;font-weight:600;color:var(--ink);padding:14px 0}
+.kom-cari button{flex:none;border:0;background:none;color:var(--abu);font-size:22px;line-height:1;padding:6px 10px;cursor:pointer}
+.kom-saya .bulat{width:36px;height:36px;border-radius:50%;font-size:12px;background:var(--ink);color:var(--aksen);font-weight:800}
+.t-dark .kom-saya .bulat{background:var(--aksen);color:#0A0A0A}
+.kom-ke-profil{cursor:pointer}
+.kom-daftar-warung{display:flex;flex-direction:column;gap:8px}
+.baris-warung{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:18px;background:var(--surface)}
+.t-mono .baris-warung,.t-dark .baris-warung{box-shadow:inset 0 0 0 1.5px var(--garis)}
+.sheet .baris-warung{background:var(--bg);box-shadow:none}
+.baris-warung-info{display:flex;align-items:center;gap:12px;flex:1;min-width:0;border:0;background:none;padding:0;font:inherit;color:var(--ink);text-align:left;cursor:pointer}
+.baris-warung-info .bulat{width:40px;height:40px;border-radius:50%;flex:none;font-size:13px;background:var(--ink);color:var(--aksen);font-weight:800}
+.t-dark .baris-warung-info .bulat{background:var(--aksen);color:#0A0A0A}
+.baris-warung-info b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.baris-warung-info small{display:block;font-size:12.5px;color:var(--abu);font-weight:600;margin-top:2px}
+.baris-warung .btn.kecil{flex:none;min-height:40px;padding:9px 16px}
+.profil-kartu{background:var(--surface);border-radius:var(--r);padding:18px;margin-top:14px}
+.t-mono .profil-kartu,.t-dark .profil-kartu{box-shadow:inset 0 0 0 1.5px var(--garis)}
+.profil-kepala{display:flex;align-items:center;gap:14px}
+.profil-kepala .bulat{width:64px;height:64px;border-radius:50%;flex:none;font-size:22px;background:var(--ink);color:var(--aksen);font-weight:800}
+.t-dark .profil-kepala .bulat{background:var(--aksen);color:#0A0A0A}
+.profil-kepala b{display:block;font-family:var(--f-head),sans-serif;font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1.2;overflow-wrap:anywhere;color:var(--ink)}
+.profil-kepala span{display:block;margin-top:3px;font-size:14px;font-weight:700;color:var(--ink)}
+.profil-kepala small{display:block;margin-top:2px;font-size:13px;font-weight:600;color:var(--abu)}
+.profil-angka{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0 14px}
+.profil-angka>*{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 4px;border:0;border-radius:14px;background:var(--bg);font:inherit;color:var(--ink)}
+.profil-angka button{cursor:pointer}
+.profil-angka b{font-family:var(--f-head),sans-serif;font-size:20px;font-weight:800}
+.profil-angka span{font-size:12.5px;font-weight:700;color:var(--abu)}
+.profil-detail{margin-top:4px;background:var(--bg);border-radius:18px;padding:6px 14px 14px}
+.profil-sub{margin-top:10px;font-size:13px;font-weight:700;color:var(--abu)}
+.profil-chip{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.profil-chip .tag{background:var(--surface);font-size:13px;padding:6px 12px}
