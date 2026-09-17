@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import { query } from '../db.js';
-import { VERSI_MODEL_WAJAH, cocokkanWajah } from '../utils/wajah.js';
+import { VERSI_MODEL_WAJAH, bacaEmbedding, cocokkanWajah, jarakEuclid } from '../utils/wajah.js';
 
 const router = Router();
+
+const SAMPEL_MAKS = 6; // sampel wajah per pelanggan
+const SAMPEL_KEMBAR = 0.2; // jarak di bawah ini = praktis wajah/foto yang sama, nggak perlu disimpen lagi
 
 const embeddingValid = (e) => Array.isArray(e) && e.length === 128 && e.every((x) => typeof x === 'number' && Number.isFinite(x));
 
@@ -23,9 +26,23 @@ router.post('/pelanggan/:id/wajah', async (req, res, next) => {
     if (!pRows.length) return res.status(404).json({ error: 'Pelanggan tidak ditemukan' });
     // Data wajah model lama orang ini dibuang - udah digantiin yang baru.
     await query("DELETE FROM pelanggan_wajah WHERE pelanggan_id=$1 AND jsonb_typeof(embedding) = 'array'", [req.params.id]);
+    // Selain foto pendaftaran, endpoint ini juga nerima wajah yang DIKONFIRMASI pemilik pas kenal wajah (SheetWajah)
+    // - sampel dari kamera & cahaya warung sendiri. Yang hampir kembar sama sampel yang udah ada nggak nambah apa-apa,
+    // jadi dilewat.
+    const { rows: ada } = await query('SELECT embedding FROM pelanggan_wajah WHERE pelanggan_id=$1', [req.params.id]);
+    const terdekat = Math.min(Infinity, ...ada.map((r) => bacaEmbedding(r.embedding)).filter(Boolean).map((d) => jarakEuclid(embedding, d)));
+    if (terdekat < SAMPEL_KEMBAR) return res.json({ dilewati: true, alasan: 'mirip sampel yang udah ada' });
     const { rows } = await query(
       'INSERT INTO pelanggan_wajah (pelanggan_id, embedding) VALUES ($1,$2) RETURNING id, created_at',
       [req.params.id, JSON.stringify({ v: VERSI_MODEL_WAJAH, d: embedding })]
+    );
+    // Maksimal SAMPEL_MAKS sampel per orang: sampel PERTAMA (biasanya foto pendaftaran) selalu disimpan, sisanya
+    // yang paling baru - wajah orang & kondisi warung bisa berubah, sampel lama paling kurang relevan.
+    await query(
+      `DELETE FROM pelanggan_wajah WHERE pelanggan_id=$1
+         AND id <> (SELECT id FROM pelanggan_wajah WHERE pelanggan_id=$1 ORDER BY created_at ASC LIMIT 1)
+         AND id NOT IN (SELECT id FROM pelanggan_wajah WHERE pelanggan_id=$1 ORDER BY created_at DESC LIMIT $2)`,
+      [req.params.id, SAMPEL_MAKS - 1]
     );
     res.status(201).json(rows[0]);
   } catch (e) {

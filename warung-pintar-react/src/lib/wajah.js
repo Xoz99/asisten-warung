@@ -168,9 +168,11 @@ function ambilPixel(sumber) {
 // ---- Jalur thread utama (cadangan) ------------------------------------------------------------------
 // Foto sekali jepret: nggak ada kesempatan kedua, jadi dicoba sampai ambang yang lebih longgar.
 const AMBANG_FOTO = [0.5, 0.3];
-// Video langsung: frame berikutnya dateng lagi sebentar, jadi cukup sekali jalan dengan ambang yang
-// wajar - wajah yang samar/ketutup mending dilewat daripada ngasilin descriptor jelek.
-const AMBANG_VIDEO = [0.5];
+// Video langsung: coba ambang wajar dulu, kalau nggak nemu wajah baru longgarin sekali. Dulu cuma [0.5] -
+// wajah yang agak miring/kena bayangan di kamera depan HP sering dilewat padahal jelas & terang. Descriptor
+// jelek dari frame longgar nggak bahaya: hasilnya dirata-rata beberapa frame & tetap harus lolos batas cocok
+// di server (lihat lib/sampelWajah.js). Jalannya di worker, jadi percobaan kedua nggak bikin layar macet.
+const AMBANG_VIDEO = [0.5, 0.3];
 
 // videoOrImg: elemen <video>/<img>/<canvas> yang lagi nampilin wajah. Balikin array 128 angka
 // (face descriptor) kalau ketemu wajah, atau null kalau nggak ada wajah kedeteksi.

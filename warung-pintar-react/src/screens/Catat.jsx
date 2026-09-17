@@ -13,6 +13,7 @@ import { useModelVisual } from '../lib/useModelVisual';
 import { mulaiScanBarcode } from '../lib/barcodeScan';
 import { ambilDeskriptorWajah, gambarDariDataUrl, panaskanModelWajah } from '../lib/wajah';
 import { perbaruiWajahLama, perluPerbaruiWajah } from '../lib/wajahLama';
+import { buatPengumpulSampel, layakDitampilkan } from '../lib/sampelWajah';
 import SheetStruk from '../components/SheetStruk.jsx';
 
 // Instance SpeechRecognition yang lagi AKTIF saat ini, kalau ada — sengaja modul-level (di luar
@@ -1274,7 +1275,8 @@ const BATAS_CARI_WAJAH_MS = 20000; // lewat segini (& udah >= 3 percobaan) -> ta
 function SheetWajah({ onClose, onTambahBaru }) {
   const { S, setPelangganTerpilih, toast, dispatch, openLunas, refreshData } = useApp();
   const [state, setState] = useState('memuat'); // memuat | menyiapkan | mencari | hasil | tidak-ketemu | error
-  const [match, setMatch] = useState(null); // { pelanggan, totalUtang, jarak, templateBelanjaan }
+  const [match, setMatch] = useState(null); // { pelanggan, totalUtang, jarak, templateBelanjaan, descriptor }
+  const [wajahKedeteksi, setWajahKedeteksi] = useState(null); // null = belum dicoba, true/false = frame terakhir
   const [bayarSebagian, setBayarSebagian] = useState(false);
   const [jumlahCustom, setJumlahCustom] = useState('');
   const [percobaanWajah, setPercobaanWajah] = useState(0); // ditampilkan biar kelihatan masih jalan, bukan nyangkut
@@ -1287,10 +1289,17 @@ function SheetWajah({ onClose, onTambahBaru }) {
       `Bayar <b style="color:var(--ink)">${rupiah(jumlah)}</b> dari total utang ${rupiah(match.totalUtang)}?`,
       (metode) => {
         dispatch({ type: 'BAYAR_UTANG_PELANGGAN', pelangganId: match.pelanggan.id, jumlah, metode });
+        pelajariWajah();
         toast(jumlah >= match.totalUtang ? 'Utang lunas' : `Sisa utang ${rupiah(match.totalUtang - jumlah)}`);
         onClose();
       }
     );
+  };
+
+  // Wajah yang barusan DIKONFIRMASI pemilik ("Ya, pakai nama dia" / bayar utang) disimpen jadi sampel tambahan
+  // orang itu - makin sering dikenali, makin kenal sama kamera & cahaya warung sendiri. "Bukan dia" nggak nyimpen apa-apa.
+  const pelajariWajah = () => {
+    if (match?.descriptor) api.wajah.daftarkan(match.pelanggan.id, match.descriptor).catch(() => {});
   };
 
   useEffect(() => {
@@ -1298,10 +1307,9 @@ function SheetWajah({ onClose, onTambahBaru }) {
     let percobaan = 0;
     let timer;
     let mulaiCari = Date.now();
-    // Nama baru ditampilkan kalau DUA frame berturut-turut sepakat orangnya sama. Satu frame bisa aja
-    // jelek (blur, lagi noleh, ketutup tangan) & kebetulan deket ke pelanggan lain - nunjukin "Ini X?"
-    // dari satu frame gitu yang bikin salah orang. Ongkosnya cuma ~1 percobaan tambahan.
-    let kandidatId = null;
+    // Descriptor beberapa frame dirata-rata sebelum dicocokkan (lihat lib/sampelWajah.js) - satu frame sendirian
+    // terlalu berisik, dulu bikin wajah yang jelas & terang sering nggak kekenal.
+    const pengumpul = buatPengumpulSampel();
 
     const cobaKenali = async () => {
       if (batal) return;
@@ -1312,15 +1320,16 @@ function SheetWajah({ onClose, onTambahBaru }) {
         // penjelasan panjangnya di lib/wajah.js). Frame berikutnya toh dateng lagi sebentar lagi.
         const descriptor = await ambilDeskriptorWajah(videoRef.current, { cepat: true });
         if (batal) return;
+        setWajahKedeteksi(Boolean(descriptor));
         if (descriptor) {
-          const hasil = await api.wajah.identifikasi(descriptor);
+          const { rata, jumlah } = pengumpul.tambah(descriptor);
+          const hasil = await api.wajah.identifikasi(rata);
           if (batal) return;
-          if (hasil.cocok && hasil.pelanggan.id === kandidatId) {
-            setMatch(hasil);
+          if (layakDitampilkan(hasil, jumlah)) {
+            setMatch({ ...hasil, descriptor: rata });
             setState('hasil');
             return;
           }
-          kandidatId = hasil.cocok ? hasil.pelanggan.id : null;
           // Aplikasi masih versi lama padahal server udah baru - nggak bakal pernah kenal siapa pun.
           if (hasil.perluUpdate) {
             toast('Aplikasi perlu diperbarui - tutup lalu buka lagi aplikasinya');
@@ -1328,7 +1337,7 @@ function SheetWajah({ onClose, onTambahBaru }) {
             return;
           }
         } else {
-          kandidatId = null;
+          pengumpul.reset();
         }
       } catch (e) {
         // model gagal DIMUAT (timeout/koneksi) - bukan soal "wajah belum kedeteksi di frame ini".
@@ -1358,7 +1367,7 @@ function SheetWajah({ onClose, onTambahBaru }) {
         const lama = performance.now() - mulai;
         setPercobaanWajah(percobaan);
         // Lagi nunggu konfirmasi frame kedua - dipercepat, orangnya masih di depan kamera.
-        timer = setTimeout(cobaKenali, kandidatId ? Math.max(300, lama) : Math.max(700, lama * 2));
+        timer = setTimeout(cobaKenali, pengumpul.jumlah ? Math.max(300, lama) : Math.max(700, lama * 2));
       }
     };
 
@@ -1425,7 +1434,13 @@ function SheetWajah({ onClose, onTambahBaru }) {
             {/* Nomor percobaan ditampilkan biar kelihatan masih jalan - di HP lambat tiap percobaan bisa
                 beberapa detik, dan layar yang diem tanpa perubahan kerasa kayak nyangkut. */}
             <p>
-              Arahkan kamera depan ke pembeli
+              {/* Bedain "wajahnya belum kelihatan" (arahin ulang kameranya) sama "wajahnya udah kelihatan, lagi dicocokin"
+                  (tunggu sebentar) - dulu dua-duanya sama-sama "Arahkan kamera", jadi nggak jelas harus ngapain. */}
+              {state !== 'mencari' || wajahKedeteksi === null
+                ? 'Arahkan kamera depan ke pembeli'
+                : wajahKedeteksi
+                  ? 'Wajah kedeteksi, lagi dicocokkan…'
+                  : 'Wajah belum kelihatan jelas - hadap ke kamera, agak dekat, jangan ketutup'}
               {state === 'mencari' && percobaanWajah > 0 ? ` \u00b7 percobaan ${percobaanWajah + 1}` : ''}
             </p>
           </>
@@ -1509,6 +1524,7 @@ function SheetWajah({ onClose, onTambahBaru }) {
               onClick={() => {
                 // Foto dibawa - dulu dipaksa null, jadi chip pembeli di Catat nampilin inisial walau pelanggannya punya foto.
                 setPelangganTerpilih({ id: match.pelanggan.id, nama: match.pelanggan.nama, wa: match.pelanggan.wa, foto: match.pelanggan.foto || null });
+                pelajariWajah();
                 onClose();
               }}
             >
