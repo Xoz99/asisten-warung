@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { api } from '../lib/api.js';
 import { EyeIcon } from '../lib/icons.jsx';
@@ -17,7 +17,7 @@ function planDariUrl() {
 }
 
 export default function Auth() {
-  const { login, register, mulaiCheckout } = useApp();
+  const { login, selesaiDaftar, mulaiCheckout } = useApp();
   const planUrl = planDariUrl();
   const [mode, setMode] = useState(planUrl ? 'daftar' : 'login'); // 'login' | 'daftar' | 'lupa'
   const [namaWarung, setNamaWarung] = useState('');
@@ -27,6 +27,57 @@ export default function Auth() {
   const [lihatPassword, setLihatPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // Daftar = 2 langkah: form -> kode WhatsApp. `pendaftaran` terisi setelah kode dikirim.
+  const [pendaftaran, setPendaftaran] = useState(null); // { id, noHpSamar, berlakuMenit }
+  const [kode, setKode] = useState('');
+  const [tungguKirimUlang, setTungguKirimUlang] = useState(0); // detik
+
+  useEffect(() => {
+    if (tungguKirimUlang <= 0) return;
+    const t = setTimeout(() => setTungguKirimUlang((d) => d - 1), 1000);
+    return () => clearTimeout(t);
+  }, [tungguKirimUlang]);
+
+  const lanjutCheckout = async () => {
+    if (planUrl) {
+      window.history.replaceState({}, '', window.location.pathname);
+      await mulaiCheckout(planUrl);
+    }
+  };
+
+  const kirimKodeDaftar = async () => {
+    const r = await api.daftar.kirimKode(namaWarung.trim(), username.trim(), password, noHp.trim());
+    setPendaftaran({ id: r.pendaftaranId, noHpSamar: r.noHpSamar, berlakuMenit: r.berlakuMenit });
+    setKode('');
+    setTungguKirimUlang(60);
+  };
+
+  const verifikasiDaftar = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (!/^\d{6}$/.test(kode.trim())) return setError('Kode itu 6 angka');
+    setLoading(true);
+    try {
+      await selesaiDaftar(pendaftaran.id, kode.trim());
+      await lanjutCheckout();
+    } catch (err) {
+      setError(err.message || 'Gagal, coba lagi');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const kirimUlang = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      await kirimKodeDaftar();
+    } catch (err) {
+      setError(err.message || 'Gagal kirim ulang kode');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -42,14 +93,11 @@ export default function Auth() {
         if (noHp.replace(/\D/g, '').length < 10) {
           throw new Error('Nomor HP belum benar. Contoh: 0812-3456-7890');
         }
-        await register(namaWarung.trim(), username.trim(), password, noHp.trim());
+        await kirimKodeDaftar(); // lanjut ke layar kode - akun baru dibuat setelah kodenya cocok
       } else {
         if (!username.trim() || !password) throw new Error('Username & password wajib diisi');
         await login(username.trim(), password);
-      }
-      if (planUrl) {
-        window.history.replaceState({}, '', window.location.pathname);
-        await mulaiCheckout(planUrl);
+        await lanjutCheckout();
       }
     } catch (err) {
       setError(err.message || 'Gagal, coba lagi');
@@ -60,6 +108,59 @@ export default function Auth() {
 
   if (mode === 'lupa') {
     return <LupaPassword awalUsername={username} onSelesai={() => { setMode('login'); setPassword(''); }} />;
+  }
+
+  // Langkah 2 daftar: masukin kode yang dikirim ke WhatsApp.
+  if (mode === 'daftar' && pendaftaran) {
+    return (
+      <div className="login">
+        <p className="p-h1">
+          Cek
+          <br />
+          WhatsApp-mu
+        </p>
+        <p className="p-sub">
+          Kode 6 angka dikirim ke WhatsApp <b style={{ color: 'var(--ink)', whiteSpace: 'nowrap' }}>{pendaftaran.noHpSamar}</b>. Berlaku{' '}
+          {pendaftaran.berlakuMenit || 10} menit. Jangan kasih kode ini ke siapa pun.
+        </p>
+        <form onSubmit={verifikasiDaftar} style={{ marginTop: 24 }}>
+          <div className="field">
+            <label>Kode verifikasi</label>
+            <input
+              value={kode}
+              onChange={(e) => setKode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              placeholder="______"
+              autoFocus
+            />
+          </div>
+          {error && (
+            <p className="p-sub" style={{ color: '#e5484d', marginTop: 10 }}>
+              {error}
+            </p>
+          )}
+          <button className="btn utama" style={{ width: '100%', marginTop: 16 }} type="submit" disabled={loading || kode.length !== 6}>
+            {loading ? 'Memproses…' : 'Verifikasi & masuk'}
+          </button>
+        </form>
+        <button className="linkkecil" style={{ marginTop: 14 }} disabled={loading || tungguKirimUlang > 0} onClick={kirimUlang}>
+          {tungguKirimUlang > 0 ? `Kirim ulang kode (${tungguKirimUlang} detik)` : 'Kirim ulang kode'}
+        </button>
+        <button
+          className="btn kecil"
+          style={{ marginTop: 12, width: '100%' }}
+          disabled={loading}
+          onClick={() => {
+            setError('');
+            setPendaftaran(null);
+          }}
+        >
+          Ganti nomor / ubah data
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -111,7 +212,7 @@ export default function Auth() {
               autoComplete="tel"
             />
             <p className="p-sub" style={{ marginTop: 6, fontSize: 12 }}>
-              Dipakai kalau kamu lupa kata sandi. Pakai nomor yang WhatsApp-nya aktif.
+              Kode verifikasi dikirim ke WhatsApp nomor ini, juga dipakai kalau kamu lupa kata sandi. Pakai nomor yang WhatsApp-nya aktif.
             </p>
           </div>
         )}
@@ -141,7 +242,7 @@ export default function Auth() {
         )}
 
         <button className="btn utama" style={{ width: '100%', marginTop: 16 }} type="submit" disabled={loading}>
-          {loading ? 'Memproses…' : mode === 'login' ? 'Masuk' : 'Daftar & masuk'}
+          {loading ? 'Memproses…' : mode === 'login' ? 'Masuk' : 'Kirim kode verifikasi'}
         </button>
       </form>
 

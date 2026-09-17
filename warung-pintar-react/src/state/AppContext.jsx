@@ -537,8 +537,9 @@ export function AppProvider({ children }) {
     sesi.simpan(token, warung);
     setAuthWarung(warung);
   }, [pastikanCacheMilikWarungIni]);
-  const register = useCallback(async (namaWarung, username, password, noHp) => {
-    const { warung, token } = await api.register(namaWarung, username, password, noHp);
+  // Langkah terakhir daftar akun: kode WhatsApp dicocokin, akun dibuat, langsung masuk (lihat Auth.jsx).
+  const selesaiDaftar = useCallback(async (pendaftaranId, kode) => {
+    const { warung, token } = await api.daftar.verifikasi(pendaftaranId, kode);
     await pastikanCacheMilikWarungIni(warung.id);
     sesi.simpan(token, warung);
     setAuthWarung(warung);
@@ -939,7 +940,7 @@ export function AppProvider({ children }) {
     authWarung,
     authLoading,
     login,
-    register,
+    selesaiDaftar,
     logout,
     gantiPassword,
     gantiNoHp,

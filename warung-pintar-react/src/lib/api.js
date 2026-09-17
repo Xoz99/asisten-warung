@@ -71,7 +71,11 @@ const put = (path, body) => req('PUT', path, body);
 const del = (path) => req('DELETE', path);
 
 export const api = {
-  register: (namaWarung, username, password, noHp) => post('/api/auth/register', { namaWarung, username, password, noHp }),
+  // Daftar akun baru 2 langkah: kirim kode ke WhatsApp -> verifikasi kode (akun baru dibuat di langkah ini).
+  daftar: {
+    kirimKode: (namaWarung, username, password, noHp) => post('/api/auth/register/kirim-kode', { namaWarung, username, password, noHp }),
+    verifikasi: (pendaftaranId, kode) => post('/api/auth/register/verifikasi', { pendaftaranId, kode }),
+  },
   login: (username, password) => post('/api/auth/login', { username, password }),
   gantiPassword: (passwordLama, passwordBaru) => req('PATCH', '/api/auth/password', { passwordLama, passwordBaru }),
   // Nomor HP = jalan pulih satu-satunya kalau password kelupaan. Ganti nomor minta password lagi

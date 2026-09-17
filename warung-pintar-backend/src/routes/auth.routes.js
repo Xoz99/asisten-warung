@@ -5,7 +5,7 @@ import { query } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { loginLimiter, otpLimiter, otpIpLimiter, pinLimiter } from '../middleware/rateLimit.js';
 import { normalisasiNoHp, samarkanNoHp } from '../utils/noHp.js';
-import { kirimOtpWa } from '../services/wa.service.js';
+import { kirimOtpWa, waAktif } from '../services/wa.service.js';
 import { simpanMemori } from '../services/memori.service.js';
 import { ambilProfilUsaha, bersihkanProfil, pastikanKolomProfil } from '../services/profilUsaha.service.js';
 
@@ -29,38 +29,139 @@ function warungPublik(w) {
   };
 }
 
-// daftar akun warung baru (1 akun dipakai bareng di beberapa device — sesuai keputusan produk di PRD)
-router.post('/register', loginLimiter, async (req, res, next) => {
+// ---- Daftar akun warung baru, WAJIB verifikasi nomor WhatsApp (1 akun dipakai bareng di beberapa device) ----
+//
+// Dua langkah: (1) isi form -> kode 6 angka dikirim ke WA lewat gateway (Fonnte), data daftarnya disimpen
+// SEMENTARA di pendaftaran_otp; (2) kode dimasukin -> baru akun warung beneran dibuat. Tujuannya:
+//  - nomor pemulihan (lupa password/PIN) dijamin nomor WA aktif milik yang daftar, bukan salah ketik/ngarang
+//    - dulu nomor ngawur lolos, dan orangnya baru sadar pas butuh reset password (kekunci permanen)
+//  - satu nomor nggak bisa dipakai orang lain buat daftar atas nama nomor itu
+//  - bot nggak bisa bikin akun trial massal tanpa nomor WA beneran
+//
+// Isi form (termasuk password) disimpen di tabel sementara, BUKAN di tabel warung, sampai kodenya cocok -
+// password-nya udah di-hash dari awal, kodenya juga (sama kayak kode_otp lupa password).
+let tabelDaftarSiap = null;
+function pastikanTabelDaftar() {
+  if (!tabelDaftarSiap) {
+    tabelDaftarSiap = (async () => {
+      await query(`CREATE TABLE IF NOT EXISTS pendaftaran_otp (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        nama TEXT NOT NULL,
+        username TEXT NOT NULL,
+        no_hp TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        kode_hash TEXT NOT NULL,
+        kedaluwarsa TIMESTAMPTZ NOT NULL,
+        percobaan INT NOT NULL DEFAULT 0,
+        dipakai BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT now()
+      )`);
+      await query('CREATE INDEX IF NOT EXISTS idx_pendaftaran_otp_hp ON pendaftaran_otp (no_hp, created_at DESC)');
+    })().catch((e) => {
+      tabelDaftarSiap = null;
+      throw e;
+    });
+  }
+  return tabelDaftarSiap;
+}
+
+const POLA_UUID_DAFTAR = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Username & nomor HP belum dipakai warung lain? Balikin pesan error, atau null kalau aman.
+async function cekBelumDipakai(username, hp) {
+  const ada = await query('SELECT id FROM warung WHERE username=$1', [username]);
+  if (ada.rows.length) return 'Username sudah dipakai';
+  const adaHp = await query('SELECT id FROM warung WHERE no_hp=$1', [hp]);
+  if (adaHp.rows.length) return 'Nomor HP ini sudah dipakai warung lain';
+  return null;
+}
+
+router.post('/register/kirim-kode', otpIpLimiter, otpLimiter, async (req, res, next) => {
   try {
     const { namaWarung, username, password, noHp } = req.body;
-    if (!namaWarung || !username || !password || !noHp) {
-      return res.status(400).json({ error: 'namaWarung, username, password, dan noHp wajib diisi' });
+    const nama = typeof namaWarung === 'string' ? namaWarung.trim() : '';
+    const user = typeof username === 'string' ? username.trim() : '';
+    if (!nama || !user || !password || !noHp) {
+      return res.status(400).json({ error: 'Nama warung, username, password, dan nomor HP wajib diisi' });
     }
-    if (password.length < 6) {
-      return res.status(400).json({ error: 'Password minimal 6 karakter' });
-    }
-    // Nomor HP diwajibkan sejak fitur lupa-password ada: tanpa ini, pemilik warung yang lupa
-    // password kekunci PERMANEN dari datanya sendiri (nggak ada admin/CS yang bisa reset manual).
+    if (password.length < 6) return res.status(400).json({ error: 'Password minimal 6 karakter' });
     const hp = normalisasiNoHp(noHp);
-    if (!hp) {
-      return res.status(400).json({ error: 'Nomor HP tidak valid. Contoh: 0812-3456-7890' });
+    if (!hp) return res.status(400).json({ error: 'Nomor HP tidak valid. Contoh: 0812-3456-7890' });
+    const dipakai = await cekBelumDipakai(user, hp);
+    if (dipakai) return res.status(409).json({ error: dipakai });
+
+    await pastikanTabelDaftar();
+    // Batas kirim per NOMOR dihitung dari tabel (sama alasannya kayak buatDanKirimOtp) - tiap kirim itu pesan WA
+    // berbayar ke nomor orang, jangan bisa dipakai nyepam nomor korban.
+    const { rows: hitung } = await query(
+      `SELECT count(*)::int AS n FROM pendaftaran_otp WHERE no_hp=$1 AND created_at > now() - ($2 || ' minutes')::interval`,
+      [hp, String(OTP_JENDELA_MENIT)]
+    );
+    if (hitung[0].n >= OTP_MAKS_KIRIM) {
+      return res.status(429).json({ error: `Sudah terlalu sering minta kode ke nomor ini. Coba lagi ${OTP_JENDELA_MENIT} menit lagi.` });
     }
 
-    const ada = await query('SELECT id FROM warung WHERE username=$1', [username]);
-    if (ada.rows.length) return res.status(409).json({ error: 'Username sudah dipakai' });
-    const adaHp = await query('SELECT id FROM warung WHERE no_hp=$1', [hp]);
-    if (adaHp.rows.length) return res.status(409).json({ error: 'Nomor HP ini sudah dipakai warung lain' });
-
-    const hash = await bcrypt.hash(password, 10);
+    // Kode lama yang masih hidup buat nomor ini dihanguskan - cuma kode terakhir yang berlaku.
+    await query('UPDATE pendaftaran_otp SET dipakai=true WHERE no_hp=$1 AND dipakai=false', [hp]);
+    const kode = String(Math.floor(100000 + Math.random() * 900000));
     const { rows } = await query(
-      'INSERT INTO warung (nama, username, password_hash, no_hp) VALUES ($1,$2,$3,$4) RETURNING *',
-      [namaWarung, username, hash, hp]
+      `INSERT INTO pendaftaran_otp (nama, username, no_hp, password_hash, kode_hash, kedaluwarsa)
+       VALUES ($1,$2,$3,$4,$5, now() + ($6 || ' minutes')::interval) RETURNING id`,
+      [nama, user, hp, await bcrypt.hash(password, 10), await bcrypt.hash(kode, 10), String(OTP_MENIT)]
     );
-    const warung = warungPublik(rows[0]);
+    const terkirim = await kirimOtpWa(hp, kode, 'daftar');
+    // Gateway WA aktif tapi pesannya ditolak (nomor nggak punya WhatsApp, dst): daftar nggak bisa lanjut, karena
+    // kodenya nggak akan pernah nyampe. Kalau gateway belum diisi sama sekali (laptop developer), kodenya ada di
+    // log server (lihat kirimOtpWa) - alurnya tetap bisa dicoba.
+    if (!terkirim && waAktif()) {
+      await query('UPDATE pendaftaran_otp SET dipakai=true WHERE id=$1', [rows[0].id]);
+      return res.status(502).json({ error: 'Kode gagal dikirim ke WhatsApp nomor ini. Pastikan nomornya benar & WhatsApp-nya aktif, lalu coba lagi.' });
+    }
+    res.json({ pendaftaranId: rows[0].id, noHpSamar: samarkanNoHp(hp), berlakuMenit: OTP_MENIT });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post('/register/verifikasi', otpIpLimiter, otpLimiter, async (req, res, next) => {
+  try {
+    const { pendaftaranId, kode } = req.body;
+    if (!POLA_UUID_DAFTAR.test(pendaftaranId || '') || !kode) return res.status(400).json({ error: 'Kode wajib diisi' });
+    await pastikanTabelDaftar();
+    const { rows } = await query('SELECT * FROM pendaftaran_otp WHERE id=$1 AND dipakai=false AND kedaluwarsa > now()', [pendaftaranId]);
+    const p = rows[0];
+    if (!p) return res.status(400).json({ error: 'Kode sudah kedaluwarsa. Minta kode baru.' });
+    if (p.percobaan >= OTP_MAKS_SALAH) {
+      await query('UPDATE pendaftaran_otp SET dipakai=true WHERE id=$1', [p.id]);
+      return res.status(429).json({ error: 'Terlalu banyak percobaan. Minta kode baru.' });
+    }
+    if (!(await bcrypt.compare(String(kode).trim(), p.kode_hash))) {
+      await query('UPDATE pendaftaran_otp SET percobaan=percobaan+1 WHERE id=$1', [p.id]);
+      const sisa = OTP_MAKS_SALAH - (p.percobaan + 1);
+      return res.status(400).json({ error: sisa > 0 ? `Kode salah. Sisa ${sisa} percobaan.` : 'Kode salah. Minta kode baru.' });
+    }
+    // Dicek ulang: selama nunggu kode, username/nomornya bisa keburu dipakai pendaftaran lain.
+    const dipakai = await cekBelumDipakai(p.username, p.no_hp);
+    if (dipakai) {
+      await query('UPDATE pendaftaran_otp SET dipakai=true WHERE id=$1', [p.id]);
+      return res.status(409).json({ error: dipakai });
+    }
+    const { rows: w } = await query(
+      'INSERT INTO warung (nama, username, password_hash, no_hp) VALUES ($1,$2,$3,$4) RETURNING *',
+      [p.nama, p.username, p.password_hash, p.no_hp]
+    );
+    await query('UPDATE pendaftaran_otp SET dipakai=true WHERE id=$1', [p.id]);
+    const warung = warungPublik(w[0]);
     res.status(201).json({ warung, token: buatToken(warung.id) });
   } catch (e) {
     next(e);
   }
+});
+
+// Jalur daftar LAMA (tanpa verifikasi WA) ditutup - kalau dibiarin, verifikasi bisa dilewatin tinggal manggil
+// endpoint ini langsung. Aplikasi versi lama yang masih ke-cache di HP dikasih tau buat buka ulang.
+router.post('/register', (req, res) => {
+  res.status(410).json({ error: 'Pendaftaran sekarang pakai verifikasi WhatsApp. Tutup lalu buka lagi aplikasinya, terus daftar ulang.' });
 });
 
 router.post('/login', loginLimiter, async (req, res, next) => {

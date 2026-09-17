@@ -437,3 +437,19 @@ CREATE TABLE IF NOT EXISTS komunitas_ikuti (
 CREATE INDEX IF NOT EXISTS idx_komunitas_ikuti_diikuti ON komunitas_ikuti (diikuti_id);
 -- notif "mulai mengikuti kamu" nggak nyangkut postingan mana pun
 ALTER TABLE komunitas_notif ALTER COLUMN post_id DROP NOT NULL;
+
+-- Pendaftaran yang nunggu verifikasi kode WhatsApp (lihat /register/kirim-kode & /register/verifikasi di
+-- auth.routes.js). Akun warung baru dibuat SETELAH kodenya cocok. Juga dibikin otomatis di sana kalau belum ada.
+CREATE TABLE IF NOT EXISTS pendaftaran_otp (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nama TEXT NOT NULL,
+  username TEXT NOT NULL,
+  no_hp TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  kode_hash TEXT NOT NULL,
+  kedaluwarsa TIMESTAMPTZ NOT NULL,
+  percobaan INT NOT NULL DEFAULT 0,
+  dipakai BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_pendaftaran_otp_hp ON pendaftaran_otp (no_hp, created_at DESC);

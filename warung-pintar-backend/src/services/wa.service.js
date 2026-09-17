@@ -1,4 +1,4 @@
-// Pengirim pesan WhatsApp buat kode OTP (lupa password & ganti PIN - lihat auth.routes.js).
+// Pengirim pesan WhatsApp buat kode OTP (daftar akun, lupa password & ganti PIN - lihat auth.routes.js).
 //
 // Sengaja dibikin ADAPTER tipis, bukan langsung nempel ke satu vendor: gateway WA lokal
 // (Fonnte, Wablas, dst) API-nya mirip semua - POST form/JSON berisi {target, message} + token.
@@ -74,7 +74,7 @@ export async function kirimWa(noHp, pesan) {
 // sistem), plus peringatan jangan kasih kodenya ke siapa pun - penipuan "halo saya dari admin,
 // sebutkan kodenya" itu modus paling umum buat ngebobol OTP di Indonesia.
 export async function kirimOtpWa(noHp, kode, tujuan) {
-  const untuk = tujuan === 'pin' ? 'mengganti PIN' : 'mengatur ulang kata sandi';
+  const untuk = tujuan === 'pin' ? 'mengganti PIN' : tujuan === 'daftar' ? 'mendaftarkan warung baru' : 'mengatur ulang kata sandi';
   const pesan =
     `*${kode}* adalah kode verifikasi Warung Pintar Anda.\n\n` +
     `Kode ini dipakai untuk ${untuk} dan berlaku 10 menit.\n\n` +
