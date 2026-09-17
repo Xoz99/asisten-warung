@@ -1272,11 +1272,41 @@ function SheetVisual({ onClose }) {
 const MAKS_PERCOBAAN_WAJAH = 10;
 const BATAS_CARI_WAJAH_MS = 20000; // lewat segini (& udah >= 3 percobaan) -> tampilkan 'nggak ketemu'
 
+const KUNCI_KAMERA_WAJAH = 'warungpintar_kamera_wajah';
+
 function SheetWajah({ onClose, onTambahBaru }) {
   const { S, setPelangganTerpilih, toast, dispatch, openLunas, refreshData } = useApp();
   const [state, setState] = useState('memuat'); // memuat | menyiapkan | mencari | hasil | tidak-ketemu | error
   const [match, setMatch] = useState(null); // { pelanggan, totalUtang, jarak, templateBelanjaan, descriptor }
   const [wajahKedeteksi, setWajahKedeteksi] = useState(null); // null = belum dicoba, true/false = frame terakhir
+  // Kamera depan (pembeli ngadep HP) atau belakang (HP diarahin ke pembeli, kamera belakang biasanya lebih tajam).
+  // Pilihan terakhir diingat di HP ini.
+  const [arahKamera, setArahKamera] = useState(() => {
+    try {
+      return localStorage.getItem(KUNCI_KAMERA_WAJAH) === 'environment' ? 'environment' : 'user';
+    } catch {
+      return 'user';
+    }
+  });
+  const [bisaGantiKamera, setBisaGantiKamera] = useState(true); // disembunyiin kalau perangkat cuma punya 1 kamera
+  const namaKamera = arahKamera === 'user' ? 'depan' : 'belakang';
+
+  useEffect(() => {
+    navigator.mediaDevices
+      ?.enumerateDevices?.()
+      .then((d) => setBisaGantiKamera(d.filter((x) => x.kind === 'videoinput').length !== 1))
+      .catch(() => {});
+  }, []);
+
+  const gantiKamera = () => {
+    const baru = arahKamera === 'user' ? 'environment' : 'user';
+    setArahKamera(baru);
+    try {
+      localStorage.setItem(KUNCI_KAMERA_WAJAH, baru);
+    } catch {
+      /* mode privat - cuma nggak keinget */
+    }
+  };
   const [bayarSebagian, setBayarSebagian] = useState(false);
   const [jumlahCustom, setJumlahCustom] = useState('');
   const [percobaanWajah, setPercobaanWajah] = useState(0); // ditampilkan biar kelihatan masih jalan, bukan nyangkut
@@ -1374,11 +1404,13 @@ function SheetWajah({ onClose, onTambahBaru }) {
     (async () => {
       try {
         setState('memuat');
+        setWajahKedeteksi(null);
+        setPercobaanWajah(0);
         // Model dipanasin BARENGAN sama proses buka kamera, bukan setelahnya - dua-duanya makan
         // waktu & nggak saling nunggu, jadi jalanin paralel. Nggak di-await di sini; kalau belum
         // kelar pas cobaKenali jalan, dia bakal nunggu sendiri lewat muatModelWajah() di dalam.
         panaskanModelWajah();
-        const stream = await bukaKamera('user'); // kamera depan
+        const stream = await bukaKamera(arahKamera); // ganti kamera = efek ini jalan ulang (lihat deps di bawah)
         if (batal) {
           tutupKamera(stream);
           return;
@@ -1399,7 +1431,7 @@ function SheetWajah({ onClose, onTambahBaru }) {
         mulaiCari = Date.now();
         timer = setTimeout(cobaKenali, 600);
       } catch (e) {
-        toast(e.message ? escapeHtml(e.message) : 'Gagal membuka kamera depan');
+        toast(e.message ? escapeHtml(e.message) : `Gagal membuka kamera ${arahKamera === 'user' ? 'depan' : 'belakang'}`);
         setState('error');
       }
     })();
@@ -1410,7 +1442,7 @@ function SheetWajah({ onClose, onTambahBaru }) {
       tutupKamera(streamRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [arahKamera]);
 
   return (
     <div className="sheet tengah show">
@@ -1418,7 +1450,22 @@ function SheetWajah({ onClose, onTambahBaru }) {
         <div className={'viewfinder' + (state === 'hasil' || state === 'tidak-ketemu' || state === 'error' ? ' diam' : '')}>
           <div className="frame" />
           {state !== 'error' && (
-            <video ref={videoRef} muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            // Kamera depan ditampilin kayak cermin (biar nggak bingung pas geser), deteksinya tetap pakai gambar asli.
+            <video
+              ref={videoRef}
+              muted
+              playsInline
+              style={{ width: '100%', height: '100%', objectFit: 'cover', transform: arahKamera === 'user' ? 'scaleX(-1)' : undefined }}
+            />
+          )}
+          {bisaGantiKamera && state !== 'hasil' && (
+            <button type="button" className="kamera-ganti" onClick={gantiKamera} aria-label={`Ganti ke kamera ${arahKamera === 'user' ? 'belakang' : 'depan'}`}>
+              <svg viewBox="0 0 24 24">
+                <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1-1.6A1.5 1.5 0 0 1 9.8 4.6h4.4a1.5 1.5 0 0 1 1.3.8L16.5 7h2A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5Z" />
+                <path d="M9 12.2a3 3 0 0 1 5.2-1.9M15 13.8a3 3 0 0 1-5.2 1.9" />
+                <path d="M14.4 9v1.5h-1.5M9.6 17v-1.5h1.5" />
+              </svg>
+            </button>
           )}
         </div>
 
@@ -1437,7 +1484,9 @@ function SheetWajah({ onClose, onTambahBaru }) {
               {/* Bedain "wajahnya belum kelihatan" (arahin ulang kameranya) sama "wajahnya udah kelihatan, lagi dicocokin"
                   (tunggu sebentar) - dulu dua-duanya sama-sama "Arahkan kamera", jadi nggak jelas harus ngapain. */}
               {state !== 'mencari' || wajahKedeteksi === null
-                ? 'Arahkan kamera depan ke pembeli'
+                ? arahKamera === 'user'
+                  ? 'Arahkan kamera depan ke pembeli'
+                  : 'Arahkan kamera belakang ke wajah pembeli'
                 : wajahKedeteksi
                   ? 'Wajah kedeteksi, lagi dicocokkan…'
                   : 'Wajah belum kelihatan jelas - hadap ke kamera, agak dekat, jangan ketutup'}
@@ -1447,7 +1496,7 @@ function SheetWajah({ onClose, onTambahBaru }) {
         )}
         {state === 'error' && (
           <>
-            <h3>Kamera depan nggak bisa dibuka</h3>
+            <h3>Kamera {namaKamera} nggak bisa dibuka</h3>
             <p>Coba lagi, atau pilih manual lewat daftar pelanggan.</p>
           </>
         )}
