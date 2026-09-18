@@ -387,7 +387,7 @@ export default function Catat() {
         {produkSeringPagi.map((p) => (
           <button key={p.id} className={'chip' + (flashId === p.id ? ' flash' : '')} onClick={() => chipTap(p.id)}>
             <ProductIcon id={p.id} foto={p.foto} />
-            {p.nama.split(' ')[0]}
+            <span className="chip-nama">{p.nama}</span>
           </button>
         ))}
       </div>

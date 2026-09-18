@@ -91,6 +91,9 @@ img.picon.produk-ikon{display:block;object-fit:cover}
 .hero-card .big{margin:10px 0 0;font-size:var(--big);line-height:.95}
 .hero-card .delta{margin-top:18px;display:inline-block;background:#0A0A0A;color:var(--aksen);padding:11px 16px;border-radius:999px;font-size:14.5px;font-weight:700}
 .hero-card .blob{position:absolute;right:-34px;top:-34px;width:140px;height:140px;border-radius:50%;background:rgba(10,10,10,.07)}
+.hero-head{display:flex;justify-content:space-between;align-items:center;gap:8px;position:relative;z-index:2}
+.hero-inner{position:relative;z-index:2;will-change:transform}
+.hero-swipe-hint{margin-top:12px;font-size:12px;font-weight:600;opacity:0.65;display:flex;align-items:center;justify-content:flex-end;gap:4px;user-select:none}
 .pop{animation:pop .45s cubic-bezier(.2,1.5,.4,1)}
 @keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.05)}100%{transform:scale(1)}}
 
@@ -138,7 +141,7 @@ img.picon.produk-ikon{display:block;object-fit:cover}
 .btn:active{transform:scale(.97)}
 .btn[disabled]{opacity:.32;pointer-events:none}
 .btn.kecil{padding:14px 18px;font-size:var(--small);min-height:48px;border-radius:999px}
-.actions{display:flex;gap:12px;margin-top:22px}
+.actions{display:flex;gap:12px;margin-top:22px;margin-bottom:calc(84px + env(safe-area-inset-bottom))}
 .actions .btn{flex:1}.actions .btn.utama{flex:1.7}
 .linkkecil{display:block;width:100%;margin:26px 0 0;background:none;border:0;color:var(--abu);font:inherit;
   font-size:14px;font-weight:600;text-decoration:underline;cursor:pointer;padding:12px}
@@ -174,9 +177,10 @@ img.picon.produk-ikon{display:block;object-fit:cover}
 .kotak-btn small{display:block;font-size:10.5px;font-weight:700;margin-top:3px;color:var(--abu)}
 
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}
-.chip{background:var(--surface);border:var(--tepi);border-radius:var(--r);padding:16px 6px;text-align:center;font-size:var(--small);font-weight:700;
-  cursor:pointer;transition:transform .12s,background .15s;font-family:inherit;color:var(--ink);width:100%;min-height:88px}
-.chip .emo{display:block;margin:0 auto 8px;font-size:26px}
+.chip{background:var(--surface);border:var(--tepi);border-radius:var(--r);padding:14px 8px;text-align:center;font-size:var(--small);font-weight:700;
+  cursor:pointer;transition:transform .12s,background .15s;font-family:inherit;color:var(--ink);width:100%;min-height:92px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.chip .emo{display:block;margin:0 auto 6px;font-size:26px}
+.chip-nama{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.25;word-break:break-word}
 .chip:active{transform:scale(.94)}
 .chip.flash{background:var(--aksen);color:#0A0A0A}
 .kosong{padding:24px 0;text-align:center;color:var(--abu);font-size:16px;font-weight:600;line-height:1.5}

@@ -120,6 +120,7 @@ function pakaiFotoGrup(produk) {
 function normKasbon(r) {
   return {
     id: r.id,
+    transaksiId: r.transaksi_id || null,
     pelangganId: r.pelanggan_id,
     ini: inisial(r.nama),
     nama: r.nama,
@@ -160,6 +161,7 @@ function normRiwayat(r) {
 }
 function normTransaksi(r) {
   return {
+    id: r.id,
     waktu: r.waktu,
     total: Number(r.total),
     laba: Number(r.laba),
@@ -183,28 +185,33 @@ function normLog(r) {
 // duplikasi.
 function bangunState({ produkRows, kasbonRows, pelangganRows, riwayatRows, penjagaR, masukRows, modalRows, trxRows, larisRows, ngendapRows }) {
   const transaksi = trxRows.map(normTransaksi);
+  const kasbon = kasbonRows.map(normKasbon);
+  const masukLog = masukRows.map(normLog);
   const hariIni = new Date().toDateString();
   const trxHariIni = transaksi.filter((t) => new Date(t.waktu).toDateString() === hariIni);
   const terjual = Object.fromEntries(larisRows.map((r) => [r.produk_id, Number(r.total_qty)]));
+
+  const omzetDirect = trxHariIni.filter((t) => t.mode !== 'kasbon').reduce((a, t) => a + t.total, 0);
+  const kasbonMasukHariIni = masukLog
+    .filter((m) => new Date(m.waktu).toDateString() === hariIni && /kasbon/i.test(m.ket || ''))
+    .reduce((a, m) => a + m.jml, 0);
 
   return {
     penjagaAktif: penjagaR.find((p) => p.aktif)?.nama || null,
     penjagaList: penjagaR.map((p) => p.nama),
     produk: pakaiFotoGrup(produkRows.map(normProduk)),
-    kasbon: kasbonRows.map(normKasbon),
+    kasbon,
     pelanggan: pelangganRows.map(normPelanggan),
     transaksi,
     riwayatJaga: riwayatRows.map(normRiwayat),
-    masukLog: masukRows.map(normLog),
+    masukLog,
     modalLog: modalRows.map(normLog),
     ngendap: ngendapRows.map((r) => ({ id: r.id, nama: r.nama, stok: r.stok, terakhirLaku: r.terakhir_laku })),
     terjual,
     untung: trxHariIni.reduce((a, t) => a + t.laba, 0),
-    // Omzet hari ini - duit yang MASUK, beda dari `untung` (laba). Dipakai buat progress target
-    // setoran di layar Catat jualan: yang dibandingin sama target itu isi laci, bukan labanya.
-    // Transaksi kasbon TIDAK dihitung: barangnya keluar tapi duitnya belum masuk, jadi kalau ikut
-    // dijumlah, target kelihatan kekejar padahal lacinya masih kosong.
-    omzetHariIni: trxHariIni.filter((t) => t.mode !== 'kasbon').reduce((a, t) => a + t.total, 0),
+    // Omzet hari ini - duit yang MASUK (termasuk pelunasan kasbon hari ini). Dipakai buat progress
+    // target setoran di layar Catat jualan: yang dibandingin sama target itu isi laci, bukan labanya.
+    omzetHariIni: omzetDirect + kasbonMasukHariIni,
     trx: trxHariIni.length,
   };
 }

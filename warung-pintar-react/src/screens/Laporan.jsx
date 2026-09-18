@@ -105,64 +105,48 @@ export default function Laporan() {
   // layar dulu (masih arah yang sama), abis itu (220ms) baru kontennya diganti + "diteleport" ke
   // sisi seberang TANPA transisi, lalu 2 frame kemudian dianimasiin masuk ke tengah - biar keliatan
   // 1 gerakan geser yang nyambung (keluar dari 1 sisi, masuk dari sisi lain), bukan lompat diem-diem.
-  const LEBAR_GESER = 260; // px - seberapa jauh kontennya "keluar layar" pas transisi (approx, kartu-nya sendiri nggak selebar ini di HP kecil, cukup buat kesan "kabur")
+  const isDraggingRef = useRef(false);
+
   const sentuhMulai = (e) => {
-    touchXRef.current = e.touches[0].clientX;
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    touchXRef.current = x;
+    isDraggingRef.current = true;
     setTransisi(false);
   };
+
   const sentuhGerak = (e) => {
-    if (touchXRef.current === null) return;
-    setDragX(e.touches[0].clientX - touchXRef.current);
+    if (!isDraggingRef.current || touchXRef.current === null) return;
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    setDragX(x - touchXRef.current);
   };
+
   const sentuhSelesai = (e) => {
-    if (touchXRef.current === null) return;
-    const delta = e.changedTouches[0].clientX - touchXRef.current;
+    if (!isDraggingRef.current || touchXRef.current === null) return;
+    const x = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+    const delta = x - touchXRef.current;
     touchXRef.current = null;
+    isDraggingRef.current = false;
     setTransisi(true);
-    if (Math.abs(delta) <= 40) {
-      setDragX(0); // batal - pegas balik ke tengah
-      return;
-    }
-    const kanan = delta < 0; // geser ke kiri (delta negatif) = MAJU ke tampilan berikutnya
-    setDragX(kanan ? -LEBAR_GESER : LEBAR_GESER); // nerusin keluar layar ke arah geser
-    setTimeout(() => {
-      // Arah geser IKUT nentuin tampilan mana yang dituju - dulu selalu maju (+1) apa pun arahnya.
-      // Waktu tampilannya masih 2, maju & mundur kebetulan sama jadi nggak kerasa. Begitu jadi 3,
-      // geser ke kanan tetep maju: kartunya keluar ke kanan lalu konten barunya masuk dari kanan
-      // juga - gerakannya jadi patah, nggak nyambung sama jari.
+
+    if (delta < -25) {
       setHeroView((v) => {
         const i = URUT_HERO.indexOf(v);
-        const langkah = kanan ? 1 : -1;
-        return URUT_HERO[(i + langkah + URUT_HERO.length) % URUT_HERO.length];
+        return URUT_HERO[(i + 1) % URUT_HERO.length];
       });
-      setTransisi(false);
-      setDragX(kanan ? LEBAR_GESER : -LEBAR_GESER); // "teleport" ke sisi seberang, konten baru masuk dari situ
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setTransisi(true);
-          setDragX(0); // animasiin masuk ke tengah
-        });
+    } else if (delta > 25) {
+      setHeroView((v) => {
+        const i = URUT_HERO.indexOf(v);
+        return URUT_HERO[(i - 1 + URUT_HERO.length) % URUT_HERO.length];
       });
-    }, 220);
+    }
+    setDragX(0);
   };
-  // Sama animasinya kayak sentuhSelesai (keluar-teleport-masuk), buat dot indikator - tap dot BEDA
-  // dari yang lagi aktif jalanin transisi yang sama, tap dot yang UDAH aktif nggak ngapa-ngapain.
+
   const pindahLewatDot = (v) => {
     if (v === heroView) return;
-    const kanan = URUT_HERO.indexOf(v) > URUT_HERO.indexOf(heroView);
     setTransisi(true);
-    setDragX(kanan ? -LEBAR_GESER : LEBAR_GESER);
-    setTimeout(() => {
-      setHeroView(v);
-      setTransisi(false);
-      setDragX(kanan ? LEBAR_GESER : -LEBAR_GESER);
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setTransisi(true);
-          setDragX(0);
-        });
-      });
-    }, 220);
+    setHeroView(v);
+    setDragX(0);
   };
 
   const labelMinggu = (r) => `Untung ${tglID(r.awal)} – ${tglID(r.akhir)}`;
@@ -305,11 +289,28 @@ export default function Laporan() {
           pas nggak ada touch event). */}
       {/* .hero-card CSS udah punya overflow:hidden bawaan - konten yang digeser ±LEBAR_GESER pas
           transisi kepotong rapi di tepi kartu, nggak numpuk ke konten lain di bawahnya. */}
-      <div className="hero-card" onTouchStart={sentuhMulai} onTouchMove={sentuhGerak} onTouchEnd={sentuhSelesai}>
+      <div
+        className="hero-card"
+        style={{ touchAction: 'pan-y', cursor: 'grab', userSelect: 'none' }}
+        onTouchStart={sentuhMulai}
+        onTouchMove={sentuhGerak}
+        onTouchEnd={sentuhSelesai}
+        onMouseDown={sentuhMulai}
+        onMouseMove={sentuhGerak}
+        onMouseUp={sentuhSelesai}
+        onMouseLeave={() => {
+          if (isDraggingRef.current) {
+            isDraggingRef.current = false;
+            setTransisi(true);
+            setDragX(0);
+          }
+        }}
+      >
         <div
           style={{
             transform: `translateX(${dragX}px)`,
-            transition: transisi ? 'transform .22s cubic-bezier(.2,.9,.3,1)' : 'none',
+            transition: transisi ? 'transform 0.28s cubic-bezier(0.18, 0.89, 0.32, 1.28)' : 'none',
+            willChange: 'transform',
           }}
         >
         {/* key={heroView} MEMAKSA React bikin ulang isinya tiap ganti tampilan, bukan dipakai ulang.

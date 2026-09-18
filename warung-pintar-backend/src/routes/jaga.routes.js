@@ -51,6 +51,13 @@ async function ringkasanGiliran(warungId) {
   const nonTunai = trxGiliran.filter((t) => t.mode === 'bayar' && (t.metode || 'Tunai') !== 'Tunai');
   const jumlah = (rows) => rows.reduce((a, t) => a + Number(t.total), 0);
 
+  const { rows: masukKasbon } = await query(
+    `SELECT COALESCE(SUM(jumlah), 0) AS total FROM masuk_log
+     WHERE warung_id=$1 AND waktu >= $2 AND (COALESCE(metode, 'Tunai') = 'Tunai') AND (keterangan LIKE 'Pelunasan kasbon%' OR keterangan LIKE 'Bayar kasbon%')`,
+    [warungId, mulai.toISOString()]
+  );
+  const totalKasbonTunai = Number(masukKasbon[0]?.total || 0);
+
   const { rows: stokHabis } = await query(
     `SELECT nama, stok FROM produk
      WHERE warung_id=$1 AND aktif AND stok <= GREATEST(1, FLOOR(laku_per_hari * 0.2))
@@ -66,7 +73,7 @@ async function ringkasanGiliran(warungId) {
     mulai: mulai.toISOString(),
     // Dipakai layar buat milih kalimat yang bener: "sejak serah terima tadi" vs "hari ini".
     lanjutanGiliran,
-    penjualanTunai: jumlah(tunai),
+    penjualanTunai: jumlah(tunai) + totalKasbonTunai,
     penjualanNonTunai: jumlah(nonTunai),
     totalTransaksi: trxGiliran.length,
     labaGiliran: trxGiliran.reduce((a, t) => a + Number(t.laba || 0), 0),

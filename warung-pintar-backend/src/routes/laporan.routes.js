@@ -17,8 +17,16 @@ router.get('/ringkasan', async (req, res, next) => {
     awal.setDate(awal.getDate() - n);
 
     const { rows: deret } = await query(
-      `SELECT date_trunc('day', waktu) AS hari, COALESCE(SUM(laba),0) AS untung, COALESCE(SUM(total),0) AS omzet
-       FROM transaksi WHERE warung_id=$1 AND waktu >= $2 AND waktu < $3
+      `SELECT hari, COALESCE(SUM(untung),0) AS untung, COALESCE(SUM(omzet),0) AS omzet
+       FROM (
+         SELECT date_trunc('day', waktu) AS hari, SUM(laba) AS untung, SUM(CASE WHEN mode='bayar' THEN total ELSE 0 END) AS omzet
+         FROM transaksi WHERE warung_id=$1 AND waktu >= $2 AND waktu < $3
+         GROUP BY hari
+         UNION ALL
+         SELECT date_trunc('day', waktu) AS hari, 0 AS untung, SUM(jumlah) AS omzet
+         FROM masuk_log WHERE warung_id=$1 AND waktu >= $2 AND waktu < $3 AND (keterangan LIKE 'Pelunasan kasbon%' OR keterangan LIKE 'Bayar kasbon%')
+         GROUP BY hari
+       ) sub
        GROUP BY hari ORDER BY hari`,
       [req.warungId, awal.toISOString(), akhir.toISOString()]
     );

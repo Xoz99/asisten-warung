@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { ProductIcon, Ikon } from '../lib/icons.jsx';
 import { kritisQ } from '../lib/voice';
@@ -18,6 +18,60 @@ export default function Beranda() {
       return false;
     }
   });
+  const [heroMode, setHeroMode] = useState(() => {
+    try {
+      return localStorage.getItem('warungpintar_hero_mode') || 'untung';
+    } catch {
+      return 'untung';
+    }
+  });
+
+  const gantiHeroMode = (m) => {
+    setHeroMode(m);
+    try {
+      localStorage.setItem('warungpintar_hero_mode', m);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const [dragX, setDragX] = useState(0);
+  const [transisi, setTransisi] = useState(false);
+  const touchXRef = useRef(null);
+  const isDraggingRef = useRef(false);
+
+  const sentuhMulai = (e) => {
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    touchXRef.current = x;
+    isDraggingRef.current = true;
+    setTransisi(false);
+  };
+
+  const sentuhGerak = (e) => {
+    if (!isDraggingRef.current || touchXRef.current === null) return;
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    const diff = x - touchXRef.current;
+    setDragX(diff);
+  };
+
+  const sentuhSelesai = (e) => {
+    if (!isDraggingRef.current || touchXRef.current === null) return;
+    const x = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+    const delta = x - touchXRef.current;
+    touchXRef.current = null;
+    isDraggingRef.current = false;
+    setTransisi(true);
+
+    if (delta > 20) {
+      // Geser ke KANAN -> Penjualan hari ini (Omzet)
+      gantiHeroMode('omzet');
+    } else if (delta < -20) {
+      // Geser ke KIRI -> Untung hari ini
+      gantiHeroMode('untung');
+    }
+    setDragX(0);
+  };
+
   const [serahOpen, setSerahOpen] = useState(false);
   const [daftarOpen, setDaftarOpen] = useState(null); // null | 'jual' | 'kasbon'
   const [strukLihat, setStrukLihat] = useState(null);
@@ -55,11 +109,7 @@ export default function Beranda() {
     [S.produk]
   );
 
-  // Perbandingan untung hari ini vs kemarin buat badge "Naik/Turun Rp X dari kemarin" di hero
-  // card - class CSS-nya (.delta) udah lama ada disiapin tapi belum pernah kepasang di JSX mana
-  // pun. Dihitung dari S.transaksi (list 150 transaksi terakhir yang udah kemuat) - kalau kemarin
-  // beneran nggak ada transaksi sama sekali (bukan cuma untungnya 0), badge-nya disembunyikan aja
-  // biar nggak nyesatin (misal warung baru buka / belum ada histori) daripada nampilin "Turun Rp 0".
+  // Perbandingan untung & omzet hari ini vs kemarin buat badge "Naik/Turun Rp X dari kemarin"
   const bandingKemarin = useMemo(() => {
     const kemarin = new Date();
     kemarin.setDate(kemarin.getDate() - 1);
@@ -67,8 +117,12 @@ export default function Beranda() {
     const trxKemarin = S.transaksi.filter((t) => new Date(t.waktu).toDateString() === kemarinStr);
     if (!trxKemarin.length) return null;
     const untungKemarin = trxKemarin.reduce((a, t) => a + t.laba, 0);
-    return { selisih: S.untung - untungKemarin };
-  }, [S.transaksi, S.untung]);
+    const omzetKemarin = trxKemarin.filter((t) => t.mode !== 'kasbon').reduce((a, t) => a + t.total, 0);
+    return {
+      selisihUntung: S.untung - untungKemarin,
+      selisihOmzet: S.omzetHariIni - omzetKemarin,
+    };
+  }, [S.transaksi, S.untung, S.omzetHariIni]);
   // "Riwayat penjualan" (drill-down tile Penjualan) niatnya cuma nampilin transaksi HARI INI (sub
   // judulnya bilang "N× hari ini") - dulu isinya malah dari S.transaksi mentah (150 transaksi
   // TERAKHIR apapun tanggalnya, termasuk hari-hari sebelumnya), jadi kelist/total-nya nggak
@@ -172,19 +226,49 @@ export default function Beranda() {
         </div>
       </div>
 
-      <div className="hero-card">
+      <div
+        className="hero-card"
+        style={{ touchAction: 'pan-y', cursor: 'grab', userSelect: 'none' }}
+        onTouchStart={sentuhMulai}
+        onTouchMove={sentuhGerak}
+        onTouchEnd={sentuhSelesai}
+        onMouseDown={sentuhMulai}
+        onMouseMove={sentuhGerak}
+        onMouseUp={sentuhSelesai}
+        onMouseLeave={() => {
+          if (isDraggingRef.current) {
+            isDraggingRef.current = false;
+            setTransisi(true);
+            setDragX(0);
+          }
+        }}
+      >
         <div className="blob" />
-        <p className="lbl">Untung hari ini</p>
-        <p className="big p-num">{rupiah(S.untung)}</p>
-        {bandingKemarin && (
-          <span className="delta">
-            {bandingKemarin.selisih > 0
-              ? `Naik ${rupiah(bandingKemarin.selisih)} dari kemarin`
-              : bandingKemarin.selisih < 0
-                ? `Turun ${rupiah(-bandingKemarin.selisih)} dari kemarin`
-                : 'Sama kayak kemarin'}
-          </span>
-        )}
+        <div
+          className="hero-inner"
+          style={{
+            transform: `translateX(${dragX}px)`,
+            transition: transisi ? 'transform 0.28s cubic-bezier(0.18, 0.89, 0.32, 1.28)' : 'none',
+          }}
+        >
+          <div className="hero-head">
+            <p className="lbl">{heroMode === 'untung' ? 'Untung hari ini' : 'Penjualan hari ini (Omzet)'}</p>
+          </div>
+          <p className="big p-num">{rupiah(heroMode === 'untung' ? S.untung : S.omzetHariIni)}</p>
+          {bandingKemarin && (
+            <span className="delta">
+              {(() => {
+                const selisih = heroMode === 'untung' ? bandingKemarin.selisihUntung : bandingKemarin.selisihOmzet;
+                if (selisih > 0) return `Naik ${rupiah(selisih)} dari kemarin`;
+                if (selisih < 0) return `Turun ${rupiah(-selisih)} dari kemarin`;
+                return 'Sama kayak kemarin';
+              })()}
+            </span>
+          )}
+          <div className="hero-swipe-hint">
+            {heroMode === 'untung' ? 'geser ke kanan untuk Penjualan ›' : '‹ geser ke kiri untuk Untung'}
+          </div>
+        </div>
       </div>
 
       <div className="bento">
@@ -303,15 +387,20 @@ export default function Beranda() {
           judul="Riwayat penjualan"
           sub={`${trxHariIni.length}× hari ini · total ${rupiah(trxHariIni.reduce((a, t) => a + t.total, 0))} · tap untuk lihat struk`}
           kosong="Belum ada penjualan hari ini"
-          rows={trxHariIni.map((t) => ({
-            nama: t.items.length ? t.items.join(', ') : 'Penjualan',
-            sub: `${tglID(t.waktu)} · ${jamID(t.waktu)} · ${t.oleh || '-'}${t.mode === 'kasbon' ? ' · kasbon ' + (t.pembeli || '') : ''}`,
-            kanan: <span className="p-num">{rupiah(t.total)}</span>,
-            onClick: () => {
-              setDaftarOpen(null);
-              setStrukLihat({ ...t, metode: t.metode || (t.mode === 'kasbon' ? 'Kasbon' : 'Tunai') });
-            },
-          }))}
+          rows={trxHariIni.map((t) => {
+            const kRelated = t.mode === 'kasbon' ? S.kasbon.find((k) => k.transaksiId === t.id || k.nama === t.pembeli) : null;
+            const isLunas = kRelated ? kRelated.lunas : false;
+            const kasbonLabel = t.mode === 'kasbon' ? ` · kasbon ${t.pembeli || ''}${isLunas ? ' (lunas ✓)' : ''}` : '';
+            return {
+              nama: t.items.length ? t.items.join(', ') : 'Penjualan',
+              sub: `${tglID(t.waktu)} · ${jamID(t.waktu)} · ${t.oleh || '-'}${kasbonLabel}`,
+              kanan: <span className="p-num">{rupiah(t.total)}</span>,
+              onClick: () => {
+                setDaftarOpen(null);
+                setStrukLihat({ ...t, metode: t.metode || (t.mode === 'kasbon' ? 'Kasbon' : 'Tunai') });
+              },
+            };
+          })}
           onClose={() => setDaftarOpen(null)}
         />
       )}

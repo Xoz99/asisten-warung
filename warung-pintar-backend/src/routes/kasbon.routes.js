@@ -3,6 +3,34 @@ import { query } from '../db.js';
 
 const router = Router();
 
+async function updateLabaTransaksi(transaksiId) {
+  if (!transaksiId) return;
+  const { rows } = await query(
+    `SELECT COALESCE(SUM((harga_satuan - modal_satuan) * qty), 0) AS total_laba,
+            COALESCE(SUM(harga_satuan * qty), 0) AS total_harga
+     FROM transaksi_item WHERE transaksi_id=$1`,
+    [transaksiId]
+  );
+  if (!rows.length) return;
+  const labaFull = Number(rows[0].total_laba);
+  const hargaFull = Number(rows[0].total_harga);
+
+  const { rows: kRows } = await query('SELECT jumlah, lunas FROM kasbon WHERE transaksi_id=$1', [transaksiId]);
+  if (!kRows.length) return;
+  const k = kRows[0];
+
+  let labaTerealisasi = 0;
+  if (k.lunas) {
+    labaTerealisasi = labaFull;
+  } else if (hargaFull > 0) {
+    const sisaUtang = Number(k.jumlah);
+    const sudahDibayar = Math.max(0, hargaFull - sisaUtang);
+    labaTerealisasi = Math.round((sudahDibayar / hargaFull) * labaFull);
+  }
+
+  await query('UPDATE transaksi SET laba=$1 WHERE id=$2', [labaTerealisasi, transaksiId]);
+}
+
 router.get('/', async (req, res, next) => {
   try {
     const { status } = req.query; // 'lunas' | 'belum'
@@ -26,6 +54,9 @@ router.post('/:id/lunasi', async (req, res, next) => {
     );
     if (!rows.length) return res.status(404).json({ error: 'Kasbon tidak ditemukan' });
     const k = rows[0];
+    if (k.transaksi_id) {
+      await updateLabaTransaksi(k.transaksi_id);
+    }
     await query('INSERT INTO masuk_log (warung_id, keterangan, jumlah, metode) VALUES ($1,$2,$3,$4)', [
       req.warungId,
       `Pelunasan kasbon ${k.nama}`,
@@ -67,6 +98,9 @@ router.post('/:id/bayar', async (req, res, next) => {
        WHERE id=$4 RETURNING *`,
       [jumlahBaru, lunasBaru, metode, k.id]
     );
+    if (k.transaksi_id) {
+      await updateLabaTransaksi(k.transaksi_id);
+    }
     await query('INSERT INTO masuk_log (warung_id, keterangan, jumlah, metode) VALUES ($1,$2,$3,$4)', [
       req.warungId,
       `Bayar kasbon ${k.nama}`,
@@ -110,6 +144,9 @@ router.post('/pelanggan/:pelangganId/bayar', async (req, res, next) => {
          WHERE id=$4`,
         [jumlahBaru, lunasBaru, metode, k.id]
       );
+      if (k.transaksi_id) {
+        await updateLabaTransaksi(k.transaksi_id);
+      }
       rincian.push({ id: k.id, dibayar: ambil, sisa: jumlahBaru, lunas: lunasBaru });
     }
 
@@ -131,3 +168,4 @@ router.post('/pelanggan/:pelangganId/bayar', async (req, res, next) => {
 });
 
 export default router;
+
