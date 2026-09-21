@@ -550,7 +550,8 @@ async function ambilPinHash(warungId) {
 // Udah punya PIN belum? (buat nentuin layar "Masukkan PIN" atau "Bikin PIN")
 router.get('/pin', requireAuth, async (req, res, next) => {
   try {
-    res.json({ dibuat: Boolean(await ambilPinHash(req.warungId)) });
+    // demo: akun demo nggak pakai PIN sama sekali (lihat akunDemo.service.js) - aplikasi langsung buka tanpa minta PIN.
+    res.json({ dibuat: Boolean(await ambilPinHash(req.warungId)), demo: await akunDemo(req.warungId) });
   } catch (e) {
     next(e);
   }

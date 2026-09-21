@@ -68,7 +68,7 @@ function BarisProduk({ p, onTap }) {
 }
 
 export default function Stok() {
-  const { S } = useApp();
+  const { S, authWarung, lisensi } = useApp();
   const [filter, setFilter] = useState('all');
   const [cari, setCari] = useState('');
   const [barcodeMode, setBarcodeMode] = useState(null); // null | 'barcode' | 'foto'
@@ -76,7 +76,9 @@ export default function Stok() {
   const [pinCallback, setPinCallback] = useState(null);
   const [tambahVarianGrup, setTambahVarianGrup] = useState(null); // {nama, contoh} - kartu grup mana yang lagi nambah varian baru
 
-  const mintaPin = (cb) => setPinCallback(() => cb);
+  // Akun demo (buat presentasi sales) nggak pakai PIN - PIN-nya emang nggak bisa dibikin/diganti di akun demo,
+  // jadi kalau tetap diminta, sales mentok di "Bikin PIN pemilik". lisensi.demo ikut dicek buat sesi login lama.
+  const mintaPin = (cb) => (authWarung?.demo || lisensi?.demo ? cb() : setPinCallback(() => cb));
 
   let list = S.produk.slice().sort((a, b) => a.stok / a.laku - b.stok / b.laku);
   if (filter === 'kritis') list = list.filter(kritisQ);
@@ -1783,7 +1785,12 @@ function SheetPin({ onClose, onSukses }) {
     let batal = false;
     (async () => {
       try {
-        let { dibuat } = await api.pin.status();
+        let { dibuat, demo } = await api.pin.status();
+        // Jaga-jaga (HP yang belum tau akunnya demo): akun demo nggak pakai PIN, langsung kebuka.
+        if (demo) {
+          if (!batal) onSukses();
+          return;
+        }
         // Pindahan dari versi lama: HP ini punya PIN lokal & akunnya belum punya PIN di server -> PIN lokal itu
         // yang jadi PIN akun (pemilik nggak perlu bikin ulang). Kalau HP lain udah duluan (409), pakai punya server.
         if (!dibuat && S.pinDibuat && S.pin && !PIN_GAMPANG.has(S.pin)) {
