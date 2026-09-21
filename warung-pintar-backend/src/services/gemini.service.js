@@ -161,6 +161,15 @@ tebak (lihat aturan tiap tipe di bawah).
   "lengkap-lengkapin", itu bisa keubah nggak sengaja pas dieksekusi).
 - tipe "hapus": produkId sama aturannya kayak "ubah" (salin PERSIS dari daftar, jangan asal tebak
   kalau ambigu/nggak ketemu).
+- tipe "ubah_nota": dipakai kalau di riwayat ada hasil baca FOTO NOTA yang statusnya "menunggu dikonfirmasi user"
+  (ditulis "(Mang AI membaca nota, kebaca: 1. ... - status: ...)") dan user minta BENERIN ISI NOTA ITU - ganti nama
+  barang, jumlah, harga, atau hapus/tambah baris ("itu bukan modem tapi modul", "yang kabel jumlahnya 2", "hapus yang
+  elektronik"). Ini BUKAN ngubah katalog - JANGAN pakai tipe "ubah" & JANGAN minta produkId. Isi "data.barang" =
+  SELURUH daftar nota SETELAH dibenerin, urutannya sama kayak di riwayat: baris yang nggak diubah DISALIN PERSIS
+  (nama, jumlah, harga), "nama" = nama barang, "stok" = JUMLAH di nota, "modal" = HARGA SATUAN di nota, "harga" isi
+  sama kayak "modal". Kalau yang disebut user cocok ke beberapa baris (mis. dua baris "MODEM-MODEM"), ubah semuanya.
+  Di "jawaban" bilang singkat apa yang diubah & suruh cek kartu notanya lalu tap "Terapkan ke stok". Kalau notanya
+  udah diterapkan/dibatalkan, "aksi" null & bilang nota itu udah nggak bisa diubah (foto ulang aja).
 - tipe "catat_modal": dipakai kalau user mau NYATET DUIT MODAL yang dia setor ke warung ("mau
   nambah modal", "catat modal 5 juta", "saya suntik modal"). Ini BUKAN nambah barang - jangan
   pernah dijawab pakai tipe "tambah". Isi "data.jumlah" (angka rupiah polos, "100jt" = 100000000,
@@ -238,7 +247,7 @@ ${konteks}`;
             type: 'OBJECT',
             nullable: true,
             properties: {
-              tipe: { type: 'STRING', enum: ['tambah', 'ubah', 'hapus', 'catat_modal', 'belanja_banyak', 'target_penjualan'] },
+              tipe: { type: 'STRING', enum: ['tambah', 'ubah', 'hapus', 'catat_modal', 'belanja_banyak', 'target_penjualan', 'ubah_nota'] },
               // "data" ditaruh SEBELUM produkId (urutan properties kepake Gemini sebagai urutan
               // "mikir" pas ngisi field-nya) - biar dia mikirin detail barangnya duluan, baru nyalin
               // id dari daftar - dulu urutannya kebalik & sering data-nya keskip kosong.
@@ -263,7 +272,8 @@ ${konteks}`;
                   // Dipakai tipe "catat_modal" doang - duit yang disetor pemilik ke warung.
                   jumlah: { type: 'NUMBER' },
                   keterangan: { type: 'STRING' },
-                  // Dipakai tipe "belanja_banyak" doang - daftar usulan barang sekali borong.
+                  // Dipakai tipe "belanja_banyak" (daftar usulan barang sekali borong) & "ubah_nota" (isi nota
+                  // setelah dibenerin: stok = jumlah, modal = harga satuan).
                   barang: {
                     type: 'ARRAY',
                     items: {
@@ -314,7 +324,7 @@ ${konteks}`;
   // ID buat tipe ini, dibuang paksa di sini daripada dipercaya mentah.
   // Tipe yang logisnya nggak nunjuk barang yang sudah ada - produkId-nya dibuang paksa di sini
   // daripada dipercaya mentah kalau model ngarang id.
-  const tanpaProdukId = ['tambah', 'catat_modal', 'belanja_banyak', 'target_penjualan'];
+  const tanpaProdukId = ['tambah', 'catat_modal', 'belanja_banyak', 'target_penjualan', 'ubah_nota'];
   const aksi = hasil.aksi?.tipe
     ? { ...hasil.aksi, produkId: tanpaProdukId.includes(hasil.aksi.tipe) ? null : hasil.aksi.produkId || null }
     : null;

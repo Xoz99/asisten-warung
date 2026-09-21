@@ -246,6 +246,23 @@ img.picon.produk-ikon{display:block;object-fit:cover}
 .nota-list li:last-child{border-bottom:0}
 .nota-list li span:first-child{font-weight:600}
 .nota-list li span:last-child{color:var(--abu);font-weight:600;flex:none}
+.nota-bantu{margin:-2px 0 10px;font-size:13px;color:var(--abu);font-weight:600}
+/* Kartu nota yang bisa diedit: nama selebar kartu, di bawahnya jumlah × harga + tombol hapus. */
+.nota-edit{display:flex;flex-direction:column;gap:8px}
+.nota-baris{display:flex;flex-direction:column;gap:6px;padding:10px;border:1px solid var(--garis);border-radius:14px;background:var(--bg)}
+.nota-baris input{font:inherit;font-size:15px;color:var(--ink);background:var(--surface);border:1.5px solid var(--garis);border-radius:10px;padding:8px 10px;min-width:0}
+.nota-baris input:focus{outline:none;border-color:var(--ink)}
+.nota-nama{width:100%;font-weight:600}
+.nota-angka{display:flex;align-items:center;gap:8px}
+.nota-angka>input{width:64px;text-align:center;flex:none}
+.nota-angka>span{color:var(--abu);font-weight:700}
+.nota-rp{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:var(--surface);border:1.5px solid var(--garis);border-radius:10px;padding-left:10px}
+.nota-rp:focus-within{border-color:var(--ink)}
+.nota-rp span{color:var(--abu);font-weight:700;font-size:14px}
+.nota-rp input{flex:1;border:0;padding-left:0;background:none}
+.nota-hapus{flex:none;width:36px;height:36px;border-radius:10px;border:0;background:none;color:var(--abu);font-size:22px;line-height:1;cursor:pointer}
+.nota-hapus:hover{background:var(--surface);color:#e5484d}
+.nota-tambah{align-self:flex-start;border:1.5px dashed var(--garis);background:none;color:var(--ink);font:inherit;font-size:14px;font-weight:700;border-radius:12px;padding:9px 14px;cursor:pointer}
 .nota-total{display:flex;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1.5px solid var(--garis);font-weight:700}
 /* .nota-aksi numpang di atas .actions (lihat definisinya di dekat .btn) buat rasio flex tombol
    Batal/Terapkan-nya (1 : 1.7) - margin-top-nya dikecilin di sini karena konteksnya di dalam

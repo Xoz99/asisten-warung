@@ -84,7 +84,7 @@ const RIWAYAT_MAKS_TURN = 6;
 function ringkasBubbleUntukRiwayat(b) {
   if (b.type === 'foto') return '(user mengirim foto)';
   if (b.type === 'nota-hasil') {
-    const daftar = b.rows.map((r) => `${r.nama} ${r.qty}x @Rp${r.harga}`).join(', ');
+    const daftar = b.rows.map((r, i) => `${i + 1}. ${r.nama} ${r.qty}x @Rp${r.harga}`).join('; ');
     const status = b.status === 'diterapkan' ? 'sudah diterapkan ke stok' : b.status === 'batal' ? 'dibatalkan oleh user' : 'menunggu dikonfirmasi user';
     return `(Mang AI membaca nota, kebaca: ${daftar} - status: ${status})`;
   }
@@ -412,7 +412,15 @@ function TanyaAI() {
       // dibuka, jadi bar-nya baru keliatan gerak setelah user refresh sendiri. Sengaja nggak
       // di-await: nyegerin angka nggak boleh bikin balesan chat ikut ketahan.
       cekLisensi().catch(() => {});
-      if (aksi) {
+      if (aksi?.tipe === 'ubah_nota') {
+        // Bukan kartu usulan baru - langsung ngubah kartu nota yang lagi nunggu (belum nyentuh stok, tetap harus
+        // "Terapkan ke stok"). Target: nota PALING BARU yang masih nunggu.
+        setLog((l) => {
+          const idx = l.map((b) => b.type === 'nota-hasil' && b.status === 'menunggu').lastIndexOf(true);
+          if (idx === -1) return [...l, { id: idBaru(), who: 'bot', html: 'Nggak ada nota yang lagi nunggu buat dibenerin. Foto notanya dulu ya.' }];
+          return l.map((b, i) => (i === idx ? { ...b, rows: aksi.data.barang, diubahAi: true } : b));
+        });
+      } else if (aksi) {
         setLog((l) => [
           ...l,
           { id: idBaru(), who: 'bot', type: 'aksi', aksi, foto: aksi.fotoDipakai ? fotoKirim : null, status: 'menunggu' },
@@ -442,11 +450,9 @@ function TanyaAI() {
 
   const tandaiSelesaiAksi = (id, status) => setLog((l) => l.map((b) => (b.id === id ? { ...b, status } : b)));
 
-  // Scan nota lewat Mang AI (dulu punya layar sendiri di menu Stok pakai tabel yang bisa dikoreksi
-  // per baris - sekarang disederhanain jadi alur chat: foto muncul sebagai bubble "aku", Mang AI
-  // balas ringkasan hasil bacanya + tombol Terapkan/Batal, BUKAN tabel yang bisa diedit per baris
-  // lagi. Kalau ada baris yang salah baca, jalan keluarnya sekarang cuma foto ulang (lebih jelas/
-  // lebih terang) - bukan koreksi manual di tempat kayak dulu.
+  // Scan nota lewat Mang AI: foto muncul sebagai bubble "aku", Mang AI balas kartu hasil bacanya. Kartunya BISA DIEDIT
+  // (nama/jumlah/harga, hapus & tambah baris - lihat BubbleNotaHasil), dan bisa juga dibenerin lewat chat ("itu bukan
+  // modem tapi modul") - Mang AI balikin aksi "ubah_nota" yang ngganti isi kartu ini. Stok baru berubah pas "Terapkan".
   const kirimFotoNota = async (fotoAsli) => {
     setKameraNotaOpen(false);
     // 2 ukuran beda kebutuhan dari foto asli yang sama: fotoOcr agak gedean (1600px) biar tulisan
@@ -476,9 +482,12 @@ function TanyaAI() {
   const terapkanNota = async (id) => {
     const entry = log.find((b) => b.id === id);
     if (!entry || entry.status !== 'menunggu') return;
-    setLog((l) => l.map((b) => (b.id === id ? { ...b, status: 'menerapkan' } : b)));
-    const totalModal = entry.rows.reduce((a, r) => a + (+r.qty || 0) * (+r.harga || 0), 0);
-    const hasil = await dispatch({ type: 'TERAPKAN_NOTA', rows: entry.rows });
+    // Baris yang namanya dikosongin / jumlahnya 0 pas diedit dianggap dihapus.
+    const rows = barisNotaValid(entry.rows);
+    if (!rows.length) return;
+    setLog((l) => l.map((b) => (b.id === id ? { ...b, rows, status: 'menerapkan' } : b)));
+    const totalModal = rows.reduce((a, r) => a + r.qty * r.harga, 0);
+    const hasil = await dispatch({ type: 'TERAPKAN_NOTA', rows });
     if (!hasil) {
       // dispatch() nggak pernah throw ke sini (gagal ditangani internal via toast + guard "perlu
       // online" sendiri) - balikin undefined berarti gagal/diblokir, biar bisa dicoba Terapkan lagi.
@@ -493,6 +502,8 @@ function TanyaAI() {
     setLog((l) => [...l, { id: idBaru(), who: 'bot', html: `Beres! Stok masuk, modal ${rupiah(totalModal)}.${catatanFoto}` }]);
     refreshData();
   };
+
+  const ubahNota = (id, rows) => setLog((l) => l.map((b) => (b.id === id && b.status === 'menunggu' ? { ...b, rows, diubahAi: false } : b)));
 
   const batalNota = (id) => {
     setLog((l) => l.map((b) => (b.id === id ? { ...b, status: 'batal' } : b)));
@@ -543,7 +554,15 @@ function TanyaAI() {
             );
           }
           if (b.type === 'nota-hasil') {
-            return <BubbleNotaHasil key={b.id} data={b} onTerapkan={() => terapkanNota(b.id)} onBatal={() => batalNota(b.id)} />;
+            return (
+              <BubbleNotaHasil
+                key={b.id}
+                data={b}
+                onUbah={(rows) => ubahNota(b.id, rows)}
+                onTerapkan={() => terapkanNota(b.id)}
+                onBatal={() => batalNota(b.id)}
+              />
+            );
           }
           if (b.type === 'aksi') {
             // Tipe aksi yang BUKAN CRUD satu barang punya kartunya sendiri - dipisah biar BubbleAksi
@@ -722,26 +741,63 @@ function TanyaAI() {
   );
 }
 
-// Ringkasan hasil baca nota (bubble tipe 'nota-hasil', lihat kirimFotoNota) - daftar barang+harga
-// yang kebaca + total, dengan tombol Terapkan/Batal. `status` nentuin tampilannya: 'menunggu'
-// (tombolnya masih aktif), 'menerapkan' (lagi proses, tombol dimatiin), 'diterapkan'/'batal'
-// (udah final, tombol diganti keterangan teks - nggak bisa dipencet dua kali).
-function BubbleNotaHasil({ data, onTerapkan, onBatal }) {
-  const { rows, status } = data;
-  const totalModal = rows.reduce((a, r) => a + (+r.qty || 0) * (+r.harga || 0), 0);
+// Baris nota yang layak diterapkan: nama keisi, jumlah > 0, harga angka >= 0.
+function barisNotaValid(rows) {
+  return rows
+    .map((r) => ({ nama: String(r.nama || '').trim(), qty: Math.floor(Number(r.qty) || 0), harga: Math.round(Number(r.harga) || 0) }))
+    .filter((r) => r.nama && r.qty > 0 && r.harga >= 0);
+}
+
+// Kartu hasil baca nota (bubble tipe 'nota-hasil', lihat kirimFotoNota). Selama statusnya 'menunggu', tiap baris BISA
+// DIEDIT langsung (nama, jumlah, harga satuan), dihapus, atau ditambah - OCR/AI sering salah baca tulisan tangan
+// (MODEM kebaca buat MODUL, dst), dan dulu satu-satunya jalan cuma foto ulang. 'menerapkan' = lagi proses, tombol mati;
+// 'diterapkan'/'batal' = final, jadi teks biasa.
+function BubbleNotaHasil({ data, onUbah, onTerapkan, onBatal }) {
+  const { rows, status, diubahAi } = data;
+  const bisaEdit = status === 'menunggu';
+  const valid = barisNotaValid(rows);
+  const totalModal = valid.reduce((a, r) => a + r.qty * r.harga, 0);
+  const ubahBaris = (i, k, v) => onUbah(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
+  const angka = (v) => v.replace(/\D/g, '').slice(0, 10);
+
   return (
     <div className="bubble bot bubble-nota">
       <p className="nota-judul">Ini yang kebaca dari notanya:</p>
-      <ul className="nota-list">
-        {rows.map((r, i) => (
-          <li key={i}>
-            <span>{r.nama || '(nama kosong)'}</span>
-            <span>
-              {r.qty} × {rupiah(r.harga)}
-            </span>
-          </li>
-        ))}
-      </ul>
+      {bisaEdit && <p className="nota-bantu">{diubahAi ? '✓ Udah dibenerin Mang AI - cek lagi ya.' : 'Salah baca? Ketuk buat ubah, atau bilang ke Mang AI.'}</p>}
+      {bisaEdit ? (
+        <div className="nota-edit">
+          {rows.map((r, i) => (
+            <div className="nota-baris" key={i}>
+              <input className="nota-nama" value={r.nama} onChange={(e) => ubahBaris(i, 'nama', e.target.value)} placeholder="Nama barang" aria-label="Nama barang" />
+              <div className="nota-angka">
+                <input value={r.qty} onChange={(e) => ubahBaris(i, 'qty', angka(e.target.value))} inputMode="numeric" aria-label="Jumlah" />
+                <span>×</span>
+                <div className="nota-rp">
+                  <span>Rp</span>
+                  <input value={r.harga} onChange={(e) => ubahBaris(i, 'harga', angka(e.target.value))} inputMode="numeric" aria-label="Harga satuan" />
+                </div>
+                <button type="button" className="nota-hapus" onClick={() => onUbah(rows.filter((_, j) => j !== i))} aria-label={`Hapus ${r.nama || 'baris'}`}>
+                  ×
+                </button>
+              </div>
+            </div>
+          ))}
+          <button type="button" className="nota-tambah" onClick={() => onUbah([...rows, { nama: '', qty: 1, harga: '' }])}>
+            + Tambah barang
+          </button>
+        </div>
+      ) : (
+        <ul className="nota-list">
+          {rows.map((r, i) => (
+            <li key={i}>
+              <span>{r.nama || '(nama kosong)'}</span>
+              <span>
+                {r.qty} × {rupiah(r.harga)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="nota-total">
         <span>Total modal</span>
         <b>{rupiah(totalModal)}</b>
@@ -751,7 +807,7 @@ function BubbleNotaHasil({ data, onTerapkan, onBatal }) {
           <button className="btn kecil" onClick={onBatal}>
             Batal
           </button>
-          <button className="btn kecil utama brand" onClick={onTerapkan} disabled={!totalModal}>
+          <button className="btn kecil utama brand" onClick={onTerapkan} disabled={!valid.length}>
             Terapkan ke stok
           </button>
         </div>

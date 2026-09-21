@@ -473,6 +473,16 @@ function validasiAksi(aksi, { produkIds, produkNama, kasbonIds }) {
   }
   // "belanja_banyak" dipangkas di sini, BUKAN cuma diandelin ke prompt: batas 25 nahan sheet yang
   // kepanjangan, dan barang tanpa nama nggak mungkin dieksekusi jadi dibuang duluan.
+  // "ubah_nota" cuma ngubah kartu nota yang lagi nunggu di chat (belum nyentuh database - tetap harus "Terapkan ke
+  // stok"). Dibersihin di sini: nama wajib, jumlah bilangan bulat > 0, harga >= 0.
+  if (aksi.tipe === 'ubah_nota') {
+    const barang = (Array.isArray(aksi.data?.barang) ? aksi.data.barang : [])
+      .map((b) => ({ nama: String(b?.nama || '').trim().slice(0, 120), qty: Math.floor(Number(b?.stok)), harga: Math.round(Number(b?.modal)) }))
+      .filter((b) => b.nama && b.qty > 0 && Number.isFinite(b.harga) && b.harga >= 0)
+      .slice(0, 60);
+    if (!barang.length) return null;
+    return { tipe: 'ubah_nota', produkId: null, data: { barang } };
+  }
   if (aksi.tipe === 'belanja_banyak') {
     // Barang yang UDAH ADA di katalog dibuang: "belanja_banyak" itu buat nambah barang BARU - kalau barang lama ikut,
     // pas disetujui jadinya barang dobel dengan harga/stok tebakan. Kulakan barang lama dijawab dari daftar kulakan.

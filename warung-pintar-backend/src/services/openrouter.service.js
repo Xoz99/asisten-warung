@@ -186,6 +186,15 @@ MENENTUKAN BARANG MANA yang dimaksud (produkId) kamu WAJIB yakin dulu, jangan as
   AMBIGU (cocok ke lebih dari 1 barang) atau NGGAK ketemu sama sekali, JANGAN asal comot/ngarang id -
   biarin "aksi" null, dan di "jawaban" tanya balik user maksudnya barang yang mana. "data" tipe
   "ubah" isi CUMA field yang BENERAN disebut mau diubah user.
+- tipe "ubah_nota": dipakai kalau di riwayat ada hasil baca FOTO NOTA yang statusnya "menunggu dikonfirmasi user"
+  (ditulis "(Mang AI membaca nota, kebaca: 1. ... - status: ...)") dan user minta BENERIN ISI NOTA ITU - ganti nama
+  barang, jumlah, harga, atau hapus/tambah baris ("itu bukan modem tapi modul", "yang kabel jumlahnya 2", "hapus yang
+  elektronik"). Ini BUKAN ngubah katalog - JANGAN pakai tipe "ubah" & JANGAN minta produkId. Isi "data.barang" =
+  SELURUH daftar nota SETELAH dibenerin, urutannya sama kayak di riwayat: baris yang nggak diubah DISALIN PERSIS
+  (nama, jumlah, harga), "nama" = nama barang, "stok" = JUMLAH di nota, "modal" = HARGA SATUAN di nota, "harga" isi
+  sama kayak "modal". Kalau yang disebut user cocok ke beberapa baris (mis. dua baris "MODEM-MODEM"), ubah semuanya.
+  Di "jawaban" bilang singkat apa yang diubah & suruh cek kartu notanya lalu tap "Terapkan ke stok". Kalau notanya
+  udah diterapkan/dibatalkan, "aksi" null & bilang nota itu udah nggak bisa diubah (foto ulang aja).
 - tipe "catat_modal": dipakai kalau user mau NYATET DUIT MODAL yang dia setor ke warung ("mau
   nambah modal", "catat modal 5 juta"). Ini BUKAN nambah barang - jangan pernah dijawab pakai tipe
   "tambah". Isi "data.jumlah" (angka rupiah polos, "100jt" = 100000000) & "data.keterangan" singkat.
@@ -219,8 +228,8 @@ MENENTUKAN BARANG MANA yang dimaksud (produkId) kamu WAJIB yakin dulu, jangan as
   dan perlu disesuaikan sama harga kulakan dia.
 ${fotoBase64 ? '- User ngirim FOTO bareng pesan ini (dilampirkan di bawah) - kalau dia minta nambahin barang dari foto ini, baca detailnya dari foto (merek/kemasan/perkiraan isi/kategori), dan set "fotoDipakai": true di "aksi" biar foto itu ikut kesimpen jadi foto barangnya.\n' : ''}
 Balas SATU objek JSON PERSIS bentuk ini, JANGAN ada teks lain di luar JSON-nya:
-{"jawaban": "<balasan chat kamu di sini>", "ingat": [], "lupakan": [], "aksi": null ATAU {"tipe": "tambah"|"ubah"|"hapus"|"catat_modal"|"belanja_banyak"|"target_penjualan", "produkId": "<id atau null>", "data": {"nama":"...", "kategori":"...", "barcode":"...", "harga":0, "modal":0, "stok":0, "satuan":"...", "isiKemasan":1, "namaKemasan":"...", "grup":"...", "jumlah":0, "keterangan":"...", "barang":[{"nama":"...","kategori":"...","harga":0,"modal":0,"stok":0,"satuan":"..."}]}}}
-Field "jumlah"/"keterangan" CUMA buat "catat_modal", field "barang" CUMA buat "belanja_banyak" - tipe lain kosongin.
+{"jawaban": "<balasan chat kamu di sini>", "ingat": [], "lupakan": [], "aksi": null ATAU {"tipe": "tambah"|"ubah"|"hapus"|"catat_modal"|"belanja_banyak"|"target_penjualan"|"ubah_nota", "produkId": "<id atau null>", "data": {"nama":"...", "kategori":"...", "barcode":"...", "harga":0, "modal":0, "stok":0, "satuan":"...", "isiKemasan":1, "namaKemasan":"...", "grup":"...", "jumlah":0, "keterangan":"...", "barang":[{"nama":"...","kategori":"...","harga":0,"modal":0,"stok":0,"satuan":"..."}]}}}
+Field "jumlah"/"keterangan" CUMA buat "catat_modal", field "barang" CUMA buat "belanja_banyak" & "ubah_nota" - tipe lain kosongin.
 (field di "data" yang nggak relevan boleh diilangin/dikosongin, nggak wajib semua ke-isi)
 
 ${ATURAN_MEMORI}
@@ -251,7 +260,7 @@ ${konteks}`;
     return { jawaban: teks, aksi: null };
   }
   if (!hasil?.jawaban) throw Object.assign(new Error('OpenRouter balikin jawaban kosong'), { status: 502 });
-  const tanpaProdukId = ['tambah', 'catat_modal', 'belanja_banyak', 'target_penjualan'];
+  const tanpaProdukId = ['tambah', 'catat_modal', 'belanja_banyak', 'target_penjualan', 'ubah_nota'];
   const aksi = hasil.aksi?.tipe
     ? { ...hasil.aksi, produkId: tanpaProdukId.includes(hasil.aksi.tipe) ? null : hasil.aksi.produkId || null }
     : null;
