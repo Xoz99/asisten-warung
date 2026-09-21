@@ -45,7 +45,7 @@ export default function AkunDemo({ api }) {
     <>
       <header className="adm-kepala">
         <div>
-          <h1>Akun demo</h1>
+          <h2 className="adm-judul-tab">Akun demo</h2>
           <p className="adm-sub">
             Buat dipinjemin ke sales. Kata sandi, nomor HP &amp; PIN nggak bisa diubah dari aplikasi, nggak bisa langganan, dan nggak pernah
             habis masa aktifnya.

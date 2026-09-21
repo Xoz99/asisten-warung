@@ -1,6 +1,8 @@
-# Konsulin Manajemen
+# Makalin Ops
 
-Aplikasi internal buat ngelola produk-produk Konsulin (sekarang: Warung Pintar > Sales). **Sengaja terpisah** dari
+Aplikasi operasional internal (dulu "Konsulin Manajemen"). Tahap 1: Dashboard, Leads (warung dari sales + CRM manual + sales),
+Keuangan (Midtrans + catatan manual), Notifikasi, Pengaturan (tim & akun demo), Profile. HR, Rekrutmen, Artifact, AI Chat: menyusul.
+Arah desain: `DESIGN.md` (neo-brutalism); filter anti-slop: `.claude/skills/antislop*` di root repo. **Sengaja terpisah** dari
 aplikasi produknya: proses pm2, port, dan domain sendiri. Aplikasi Warung Pintar nggak punya halaman/API admin sama sekali.
 Manajemen baca/tulis langsung ke database produk.
 

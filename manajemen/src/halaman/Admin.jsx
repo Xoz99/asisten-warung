@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 // Akun admin manajemen (tiap orang punya akun sendiri) + catatan siapa ngapain.
 const waktu = (t) => (t ? new Date(t).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-');
-const NAMA_AKSI = {
+export const NAMA_AKSI = {
   'admin.setup': 'bikin admin pertama',
   'admin.tambah': 'nambah admin',
   'admin.aktifkan': 'ngaktifin admin',
@@ -16,8 +16,13 @@ const NAMA_AKSI = {
   'warung-pintar.demo.tandai': 'jadiin akun demo',
   'warung-pintar.demo.lepas': 'lepas akun demo',
   'warung-pintar.demo.ganti_password': 'ganti kata sandi akun demo',
+  'ops.lead.tambah': 'nambah lead CRM',
+  'ops.lead.ubah': 'ubah lead CRM',
+  'ops.lead.hapus': 'hapus lead CRM',
+  'ops.keuangan.catat': 'catat transaksi',
+  'ops.keuangan.hapus': 'hapus transaksi',
 };
-const ringkasDetail = (d) =>
+export const ringkasDetail = (d) =>
   d
     ? Object.entries(d)
         .map(([k, v]) => `${k}: ${v === null ? '-' : v}`)
@@ -68,8 +73,8 @@ export default function Admin({ api, admin }) {
     <>
       <header className="adm-kepala">
         <div>
-          <h1>Admin &amp; aktivitas</h1>
-          <p className="adm-sub">Tiap orang punya akun sendiri, jadi ketauan siapa ngapain.</p>
+          <h2 className="adm-judul-tab">Pengguna &amp; tim</h2>
+          <p className="adm-sub">Tiap orang punya akun sendiri, jadi ketauan siapa ngapain. Ganti password kamu sendiri di Profile.</p>
         </div>
       </header>
       {error && <p className="adm-error">{error}</p>}
@@ -94,7 +99,6 @@ export default function Admin({ api, admin }) {
             </ul>
           )}
           <FormTambah onTambah={(isi) => aksi(() => api('POST', '/admin', isi), `Admin ${isi.nama} ditambah ✓ - kasih tau username & password-nya`)} />
-          <FormPasswordSaya onGanti={(isi) => aksi(() => api('POST', '/saya/password', isi), 'Password kamu diganti ✓ - masuk lagi pakai password baru')} />
         </section>
 
         <section className="adm-kartu">
@@ -198,35 +202,6 @@ function FormTambah({ onTambah }) {
       </div>
       <button className="btn utama" style={{ marginTop: 12 }} type="submit" disabled={!isi.nama.trim() || isi.username.trim().length < 3 || isi.password.length < 8}>
         Tambah admin
-      </button>
-    </form>
-  );
-}
-
-function FormPasswordSaya({ onGanti }) {
-  const [isi, setIsi] = useState({ passwordLama: '', passwordBaru: '' });
-  const ubah = (k) => (e) => setIsi((x) => ({ ...x, [k]: e.target.value }));
-  return (
-    <form
-      className="adm-tambah"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        await onGanti(isi);
-      }}
-    >
-      <h3>Ganti password kamu</h3>
-      <div className="adm-baris" style={{ gridTemplateColumns: '1fr 1fr' }}>
-        <div className="field">
-          <label>Password lama</label>
-          <input type="password" value={isi.passwordLama} onChange={ubah('passwordLama')} autoComplete="current-password" />
-        </div>
-        <div className="field">
-          <label>Password baru (min. 8)</label>
-          <input type="password" value={isi.passwordBaru} onChange={ubah('passwordBaru')} autoComplete="new-password" />
-        </div>
-      </div>
-      <button className="btn kecil" style={{ marginTop: 12 }} type="submit" disabled={!isi.passwordLama || isi.passwordBaru.length < 8}>
-        Ganti password
       </button>
     </form>
   );

@@ -25,6 +25,7 @@ export function pastikanTabelSales() {
       await query('CREATE INDEX IF NOT EXISTS idx_warung_sales ON warung (sales_id)');
       // Akun demo buat sales - lihat warung-pintar-backend/src/services/akunDemo.service.js.
       await query('ALTER TABLE warung ADD COLUMN IF NOT EXISTS demo BOOLEAN NOT NULL DEFAULT false');
+      await query('ALTER TABLE warung ADD COLUMN IF NOT EXISTS profil_usaha JSONB');
     })().catch((e) => {
       siap = null;
       throw e;

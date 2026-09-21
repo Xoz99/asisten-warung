@@ -34,7 +34,7 @@ export default function Pembayaran({ api }) {
     <>
       <header className="adm-kepala">
         <div>
-          <h1>Pembayaran</h1>
+          <h2 className="adm-judul-tab">Pembayaran</h2>
           <p className="adm-sub">Semua transaksi langganan. Order ID-nya sama persis kayak di dashboard Midtrans.</p>
         </div>
       </header>

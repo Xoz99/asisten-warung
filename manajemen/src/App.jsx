@@ -1,27 +1,38 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { bacaSesi, panggil, simpanSesi } from './lib/api.js';
-import SalesWarungPintar from './produk/warung-pintar/Sales.jsx';
-import PembayaranWarungPintar from './produk/warung-pintar/Pembayaran.jsx';
-import AkunDemoWarungPintar from './produk/warung-pintar/AkunDemo.jsx';
-import Admin from './halaman/Admin.jsx';
+import Dashboard from './halaman/Dashboard.jsx';
+import Leads from './halaman/Leads.jsx';
+import Keuangan from './halaman/Keuangan.jsx';
+import Notifikasi from './halaman/Notifikasi.jsx';
+import Pengaturan from './halaman/Pengaturan.jsx';
+import Profile from './halaman/Profile.jsx';
 
-// Halaman per produk. Nambah produk/halaman baru: daftarin komponennya di sini, dengan id produk yang sama kayak
-// di server/produk/index.js.
-const HALAMAN_PRODUK = {
-  'warung-pintar': [
-    { id: 'sales', nama: 'Sales', Komponen: SalesWarungPintar },
-    { id: 'pembayaran', nama: 'Pembayaran', Komponen: PembayaranWarungPintar },
-    { id: 'demo', nama: 'Akun demo', Komponen: AkunDemoWarungPintar },
-  ],
-};
-// Halaman umum manajemen (bukan punya produk tertentu).
-const HALAMAN_UMUM = [{ id: 'admin', nama: 'Admin & aktivitas', Komponen: Admin }];
+// Makalin Ops: kerangka (sidebar + topbar), login per admin, dan navigasi lewat alamat (#/leads/crm dst) biar
+// halaman yang lagi dibuka tetap kebuka pas di-refresh & bisa dibagiin linknya.
+const NAMA_HALAMAN = { dashboard: 'Dashboard', leads: 'Leads', keuangan: 'Keuangan', notifikasi: 'Notifikasi', pengaturan: 'Pengaturan', profile: 'Profile' };
+
+function bacaRute() {
+  const [halaman, tab] = window.location.hash.replace(/^#\/?/, '').split('/');
+  return { halaman: NAMA_HALAMAN[halaman] ? halaman : 'dashboard', tab: tab || '' };
+}
 
 export default function App() {
   const [sesi, setSesi] = useState(bacaSesi); // { token, admin }
   const [produk, setProduk] = useState(null);
   const [error, setError] = useState('');
-  const [aktif, setAktif] = useState(null); // { produk: id | null, halaman }
+  const [rute, setRute] = useState(bacaRute);
+  const [lacibuka, setLaciBuka] = useState(false);
+  const [notifBaru, setNotifBaru] = useState(0);
+
+  useEffect(() => {
+    const ganti = () => {
+      setRute(bacaRute());
+      setLaciBuka(false);
+      window.scrollTo(0, 0);
+    };
+    window.addEventListener('hashchange', ganti);
+    return () => window.removeEventListener('hashchange', ganti);
+  }, []);
 
   const keluar = useCallback((pesan = '') => {
     simpanSesi(null);
@@ -48,26 +59,36 @@ export default function App() {
     if (!token) return;
     let batal = false;
     panggil(token, 'GET', '/produk')
-      .then((p) => {
-        if (batal) return;
-        setProduk(p);
-        const pertama = p.find((x) => HALAMAN_PRODUK[x.id]);
-        setAktif(pertama ? { produk: pertama.id, halaman: HALAMAN_PRODUK[pertama.id][0].id } : { produk: null, halaman: 'admin' });
-      })
+      .then((p) => !batal && setProduk(p))
       .catch((e) => !batal && keluar(e.message));
     return () => {
       batal = true;
     };
   }, [token, keluar]);
 
-  const produkAktif = aktif?.produk ? produk?.find((p) => p.id === aktif.produk) : null;
-  const halamanAktif = produkAktif
-    ? HALAMAN_PRODUK[produkAktif.id]?.find((h) => h.id === aktif.halaman)
-    : HALAMAN_UMUM.find((h) => h.id === aktif?.halaman);
-  const Komponen = halamanAktif?.Komponen;
-  const idProduk = produkAktif?.id;
+  // Angka di lonceng: dicek pas buka & tiap menit.
+  const cekNotif = useCallback(() => {
+    if (!token) return;
+    panggil(token, 'GET', '/notifikasi/jumlah')
+      .then((r) => setNotifBaru(r.belumDibaca))
+      .catch(() => {});
+  }, [token]);
+  useEffect(() => {
+    cekNotif();
+    const t = setInterval(cekNotif, 60000);
+    return () => clearInterval(t);
+  }, [cekNotif]);
+
+  const produkWp = produk?.find((p) => p.id === 'warung-pintar') || null;
   // Harus stabil - halaman ngambil datanya di useEffect yang bergantung sama fungsi ini.
-  const apiHalaman = useMemo(() => (idProduk ? (m, path, b) => api(m, '/' + idProduk + path, b) : api), [api, idProduk]);
+  const apiProduk = useMemo(() => (produkWp ? (m, path, b) => api(m, '/warung-pintar' + path, b) : null), [api, produkWp]);
+
+  useEffect(() => {
+    if (!lacibuka) return;
+    const tekan = (e) => e.key === 'Escape' && setLaciBuka(false);
+    document.addEventListener('keydown', tekan);
+    return () => document.removeEventListener('keydown', tekan);
+  }, [lacibuka]);
 
   if (!sesi) {
     return (
@@ -82,53 +103,101 @@ export default function App() {
     );
   }
 
-  const tombolNav = (produkId, h) => (
-    <button
-      key={h.id}
-      className={'adm-nav' + (aktif?.produk === produkId && aktif?.halaman === h.id ? ' on' : '')}
-      onClick={() => setAktif({ produk: produkId, halaman: h.id })}
-    >
-      {h.nama}
-    </button>
-  );
+  const { halaman, tab } = rute;
+  const props = { api, apiProduk, produkWp, admin: sesi.admin, tab };
 
   return (
     <div className="adm">
-      <aside className="adm-samping">
-        <div className="adm-merek">
-          Konsulin <span>Manajemen</span>
-        </div>
-        <nav>
-          {(produk || []).map((p) => (
-            <div key={p.id} className="adm-nav-grup">
-              <div className="adm-nav-produk">{p.nama}</div>
-              {(HALAMAN_PRODUK[p.id] || []).map((h) => tombolNav(p.id, h))}
-            </div>
-          ))}
-          <div className="adm-nav-grup">
-            <div className="adm-nav-produk">Manajemen</div>
-            {HALAMAN_UMUM.map((h) => tombolNav(null, h))}
-          </div>
-        </nav>
-        <div className="adm-akun">
-          <span className="adm-redup">Masuk sebagai</span>
-          <b>{sesi.admin?.nama}</b>
-          <button className="btn kecil" onClick={() => keluar()}>
-            Keluar
+      <Samping halaman={halaman} tab={tab} admin={sesi.admin} notifBaru={notifBaru} buka={lacibuka} />
+      {lacibuka && <div className="adm-latar" style={{ zIndex: 25, padding: 0 }} onClick={() => setLaciBuka(false)} aria-hidden="true" />}
+      <div className="adm-utama">
+        <header className="adm-topbar">
+          <button className="adm-menu-tombol" onClick={() => setLaciBuka(true)} aria-label="Buka menu" aria-expanded={lacibuka}>
+            MENU
           </button>
-        </div>
-      </aside>
-      <main className="adm-isi">
-        {!produk ? (
-          <p className="adm-sub">Memuat…</p>
-        ) : !Komponen ? (
-          <p className="adm-sub">Belum ada produk yang aktif. Isi database produknya di .env server manajemen.</p>
-        ) : (
-          // key: ganti halaman = state halaman mulai dari nol
-          <Komponen key={(idProduk || '') + halamanAktif.id} produk={produkAktif} api={apiHalaman} admin={sesi.admin} />
-        )}
-      </main>
+          <div className="adm-crumb">
+            Makalin Ops / <b>{NAMA_HALAMAN[halaman]}</b>
+          </div>
+          <a className="adm-bel" href="#/notifikasi" aria-label={notifBaru ? `Notifikasi, ${notifBaru} belum dibaca` : 'Notifikasi'}>
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="square">
+              <path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4z" />
+              <path d="M10 21h4" />
+            </svg>
+            {notifBaru > 0 && <span className="adm-hitung">{notifBaru > 99 ? '99+' : notifBaru}</span>}
+          </a>
+          <a className="adm-inisial" href="#/profile" aria-label={`Profile ${sesi.admin.nama}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+            {sesi.admin.nama?.[0]?.toUpperCase()}
+          </a>
+        </header>
+        <main className="adm-isi" id="isi">
+          {halaman === 'dashboard' && <Dashboard {...props} />}
+          {halaman === 'leads' && <Leads key={tab} {...props} />}
+          {halaman === 'keuangan' && <Keuangan key={tab} {...props} />}
+          {halaman === 'notifikasi' && <Notifikasi {...props} onDibaca={cekNotif} />}
+          {halaman === 'pengaturan' && <Pengaturan key={tab} {...props} />}
+          {halaman === 'profile' && <Profile {...props} onKeluar={keluar} />}
+        </main>
+      </div>
     </div>
+  );
+}
+
+// Menu yang belum dibangun ditulis "Segera" & nggak bisa diklik - bukan link ke halaman kosong (antislop R-24).
+function Samping({ halaman, admin, notifBaru, buka }) {
+  const link = (id, nama, ekstra) => (
+    <a key={id} href={`#/${id}`} className={'adm-nav' + (halaman === id ? ' on' : '')} aria-current={halaman === id ? 'page' : undefined}>
+      <span>{nama}</span>
+      {ekstra}
+    </a>
+  );
+  const segera = (nama, anak) => (
+    <span key={nama} className={'adm-nav' + (anak ? ' anak' : '')} aria-disabled="true">
+      <span>{nama}</span>
+      <span className="adm-segera">Segera</span>
+    </span>
+  );
+  return (
+    <aside className={'adm-samping' + (buka ? ' buka' : '')} aria-label="Menu utama">
+      <div className="adm-merek">
+        <span className="adm-merek-kotak" aria-hidden="true">
+          M
+        </span>
+        <div>
+          Makalin Ops
+          <small>Workspace internal</small>
+        </div>
+      </div>
+      <nav>
+        <div className="adm-nav-grup">
+          {link('dashboard', 'Dashboard')}
+          {link('leads', 'Leads')}
+          <span className="adm-nav-produk" style={{ marginTop: 8 }}>
+            HR
+          </span>
+          {segera('Rekrutmen', true)}
+          {segera('Karyawan', true)}
+          {link('keuangan', 'Keuangan')}
+        </div>
+        <div className="adm-nav-grup">
+          {segera('Artifact')}
+          {segera('AI Chat')}
+        </div>
+        <div className="adm-nav-grup">
+          {link('notifikasi', 'Notifikasi', notifBaru > 0 ? <span className="adm-hitung">{notifBaru > 99 ? '99+' : notifBaru}</span> : null)}
+          {link('pengaturan', 'Pengaturan')}
+          {link('profile', 'Profile')}
+        </div>
+      </nav>
+      <a className="adm-akun" href="#/profile" style={{ textDecoration: 'none', color: 'inherit' }}>
+        <span className="adm-inisial" aria-hidden="true">
+          {admin.nama?.[0]?.toUpperCase()}
+        </span>
+        <div>
+          <b>{admin.nama}</b>
+          <span className="adm-redup">@{admin.username}</span>
+        </div>
+      </a>
+    </aside>
   );
 }
 
@@ -170,18 +239,23 @@ function Masuk({ error, onMasuk }) {
 
   return (
     <div className="adm-tengah">
-      <form className="adm-kartu adm-masuk" onSubmit={kirim}>
-        <div className="adm-merek">
-          Konsulin <span>Manajemen</span>
+      <form className="adm-kartu adm-masuk" onSubmit={kirim} style={{ boxShadow: '8px 8px 0 #000' }}>
+        <div className="adm-kartu-kepala hitam">
+          <div className="adm-merek">
+            <span className="adm-merek-kotak" style={{ border: '2px solid #fff' }} aria-hidden="true">
+              M
+            </span>
+            Makalin Ops
+          </div>
         </div>
         {perluSetup === null ? (
           <p className="adm-sub">{salah || 'Memuat…'}</p>
         ) : (
           <>
-            <p className="adm-sub">
+            <p className="adm-sub" style={{ marginTop: 0 }}>
               {perluSetup
                 ? 'Belum ada admin. Bikin akun admin pertama pakai kunci setup (ADMIN_KEY di .env server).'
-                : 'Khusus internal. Masuk pakai akun adminmu.'}
+                : 'Khusus tim internal. Masuk pakai akun adminmu.'}
             </p>
             {perluSetup && field('kunciSetup', 'Kunci setup', { type: 'password', autoComplete: 'off' })}
             {perluSetup && field('nama', 'Nama kamu')}
@@ -190,8 +264,12 @@ function Masuk({ error, onMasuk }) {
               type: 'password',
               autoComplete: perluSetup ? 'new-password' : 'current-password',
             })}
-            {(salah || error) && <p className="adm-error">{salah || error}</p>}
-            <button className="btn utama" style={{ width: '100%', marginTop: 16 }} type="submit" disabled={loading}>
+            {(salah || error) && (
+              <p className="adm-error" role="alert">
+                {salah || error}
+              </p>
+            )}
+            <button className="btn utama" style={{ width: '100%', marginTop: 18 }} type="submit" disabled={loading}>
               {loading ? 'Memproses…' : perluSetup ? 'Buat admin & masuk' : 'Masuk'}
             </button>
           </>

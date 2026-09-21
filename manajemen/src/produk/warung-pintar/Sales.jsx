@@ -41,7 +41,7 @@ export default function Sales({ api, produk }) {
     <>
       <header className="adm-kepala">
         <div>
-          <h1>Sales</h1>
+          <h2 className="adm-judul-tab">Sales</h2>
           <p className="adm-sub">Warung bawaan tiap sales & siapa yang udah langganan {produk.nama}.</p>
         </div>
         <button className="btn kecil" onClick={muat} disabled={memuat}>
