@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { query } from '../db.js';
+import { pool, query } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { loginLimiter, otpLimiter, otpIpLimiter, pinLimiter } from '../middleware/rateLimit.js';
 import { normalisasiNoHp, samarkanNoHp } from '../utils/noHp.js';
@@ -62,6 +62,7 @@ function pastikanTabelDaftar() {
       // Sales yang bawa warung ini (kode sales dari link /?ref= atau diketik di form) - lihat sales.service.js.
       await pastikanTabelSales();
       await query('ALTER TABLE pendaftaran_otp ADD COLUMN IF NOT EXISTS sales_id UUID');
+      await query('ALTER TABLE pendaftaran_otp ADD COLUMN IF NOT EXISTS atribusi JSONB');
     })().catch((e) => {
       tabelDaftarSiap = null;
       throw e;
@@ -95,7 +96,7 @@ async function cekBelumDipakai(username, hp) {
 
 router.post('/register/kirim-kode', otpIpLimiter, otpLimiter, async (req, res, next) => {
   try {
-    const { namaWarung, username, password, noHp, kodeSales } = req.body;
+    const { namaWarung, username, password, noHp, kodeSales, refLink } = req.body;
     const nama = typeof namaWarung === 'string' ? namaWarung.trim() : '';
     const user = typeof username === 'string' ? username.trim() : '';
     if (!nama || !user || !password || !noHp) {
@@ -106,13 +107,29 @@ router.post('/register/kirim-kode', otpIpLimiter, otpLimiter, async (req, res, n
     if (!hp) return res.status(400).json({ error: 'Nomor HP tidak valid. Contoh: 0812-3456-7890' });
     const dipakai = await cekBelumDipakai(user, hp);
     if (dipakai) return res.status(409).json({ error: dipakai });
-    // Kode sales opsional, tapi kalau diisi harus bener - salah ketik jangan diem-diem bikin warungnya nggak
-    // kecatat ke sales mana pun.
-    let sales = null;
-    if (typeof kodeSales === 'string' && kodeSales.trim()) {
-      sales = await cariSalesAktif(kodeSales);
-      if (!sales) return res.status(400).json({ error: 'Kode sales nggak dikenal. Cek lagi, atau kosongin aja kalau nggak ada.' });
+    // Atribusi (PRD v0.2 §14): klaim LINK (?ref= yang kebawa dari link sales) & KODE yang diketik di form.
+    // - Kode diketik (beda dari link) dan valid -> kode menang, otomatis (D-65). Klaim link yang kalah tetap disimpen.
+    // - Cuma link -> link. Link yang basi/nggak dikenal diabaikan diam-diam (bukan salah pendaftar).
+    // - Nggak ada dua-duanya -> 'mandiri' = house account, 100% milik Konsulin (D-43).
+    // Kode yang DIKETIK tapi salah ditolak - salah ketik jangan diem-diem bikin warungnya nggak kecatat ke sales.
+    const kodeKetik = typeof kodeSales === 'string' ? kodeSales.trim().toUpperCase() : '';
+    const kodeLink = typeof refLink === 'string' ? refLink.trim().toUpperCase() : '';
+    const salesLink = kodeLink ? await cariSalesAktif(kodeLink) : null;
+    let salesKode = null;
+    if (kodeKetik && kodeKetik !== kodeLink) {
+      salesKode = await cariSalesAktif(kodeKetik);
+      if (!salesKode) return res.status(400).json({ error: 'Kode sales nggak dikenal. Cek lagi, atau kosongin aja kalau nggak ada.' });
+    } else if (kodeKetik && !salesLink) {
+      return res.status(400).json({ error: 'Kode sales nggak dikenal. Cek lagi, atau kosongin aja kalau nggak ada.' });
     }
+    const sales = salesKode || salesLink;
+    const atribusi = {
+      sumber: salesKode ? 'kode' : sales ? 'link' : 'mandiri',
+      link_kode: kodeLink || null,
+      link_sales_id: salesLink?.id || null,
+      kode_ketik: kodeKetik && kodeKetik !== kodeLink ? kodeKetik : null,
+      kode_sales_id: salesKode?.id || null,
+    };
 
     await pastikanTabelDaftar();
     // Batas kirim per NOMOR dihitung dari tabel (sama alasannya kayak buatDanKirimOtp) - tiap kirim itu pesan WA
@@ -129,9 +146,9 @@ router.post('/register/kirim-kode', otpIpLimiter, otpLimiter, async (req, res, n
     await query('UPDATE pendaftaran_otp SET dipakai=true WHERE no_hp=$1 AND dipakai=false', [hp]);
     const kode = String(Math.floor(100000 + Math.random() * 900000));
     const { rows } = await query(
-      `INSERT INTO pendaftaran_otp (nama, username, no_hp, password_hash, kode_hash, kedaluwarsa, sales_id)
-       VALUES ($1,$2,$3,$4,$5, now() + ($6 || ' minutes')::interval, $7) RETURNING id`,
-      [nama, user, hp, await bcrypt.hash(password, 10), await bcrypt.hash(kode, 10), String(OTP_MENIT), sales?.id || null]
+      `INSERT INTO pendaftaran_otp (nama, username, no_hp, password_hash, kode_hash, kedaluwarsa, sales_id, atribusi)
+       VALUES ($1,$2,$3,$4,$5, now() + ($6 || ' minutes')::interval, $7, $8) RETURNING id`,
+      [nama, user, hp, await bcrypt.hash(password, 10), await bcrypt.hash(kode, 10), String(OTP_MENIT), sales?.id || null, JSON.stringify(atribusi)]
     );
     const terkirim = await kirimOtpWa(hp, kode, 'daftar');
     // Gateway WA aktif tapi pesannya ditolak (nomor nggak punya WhatsApp, dst): daftar nggak bisa lanjut, karena
@@ -170,12 +187,37 @@ router.post('/register/verifikasi', otpIpLimiter, otpLimiter, async (req, res, n
       await query('UPDATE pendaftaran_otp SET dipakai=true WHERE id=$1', [p.id]);
       return res.status(409).json({ error: dipakai });
     }
-    const { rows: w } = await query(
-      `INSERT INTO warung (nama, username, password_hash, no_hp, sales_id)
-       VALUES ($1,$2,$3,$4, (SELECT id FROM sales WHERE id=$5)) RETURNING *`,
-      [p.nama, p.username, p.password_hash, p.no_hp, p.sales_id]
-    );
-    await query('UPDATE pendaftaran_otp SET dipakai=true WHERE id=$1', [p.id]);
+    // Warung + atribusi + periode kepemilikan pertama dibikin dalam SATU transaksi - jangan sampai ada warung tanpa
+    // riwayat kepemilikan (PRD §15.1, §28).
+    await pastikanTabelSales();
+    const a = p.atribusi || { sumber: p.sales_id ? 'link' : 'mandiri' };
+    const client = await pool.connect();
+    let w;
+    try {
+      await client.query('BEGIN');
+      ({ rows: w } = await client.query(
+        `INSERT INTO warung (nama, username, password_hash, no_hp, sales_id)
+         VALUES ($1,$2,$3,$4, (SELECT id FROM sales WHERE id=$5)) RETURNING *`,
+        [p.nama, p.username, p.password_hash, p.no_hp, p.sales_id]
+      ));
+      await client.query(
+        `INSERT INTO atribusi_warung (warung_id, sumber, sales_id, link_kode, link_sales_id, kode_ketik, kode_sales_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [w[0].id, a.sumber, w[0].sales_id, a.link_kode || null, a.link_sales_id || null, a.kode_ketik || null, a.kode_sales_id || null]
+      );
+      await client.query(`INSERT INTO kepemilikan_warung (warung_id, sales_id, alasan, aktor) VALUES ($1,$2,$3,'sistem')`, [
+        w[0].id,
+        w[0].sales_id,
+        w[0].sales_id ? `Daftar lewat ${a.sumber === 'kode' ? 'kode sales' : 'link sales'}` : 'Daftar sendiri tanpa link/kode (house account)',
+      ]);
+      await client.query('UPDATE pendaftaran_otp SET dipakai=true WHERE id=$1', [p.id]);
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
     const warung = warungPublik(w[0]);
     res.status(201).json({ warung, token: buatToken(warung.id) });
   } catch (e) {

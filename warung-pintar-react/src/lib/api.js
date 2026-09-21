@@ -73,8 +73,10 @@ const del = (path) => req('DELETE', path);
 export const api = {
   // Daftar akun baru 2 langkah: kirim kode ke WhatsApp -> verifikasi kode (akun baru dibuat di langkah ini).
   daftar: {
-    kirimKode: (namaWarung, username, password, noHp, kodeSales) =>
-      post('/api/auth/register/kirim-kode', { namaWarung, username, password, noHp, kodeSales }),
+    // kodeSales = isi kolom kode di form; refLink = kode dari link ?ref= yang kebawa. Dikirim DUA-DUANYA - server yang
+    // nentuin pemenangnya (kode diketik menang, klaim link tetap dicatat).
+    kirimKode: (namaWarung, username, password, noHp, kodeSales, refLink) =>
+      post('/api/auth/register/kirim-kode', { namaWarung, username, password, noHp, kodeSales, refLink }),
     cekSales: (kode) => get('/api/auth/sales/' + encodeURIComponent(kode)),
     verifikasi: (pendaftaranId, kode) => post('/api/auth/register/verifikasi', { pendaftaranId, kode }),
   },

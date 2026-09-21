@@ -261,45 +261,65 @@ function TambahSales({ urlProduk, onTambah }) {
 }
 
 // Baris warung + pilihan sales-nya (buat benerin warung yang lupa ngisi kode pas daftar).
+// Baris warung + pindah pemilik. Pindah wajib pakai alasan (PRD §15.1) - periode lama ditutup, riwayatnya tetap ada.
 function BarisWarung({ w, api, sales, onBerubah }) {
-  const [salesKode, setSalesKode] = useState(w.sales_kode || '');
+  const [tujuan, setTujuan] = useState(null); // null = belum mau pindah; '' = house account; 'KODE' = sales
+  const [alasan, setAlasan] = useState('');
   const [status, setStatus] = useState('');
-  const ganti = async (kode) => {
-    setSalesKode(kode);
+  const simpan = async (e) => {
+    e.preventDefault();
     setStatus('menyimpan…');
     try {
-      await api('PUT', `/warung/${w.id}/sales`, { kode: kode || null });
-      setStatus('tersimpan ✓');
+      await api('PUT', `/warung/${w.id}/sales`, { kode: tujuan || null, alasan });
+      setStatus('pemilik dipindah ✓');
+      setTujuan(null);
+      setAlasan('');
       onBerubah();
-    } catch (e) {
-      setSalesKode(w.sales_kode || '');
-      setStatus(e.message);
+    } catch (err) {
+      setStatus(err.message);
     }
   };
   return (
-    <li>
-      <div>
-        <b>{w.nama}</b> <span className="adm-redup">@{w.username}</span>
-        <div className="adm-redup">
-          Daftar {tgl(w.created_at)}
-          {w.no_hp ? ` · ${w.no_hp}` : ''}
+    <li style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <b>{w.nama}</b> <span className="adm-redup">@{w.username}</span>
+          <div className="adm-redup">
+            Daftar {tgl(w.created_at)}
+            {w.no_hp ? ` · ${w.no_hp}` : ''}
+          </div>
+          <div className="adm-redup">
+            {w.langganan_aktif ? `${NAMA_PLAN[w.plan] || w.plan} s/d ${tgl(w.lisensi_berlaku_sampai)}` : w.plan === 'trial' ? 'Masih trial' : 'Langganan habis'}
+            {w.total_bayar > 0 ? ` · total bayar ${rupiah(w.total_bayar)}` : ''}
+          </div>
         </div>
-        <div className="adm-redup">
-          {w.langganan_aktif ? `${NAMA_PLAN[w.plan] || w.plan} s/d ${tgl(w.lisensi_berlaku_sampai)}` : w.plan === 'trial' ? 'Masih trial' : 'Langganan habis'}
-          {w.total_bayar > 0 ? ` · total bayar ${rupiah(w.total_bayar)}` : ''}
+        <div className="adm-kanan">
+          <span>{w.sales_nama ? `${w.sales_nama} (${w.sales_kode})` : 'House account'}</span>
+          <select value={tujuan ?? ''} onChange={(e) => setTujuan(e.target.value === '__batal' ? null : e.target.value)} aria-label={`Pindah pemilik ${w.nama}`}>
+            <option value="__batal">Pindah pemilik…</option>
+            <option value="">House account</option>
+            {sales
+              .filter((s) => s.kode !== w.sales_kode)
+              .map((s) => (
+                <option key={s.id} value={s.kode}>
+                  {s.nama} ({s.kode})
+                </option>
+              ))}
+          </select>
+          {status && <span className="adm-redup">{status}</span>}
         </div>
       </div>
-      <div className="adm-kanan">
-        <select value={salesKode} onChange={(e) => ganti(e.target.value)}>
-          <option value="">Tanpa sales</option>
-          {sales.map((s) => (
-            <option key={s.id} value={s.kode}>
-              {s.nama} ({s.kode})
-            </option>
-          ))}
-        </select>
-        {status && <span className="adm-redup">{status}</span>}
-      </div>
+      {tujuan !== null && (
+        <form className="adm-cari" onSubmit={simpan}>
+          <input value={alasan} onChange={(e) => setAlasan(e.target.value)} placeholder="Alasan pindah (wajib)" aria-label="Alasan pindah pemilik" autoFocus />
+          <button className="btn kecil utama" type="submit" disabled={alasan.trim().length < 5}>
+            Pindahkan
+          </button>
+          <button className="btn kecil" type="button" onClick={() => setTujuan(null)}>
+            Batal
+          </button>
+        </form>
+      )}
     </li>
   );
 }

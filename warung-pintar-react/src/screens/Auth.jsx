@@ -71,7 +71,7 @@ export default function Auth() {
   };
 
   const kirimKodeDaftar = async () => {
-    const r = await api.daftar.kirimKode(namaWarung.trim(), username.trim(), password, noHp.trim(), kodeSalesRapi || undefined);
+    const r = await api.daftar.kirimKode(namaWarung.trim(), username.trim(), password, noHp.trim(), kodeSalesRapi || undefined, kodeSalesTersimpan() || undefined);
     setPendaftaran({ id: r.pendaftaranId, noHpSamar: r.noHpSamar, berlakuMenit: r.berlakuMenit });
     setKode('');
     setTungguKirimUlang(60);

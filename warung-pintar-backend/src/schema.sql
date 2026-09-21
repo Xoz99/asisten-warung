@@ -487,3 +487,25 @@ CREATE INDEX IF NOT EXISTS idx_ganti_nohp_warung ON ganti_nohp (warung_id, creat
 -- Akun demo buat sales (lihat services/akunDemo.service.js - dibikin otomatis juga di sana): nggak bisa ganti kata
 -- sandi/nomor HP/PIN, nggak bisa lupa-password, nggak bisa langganan, lisensinya nggak pernah habis.
 ALTER TABLE warung ADD COLUMN IF NOT EXISTS demo BOOLEAN NOT NULL DEFAULT false;
+
+-- Atribusi & kepemilikan customer (PRD v0.2 §14-15; dibikin otomatis juga di services/sales.service.js).
+CREATE TABLE IF NOT EXISTS atribusi_warung (
+  warung_id UUID PRIMARY KEY REFERENCES warung(id) ON DELETE CASCADE,
+  sumber TEXT NOT NULL,
+  sales_id UUID REFERENCES sales(id) ON DELETE SET NULL,
+  link_kode TEXT, link_sales_id UUID REFERENCES sales(id) ON DELETE SET NULL,
+  kode_ketik TEXT, kode_sales_id UUID REFERENCES sales(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS kepemilikan_warung (
+  id BIGSERIAL PRIMARY KEY,
+  warung_id UUID NOT NULL REFERENCES warung(id) ON DELETE CASCADE,
+  sales_id UUID REFERENCES sales(id) ON DELETE SET NULL,
+  valid_from TIMESTAMPTZ NOT NULL DEFAULT now(),
+  valid_to TIMESTAMPTZ,
+  alasan TEXT NOT NULL,
+  aktor TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_kepemilikan_aktif ON kepemilikan_warung (warung_id) WHERE valid_to IS NULL;
+ALTER TABLE pendaftaran_otp ADD COLUMN IF NOT EXISTS atribusi JSONB;

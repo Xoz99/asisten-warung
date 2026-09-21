@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { normalisasiNoHp } from '../../utils/noHp.js';
 import { catatLog } from '../../db.js';
+import { pindahPemilik } from './kepemilikan.js';
 import { POLA_KODE_SALES, query, rapikanKodeSales } from './db.js';
 
 // Warung Pintar: kelola sales + rekap sales mana bawa warung mana & siapa yang udah bayar langganan.
@@ -39,7 +40,15 @@ router.get('/ringkasan', async (req, res, next) => {
     const { rows: pembayaran } = await query(
       `SELECT p.order_id, p.plan, p.jumlah::float AS jumlah, p.updated_at AS lunas_pada,
               w.id AS warung_id, w.nama AS warung, w.username, s.kode AS sales_kode, s.nama AS sales_nama
-       FROM pembayaran p JOIN warung w ON w.id = p.warung_id LEFT JOIN sales s ON s.id = w.sales_id
+       FROM pembayaran p JOIN warung w ON w.id = p.warung_id
+       LEFT JOIN LATERAL (
+           -- Pemilik PADA SAAT bayar: periode terakhir yang mulai sebelum/pas waktu bayar. Kalau waktu bayarnya lebih
+           -- awal dari periode pertama (data lama), pakai periode pertama.
+           SELECT k.sales_id FROM kepemilikan_warung k WHERE k.warung_id = p.warung_id
+           ORDER BY (k.valid_from <= p.updated_at) DESC, CASE WHEN k.valid_from <= p.updated_at THEN k.valid_from END DESC, k.valid_from ASC
+           LIMIT 1
+         ) k ON true
+       LEFT JOIN sales s ON s.id = k.sales_id
        WHERE p.status='settlement' ORDER BY p.updated_at DESC LIMIT 30`
     );
     res.json({ sales, tanpaSales: tanpa[0], pembayaran });
@@ -138,19 +147,19 @@ router.get('/warung', async (req, res, next) => {
   }
 });
 
-// Pasang / ganti / lepas sales sebuah warung. { kode: 'BUDI' } atau { kode: null } buat dilepas.
+// Pasang / ganti / lepas sales sebuah warung. { kode: 'BUDI' | null, alasan } - alasan wajib (PRD §15.1, §23).
 router.put('/warung/:id/sales', async (req, res, next) => {
   try {
     if (!POLA_UUID.test(req.params.id)) return res.status(404).json({ error: 'Warung tidak ditemukan' });
+    const alasan = typeof req.body.alasan === 'string' ? req.body.alasan.trim().slice(0, 300) : '';
+    if (alasan.length < 5) return res.status(400).json({ error: 'Alasan pindah pemilik wajib diisi (minimal 5 huruf)' });
     let salesId = null;
     if (req.body.kode) {
       const { rows } = await query('SELECT id FROM sales WHERE kode=$1', [rapikanKodeSales(req.body.kode)]);
       if (!rows.length) return res.status(400).json({ error: 'Kode sales nggak dikenal' });
       salesId = rows[0].id;
     }
-    const { rows: w } = await query('UPDATE warung SET sales_id=$2 WHERE id=$1 RETURNING username', [req.params.id, salesId]);
-    if (!w.length) return res.status(404).json({ error: 'Warung tidak ditemukan' });
-    await catatLog(req, 'warung-pintar.warung.ganti_sales', { username: w[0].username, sales: req.body.kode || null });
+    await pindahPemilik(req, req.params.id, salesId, alasan);
     res.json({ ok: true });
   } catch (e) {
     next(e);
