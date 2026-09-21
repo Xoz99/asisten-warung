@@ -467,3 +467,19 @@ CREATE TABLE IF NOT EXISTS sales (
 ALTER TABLE warung ADD COLUMN IF NOT EXISTS sales_id UUID REFERENCES sales(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_warung_sales ON warung (sales_id);
 ALTER TABLE pendaftaran_otp ADD COLUMN IF NOT EXISTS sales_id UUID;
+
+-- Permintaan ganti nomor HP pemulihan (lihat auth.routes.js /no-hp/* - dibikin otomatis juga di sana). Nomor baru
+-- baru dipasang kalau kode dari WA nomor LAMA (izin pemilik) dan WA nomor BARU dua-duanya cocok.
+CREATE TABLE IF NOT EXISTS ganti_nohp (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  warung_id UUID NOT NULL REFERENCES warung(id) ON DELETE CASCADE,
+  no_hp_lama TEXT,
+  no_hp_baru TEXT NOT NULL,
+  kode_lama_hash TEXT,
+  kode_baru_hash TEXT NOT NULL,
+  kedaluwarsa TIMESTAMPTZ NOT NULL,
+  percobaan INT NOT NULL DEFAULT 0,
+  dipakai BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_ganti_nohp_warung ON ganti_nohp (warung_id, created_at DESC);

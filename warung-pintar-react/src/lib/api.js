@@ -83,7 +83,11 @@ export const api = {
   // Nomor HP = jalan pulih satu-satunya kalau password kelupaan. Ganti nomor minta password lagi
   // (backend yang maksa) - biar HP warung yang lagi kebuka nggak bisa dipakai orang lain mindahin
   // nomor pemulihan ke nomornya sendiri.
-  gantiNoHp: (password, noHp) => req('PATCH', '/api/auth/no-hp', { password, noHp }),
+  // Ganti nomor HP 2 langkah: kode ke WA nomor lama + nomor baru -> dua kode dicocokkan.
+  noHp: {
+    kirimKode: (password, noHp) => post('/api/auth/no-hp/kirim-kode', { password, noHp }),
+    verifikasi: (id, kodeLama, kodeBaru) => post('/api/auth/no-hp/verifikasi', { id, kodeLama, kodeBaru }),
+  },
 
   // Lupa password (belum login): minta kode -> verifikasi -> pasang password baru.
   // `id` boleh username ATAU nomor HP - yang lupa password sering lupa username juga.

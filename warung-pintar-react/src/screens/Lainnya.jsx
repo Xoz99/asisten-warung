@@ -696,48 +696,126 @@ function SheetGantiPin({ onClose }) {
   );
 }
 
-// Isi/ganti nomor HP pemulihan. Password diminta lagi (dipaksa backend) supaya HP warung yang
-// lagi kebuka nggak bisa dipakai orang lain mindahin nomor pemulihan ke nomornya sendiri —
-// itu jalan pintas paling gampang buat ambil alih akun.
+// Isi/ganti nomor HP pemulihan - 2 langkah (dipaksa backend, lihat auth.routes.js /no-hp/*):
+// 1. nomor baru + kata sandi -> kode dikirim ke WA nomor LAMA (izin pemilik) & WA nomor BARU;
+// 2. dua kode dimasukin -> nomornya diganti.
+// Password doang nggak cukup, karena password sering dibagi (istri, penjaga, akun demo buat sales) - tanpa HP nomor
+// lama, nomor pemulihan nggak bisa dipindah orang lain.
 function SheetNoHp({ onClose }) {
   const { gantiNoHp, authWarung, toast } = useApp();
-  const [noHp, setNoHp] = useState(authWarung?.noHp ? tampilNoHp(authWarung.noHp) : '');
+  const [noHp, setNoHp] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [permintaan, setPermintaan] = useState(null); // hasil kirim-kode
+  const [kodeLama, setKodeLama] = useState('');
+  const [kodeBaru, setKodeBaru] = useState('');
+  const [error, setError] = useState('');
 
-  const simpan = async () => {
-    if (noHp.replace(/\D/g, '').length < 10) return toast('Nomor HP belum benar');
-    if (!password) return toast('Masukkan kata sandi kamu');
+  const kirimKode = async () => {
+    setError('');
+    if (noHp.replace(/\D/g, '').length < 10) return setError('Nomor HP belum benar');
+    if (!password) return setError('Masukkan kata sandi kamu');
     setLoading(true);
     try {
-      await gantiNoHp(password, noHp.trim());
-      toast('Nomor HP tersimpan ✓');
-      onClose();
+      setPermintaan(await api.noHp.kirimKode(password, noHp.trim()));
+      setKodeLama('');
+      setKodeBaru('');
     } catch (e) {
-      toast(e.message ? escapeHtml(e.message) : 'Gagal menyimpan nomor HP');
+      setError(e.message || 'Gagal kirim kode');
     } finally {
       setLoading(false);
     }
   };
 
+  const verifikasi = async () => {
+    setError('');
+    if (permintaan.perluKodeLama && kodeLama.length !== 6) return setError('Kode dari nomor lama itu 6 angka');
+    if (kodeBaru.length !== 6) return setError('Kode dari nomor baru itu 6 angka');
+    setLoading(true);
+    try {
+      await gantiNoHp(permintaan.id, kodeLama, kodeBaru);
+      toast('Nomor HP tersimpan ✓');
+      onClose();
+    } catch (e) {
+      setError(e.message || 'Gagal menyimpan nomor HP');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const inputKode = (nilai, set, label) => (
+    <div className="field">
+      <label>{label}</label>
+      <input
+        value={nilai}
+        onChange={(e) => set(e.target.value.replace(/\D/g, '').slice(0, 6))}
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        maxLength={6}
+        placeholder="______"
+      />
+    </div>
+  );
+
   return (
     <div className="sheet show">
       <div className="panel">
         <h3>Nomor HP pemulihan</h3>
-        <p>Dipakai buat kirim kode kalau kamu lupa kata sandi atau mau ganti PIN. Pakai nomor yang WhatsApp-nya aktif.</p>
-        <div className="field">
-          <label>Nomor HP (WhatsApp)</label>
-          <input value={noHp} onChange={(e) => setNoHp(e.target.value)} inputMode="tel" placeholder="0812-3456-7890" />
-        </div>
-        <div className="field">
-          <label>Kata sandi kamu (buat memastikan)</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••" />
-        </div>
-        <button className="btn utama" style={{ width: '100%', marginTop: 18 }} onClick={simpan} disabled={loading}>
-          {loading ? 'Menyimpan…' : 'Simpan nomor HP'}
+        {!permintaan ? (
+          <>
+            <p>
+              {authWarung?.noHp ? (
+                <>
+                  Nomor sekarang <b>{tampilNoHp(authWarung.noHp)}</b>. Buat ganti, kode dikirim ke WhatsApp nomor ini{' '}
+                  <b>dan</b> nomor baru - jadi cuma pemilik nomor sekarang yang bisa mindahinnya.
+                </>
+              ) : (
+                'Dipakai buat kirim kode kalau kamu lupa kata sandi atau mau ganti PIN. Pakai nomor yang WhatsApp-nya aktif.'
+              )}
+            </p>
+            <div className="field">
+              <label>Nomor HP baru (WhatsApp)</label>
+              <input value={noHp} onChange={(e) => setNoHp(e.target.value)} inputMode="tel" placeholder="0812-3456-7890" />
+            </div>
+            <div className="field">
+              <label>Kata sandi kamu (buat memastikan)</label>
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••" />
+            </div>
+          </>
+        ) : (
+          <>
+            <p>
+              {permintaan.perluKodeLama ? (
+                <>
+                  Kode dikirim ke WhatsApp nomor lama <b style={{ whiteSpace: 'nowrap' }}>{permintaan.noHpLamaSamar}</b> dan nomor baru{' '}
+                  <b style={{ whiteSpace: 'nowrap' }}>{permintaan.noHpBaruSamar}</b>. Berlaku {permintaan.berlakuMenit || 10} menit.
+                </>
+              ) : (
+                <>
+                  Kode dikirim ke WhatsApp <b style={{ whiteSpace: 'nowrap' }}>{permintaan.noHpBaruSamar}</b>. Berlaku {permintaan.berlakuMenit || 10} menit.
+                </>
+              )}
+            </p>
+            {permintaan.perluKodeLama && inputKode(kodeLama, setKodeLama, `Kode dari nomor lama (${permintaan.noHpLamaSamar})`)}
+            {inputKode(kodeBaru, setKodeBaru, permintaan.perluKodeLama ? `Kode dari nomor baru (${permintaan.noHpBaruSamar})` : 'Kode verifikasi')}
+          </>
+        )}
+        {error && <p style={{ color: '#e5484d', fontWeight: 600, marginTop: 10 }}>{error}</p>}
+        <button className="btn utama" style={{ width: '100%', marginTop: 18 }} onClick={permintaan ? verifikasi : kirimKode} disabled={loading}>
+          {loading ? 'Memproses…' : permintaan ? 'Verifikasi & simpan' : 'Kirim kode'}
         </button>
-        <button className="btn" style={{ width: '100%', marginTop: 10 }} onClick={onClose}>
-          Batal
+        <button
+          className="btn"
+          style={{ width: '100%', marginTop: 10 }}
+          onClick={() => {
+            if (permintaan) {
+              setPermintaan(null);
+              setError('');
+            } else onClose();
+          }}
+          disabled={loading}
+        >
+          {permintaan ? 'Kembali' : 'Batal'}
         </button>
       </div>
     </div>

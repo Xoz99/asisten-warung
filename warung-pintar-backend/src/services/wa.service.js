@@ -73,12 +73,23 @@ export async function kirimWa(noHp, pesan) {
 // Pesan OTP siap pakai. Teksnya ditulis buat pemilik warung (bahasa sehari-hari, bukan bahasa
 // sistem), plus peringatan jangan kasih kodenya ke siapa pun - penipuan "halo saya dari admin,
 // sebutkan kodenya" itu modus paling umum buat ngebobol OTP di Indonesia.
-export async function kirimOtpWa(noHp, kode, tujuan) {
-  const untuk = tujuan === 'pin' ? 'mengganti PIN' : tujuan === 'daftar' ? 'mendaftarkan warung baru' : 'mengatur ulang kata sandi';
+export async function kirimOtpWa(noHp, kode, tujuan, info = {}) {
+  const UNTUK = {
+    pin: 'mengganti PIN',
+    daftar: 'mendaftarkan warung baru',
+    'nohp-baru': 'memasang nomor ini sebagai nomor HP akun Warung Pintar',
+  };
+  const untuk = UNTUK[tujuan] || 'mengatur ulang kata sandi';
+  // Ke nomor LAMA pas ada yang mau ganti nomor: sekalian peringatan - kalau bukan pemiliknya yang minta, dia tau
+  // ada yang pegang password-nya & nyoba mindahin nomor akun.
   const pesan =
-    `*${kode}* adalah kode verifikasi Warung Pintar Anda.\n\n` +
-    `Kode ini dipakai untuk ${untuk} dan berlaku 10 menit.\n\n` +
-    `JANGAN berikan kode ini ke siapa pun, termasuk yang mengaku admin Warung Pintar atau Konsulin.`;
+    tujuan === 'nohp-lama'
+      ? `Ada permintaan MENGGANTI nomor HP akun Warung Pintar Anda ke nomor ${info.noHpBaru || 'lain'}.\n\n` +
+        `Kalau memang Anda yang minta, kodenya: *${kode}* (berlaku 10 menit).\n\n` +
+        `Kalau BUKAN Anda, JANGAN berikan kode ini ke siapa pun & segera ganti kata sandi akun Anda.`
+      : `*${kode}* adalah kode verifikasi Warung Pintar Anda.\n\n` +
+        `Kode ini dipakai untuk ${untuk} dan berlaku 10 menit.\n\n` +
+        `JANGAN berikan kode ini ke siapa pun, termasuk yang mengaku admin Warung Pintar atau Konsulin.`;
 
   const terkirim = await kirimWa(noHp, pesan);
   if (!terkirim) {

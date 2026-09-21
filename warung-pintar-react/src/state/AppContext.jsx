@@ -564,8 +564,8 @@ export function AppProvider({ children }) {
   const gantiPassword = useCallback((lama, baru) => api.gantiPassword(lama, baru), []);
   // Nomor HP disimpan ulang ke sesi lokal juga - layar Akun baca dari authWarung, kalau nggak
   // disegarkan di sini nomornya baru keliatan berubah setelah logout-login.
-  const gantiNoHp = useCallback(async (password, noHp) => {
-    const { noHp: tersimpan } = await api.gantiNoHp(password, noHp);
+  const gantiNoHp = useCallback(async (id, kodeLama, kodeBaru) => {
+    const { noHp: tersimpan } = await api.noHp.verifikasi(id, kodeLama, kodeBaru);
     setAuthWarung((w) => {
       const baru = { ...w, noHp: tersimpan };
       sesi.simpan(sesi.token(), baru);

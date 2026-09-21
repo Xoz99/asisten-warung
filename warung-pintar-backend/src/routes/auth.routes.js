@@ -223,29 +223,142 @@ router.patch('/password', requireAuth, loginLimiter, async (req, res, next) => {
   }
 });
 
-// Isi/ganti nomor HP (butuh login + password, dipakai dari menu Akun). WAJIB ada karena akun yang
-// dibikin SEBELUM fitur ini no_hp-nya NULL - tanpa jalan ini, mereka nggak akan pernah bisa pakai
-// lupa-password. Password diminta lagi biar HP yang lagi kebuka nggak bisa dipakai orang lain
-// mindahin nomor pemulihan ke nomornya sendiri (itu jalan pintas ambil alih akun).
-router.patch('/no-hp', requireAuth, loginLimiter, async (req, res, next) => {
+// ---- Isi/ganti nomor HP pemulihan (menu Lainnya) ----
+//
+// Dulu cukup password. Masalahnya password itu sering DIBAGI (1 akun dipakai istri/anak/penjaga, akun demo dipakai
+// rame-rame sama sales) - siapa pun yang tau password bisa mindahin nomor pemulihan ke nomornya sendiri, terus
+// pakai "lupa password" buat ngambil alih akun. Sekarang 2 langkah:
+//  1. password + nomor baru -> kode dikirim ke WA nomor LAMA (izin pemilik nomor sekarang) DAN ke WA nomor BARU
+//     (mastiin nomornya bener & aktif). Akun yang belum punya nomor cuma dapet kode ke nomor baru.
+//  2. dua kode dimasukin -> baru nomornya diganti.
+// Tanpa pegang HP nomor lama, nomor nggak bisa dipindah.
+let tabelGantiHpSiap = null;
+function pastikanTabelGantiHp() {
+  if (!tabelGantiHpSiap) {
+    tabelGantiHpSiap = (async () => {
+      await query(`CREATE TABLE IF NOT EXISTS ganti_nohp (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        warung_id UUID NOT NULL REFERENCES warung(id) ON DELETE CASCADE,
+        no_hp_lama TEXT,
+        no_hp_baru TEXT NOT NULL,
+        kode_lama_hash TEXT,
+        kode_baru_hash TEXT NOT NULL,
+        kedaluwarsa TIMESTAMPTZ NOT NULL,
+        percobaan INT NOT NULL DEFAULT 0,
+        dipakai BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT now()
+      )`);
+      await query('CREATE INDEX IF NOT EXISTS idx_ganti_nohp_warung ON ganti_nohp (warung_id, created_at DESC)');
+    })().catch((e) => {
+      tabelGantiHpSiap = null;
+      throw e;
+    });
+  }
+  return tabelGantiHpSiap;
+}
+
+const GANTI_HP_MAKS_KIRIM = 4; // per akun per OTP_JENDELA_MENIT - tiap permintaan bisa ngirim 2 pesan WA
+const buatKode = () => String(Math.floor(100000 + Math.random() * 900000));
+
+router.post('/no-hp/kirim-kode', requireAuth, otpIpLimiter, otpLimiter, async (req, res, next) => {
   try {
     const { password, noHp } = req.body;
     const hp = normalisasiNoHp(noHp);
     if (!password || !hp) return res.status(400).json({ error: 'Password & nomor HP yang valid wajib diisi' });
-
     const { rows } = await query('SELECT * FROM warung WHERE id=$1', [req.warungId]);
     const w = rows[0];
     if (!w || !(await bcrypt.compare(password, w.password_hash))) {
       return res.status(401).json({ error: 'Password salah' });
     }
+    if (hp === w.no_hp) return res.status(400).json({ error: 'Itu nomor yang sekarang dipakai' });
     const dipakai = await query('SELECT id FROM warung WHERE no_hp=$1 AND id<>$2', [hp, w.id]);
     if (dipakai.rows.length) return res.status(409).json({ error: 'Nomor HP ini sudah dipakai warung lain' });
 
-    await query('UPDATE warung SET no_hp=$1 WHERE id=$2', [hp, w.id]);
-    res.json({ ok: true, noHp: hp });
+    await pastikanTabelGantiHp();
+    const { rows: hitung } = await query(
+      `SELECT count(*)::int AS n FROM ganti_nohp WHERE warung_id=$1 AND created_at > now() - ($2 || ' minutes')::interval`,
+      [w.id, String(OTP_JENDELA_MENIT)]
+    );
+    if (hitung[0].n >= GANTI_HP_MAKS_KIRIM) {
+      return res.status(429).json({ error: `Sudah terlalu sering minta kode. Coba lagi ${OTP_JENDELA_MENIT} menit lagi.` });
+    }
+
+    await query('UPDATE ganti_nohp SET dipakai=true WHERE warung_id=$1 AND dipakai=false', [w.id]);
+    const kodeBaru = buatKode();
+    const kodeLama = w.no_hp ? buatKode() : null;
+    const { rows: g } = await query(
+      `INSERT INTO ganti_nohp (warung_id, no_hp_lama, no_hp_baru, kode_lama_hash, kode_baru_hash, kedaluwarsa)
+       VALUES ($1,$2,$3,$4,$5, now() + ($6 || ' minutes')::interval) RETURNING id`,
+      [w.id, w.no_hp, hp, kodeLama ? await bcrypt.hash(kodeLama, 10) : null, await bcrypt.hash(kodeBaru, 10), String(OTP_MENIT)]
+    );
+    // Nomor lama dikirimin juga peringatan: kalau bukan pemiliknya yang minta, dia langsung tau ada yang nyoba.
+    const lamaTerkirim = kodeLama ? await kirimOtpWa(w.no_hp, kodeLama, 'nohp-lama', { noHpBaru: samarkanNoHp(hp) }) : true;
+    const baruTerkirim = await kirimOtpWa(hp, kodeBaru, 'nohp-baru');
+    if (waAktif() && (!lamaTerkirim || !baruTerkirim)) {
+      await query('UPDATE ganti_nohp SET dipakai=true WHERE id=$1', [g[0].id]);
+      return res.status(502).json({
+        error: !baruTerkirim
+          ? 'Kode gagal dikirim ke WhatsApp nomor baru. Pastikan nomornya benar & WhatsApp-nya aktif.'
+          : 'Kode gagal dikirim ke WhatsApp nomor lama. Coba lagi sebentar lagi.',
+      });
+    }
+    res.json({
+      id: g[0].id,
+      perluKodeLama: !!kodeLama,
+      noHpLamaSamar: w.no_hp ? samarkanNoHp(w.no_hp) : null,
+      noHpBaruSamar: samarkanNoHp(hp),
+      berlakuMenit: OTP_MENIT,
+    });
   } catch (e) {
     next(e);
   }
+});
+
+router.post('/no-hp/verifikasi', requireAuth, otpIpLimiter, otpLimiter, async (req, res, next) => {
+  try {
+    const { id, kodeLama, kodeBaru } = req.body;
+    if (!POLA_UUID_DAFTAR.test(id || '') || !kodeBaru) return res.status(400).json({ error: 'Kode wajib diisi' });
+    await pastikanTabelGantiHp();
+    const { rows } = await query(
+      'SELECT * FROM ganti_nohp WHERE id=$1 AND warung_id=$2 AND dipakai=false AND kedaluwarsa > now()',
+      [id, req.warungId]
+    );
+    const g = rows[0];
+    if (!g) return res.status(400).json({ error: 'Kode sudah kedaluwarsa. Minta kode baru.' });
+    if (g.percobaan >= OTP_MAKS_SALAH) {
+      await query('UPDATE ganti_nohp SET dipakai=true WHERE id=$1', [g.id]);
+      return res.status(429).json({ error: 'Terlalu banyak percobaan. Minta kode baru.' });
+    }
+    const lamaCocok = !g.kode_lama_hash || (await bcrypt.compare(String(kodeLama || '').trim(), g.kode_lama_hash));
+    const baruCocok = await bcrypt.compare(String(kodeBaru).trim(), g.kode_baru_hash);
+    if (!lamaCocok || !baruCocok) {
+      await query('UPDATE ganti_nohp SET percobaan=percobaan+1 WHERE id=$1', [g.id]);
+      const sisa = OTP_MAKS_SALAH - (g.percobaan + 1);
+      const yang = !lamaCocok && !baruCocok ? 'Dua kode salah' : !lamaCocok ? 'Kode dari nomor lama salah' : 'Kode dari nomor baru salah';
+      return res.status(400).json({ error: sisa > 0 ? `${yang}. Sisa ${sisa} percobaan.` : `${yang}. Minta kode baru.` });
+    }
+    // Selama nunggu kode, nomornya bisa keburu berubah (dari HP lain) atau nomor barunya keburu dipakai warung lain.
+    const { rows: wr } = await query('SELECT no_hp FROM warung WHERE id=$1', [req.warungId]);
+    if ((wr[0]?.no_hp || null) !== (g.no_hp_lama || null)) {
+      await query('UPDATE ganti_nohp SET dipakai=true WHERE id=$1', [g.id]);
+      return res.status(409).json({ error: 'Nomor akun ini baru aja berubah. Ulangi dari awal.' });
+    }
+    const dipakai = await query('SELECT id FROM warung WHERE no_hp=$1 AND id<>$2', [g.no_hp_baru, req.warungId]);
+    if (dipakai.rows.length) {
+      await query('UPDATE ganti_nohp SET dipakai=true WHERE id=$1', [g.id]);
+      return res.status(409).json({ error: 'Nomor HP ini sudah dipakai warung lain' });
+    }
+    await query('UPDATE warung SET no_hp=$1 WHERE id=$2', [g.no_hp_baru, req.warungId]);
+    await query('UPDATE ganti_nohp SET dipakai=true WHERE id=$1', [g.id]);
+    res.json({ ok: true, noHp: g.no_hp_baru });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Jalur lama (cukup password) ditutup - kalau dibiarin, verifikasi WA bisa dilewatin tinggal manggil ini langsung.
+router.patch('/no-hp', requireAuth, (req, res) => {
+  res.status(410).json({ error: 'Ganti nomor sekarang pakai kode WhatsApp. Tutup lalu buka lagi aplikasinya, terus coba lagi.' });
 });
 
 // ---- OTP: bikin, kirim, verifikasi ----
