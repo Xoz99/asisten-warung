@@ -222,6 +222,8 @@ function kenaliFile(buf) {
   if (buf.subarray(0, 4).toString() === '%PDF') return { mime: 'application/pdf', ext: 'pdf' };
   if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return { mime: 'image/jpeg', ext: 'jpg' };
   if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return { mime: 'image/png', ext: 'png' };
+  // Foto & CV gambar dikonversi ke WEBP di browser sebelum dikirim (lihat lib/gambar di form lamaran).
+  if (buf.subarray(0, 4).toString() === 'RIFF' && buf.subarray(8, 12).toString() === 'WEBP') return { mime: 'image/webp', ext: 'webp' };
   return null;
 }
 function bacaDokumen(d, jenis) {
@@ -231,7 +233,7 @@ function bacaDokumen(d, jenis) {
   const buf = Buffer.from(m[1], 'base64');
   if (buf.length > MAKS_DOKUMEN) throw salah(`File ${jenis === 'cv' ? 'CV' : 'foto'} maksimal 3 MB`);
   const k = kenaliFile(buf);
-  if (!k || (jenis === 'foto' && k.ext === 'pdf')) throw salah(jenis === 'cv' ? 'CV harus PDF, JPG, atau PNG' : 'Foto harus JPG atau PNG');
+  if (!k || (jenis === 'foto' && k.ext === 'pdf')) throw salah(jenis === 'cv' ? 'CV harus PDF atau gambar (JPG, PNG, WEBP)' : 'Foto harus JPG, PNG, atau WEBP');
   return { buf, ...k, nama: teks(d.nama, 120) || `${jenis}.${k.ext}` };
 }
 

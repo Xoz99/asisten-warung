@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { panggil } from '../lib/api.js';
+import { keWebp } from '../lib/gambar.js';
 
 // Form lamaran calon Sales Partner bawaan Makalin (/daftar). Di produksi form publiknya di konsulin.com/karir
 // (repo konsulin-landing-page) dan /daftar dialihin ke sana - form ini dipakai kalau DAFTAR_URL kosong (mis. lokal).
@@ -83,14 +84,26 @@ export default function DaftarPublik() {
     }
   };
 
-  const pilihFile = (set, jenis) => (e) => {
+  // Gambar (foto & CV berupa foto) diubah ke WEBP + dikecilin di HP dulu, jadi foto kamera 5-10 MB tetap bisa dikirim.
+  // PDF dikirim apa adanya (maks 3 MB).
+  const pilihFile = (set, jenis) => async (e) => {
     const f = e.target.files?.[0];
     e.target.value = '';
     setError('');
     if (!f) return;
-    if (f.size > MAKS_FILE) return setError(`${jenis === 'cv' ? 'CV' : 'Foto'} maksimal 3 MB`);
-    const boleh = jenis === 'cv' ? ['application/pdf', 'image/jpeg', 'image/png'] : ['image/jpeg', 'image/png'];
-    if (!boleh.includes(f.type)) return setError(jenis === 'cv' ? 'CV harus PDF, JPG, atau PNG' : 'Foto harus JPG atau PNG');
+    const gambar = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'].includes(f.type);
+    if (jenis === 'foto' && !gambar) return setError('Foto harus berupa gambar (JPG, PNG, WEBP)');
+    if (jenis === 'cv' && !gambar && f.type !== 'application/pdf') return setError('CV harus PDF atau gambar (JPG, PNG, WEBP)');
+    if (gambar) {
+      try {
+        const h = await keWebp(f, jenis === 'foto' ? 1200 : 2000);
+        if (h.ukuran > MAKS_FILE) return setError(`${jenis === 'cv' ? 'CV' : 'Foto'} masih lebih dari 3 MB setelah dikecilin`);
+        return set(h);
+      } catch {
+        return setError('Gambar nggak kebaca. Coba pilih ulang atau pakai JPG.');
+      }
+    }
+    if (f.size > MAKS_FILE) return setError('CV PDF maksimal 3 MB');
     const r = new FileReader();
     r.onload = () => set({ nama: f.name, ukuran: f.size, data: r.result });
     r.readAsDataURL(f);
@@ -177,7 +190,7 @@ export default function DaftarPublik() {
         <label className="adm-unggah" style={{ marginTop: 0 }}>
           <input type="file" accept={accept} onChange={pilihFile(set, jenis)} />
           <b>Pilih file</b>
-          <span className="adm-redup">{jenis === 'cv' ? 'PDF, JPG, atau PNG, maksimal 3 MB' : 'JPG atau PNG, maksimal 3 MB'}</span>
+          <span className="adm-redup">{jenis === 'cv' ? 'PDF (maks 3 MB) atau foto dokumen' : 'Foto dari kamera atau galeri'}</span>
         </label>
       )}
     </div>
@@ -269,8 +282,8 @@ export default function DaftarPublik() {
 
             {langkah === 2 && (
               <>
-                {berkas('CV / riwayat hidup', cv, setCv, 'cv', 'application/pdf,image/jpeg,image/png')}
-                {berkas('Foto diri (opsional)', foto, setFoto, 'foto', 'image/jpeg,image/png')}
+                {berkas('CV / riwayat hidup', cv, setCv, 'cv', 'application/pdf,image/*')}
+                {berkas('Foto diri (opsional)', foto, setFoto, 'foto', 'image/*')}
                 {f('sosmed', 'Link Instagram / Facebook / LinkedIn (opsional)', { placeholder: 'https://' })}
                 {f('referral', 'Kode referral (kalau diajak teman)', { placeholder: 'REF-A1B2C3', autoCapitalize: 'characters' })}
                 {perluDropdown && pilih('dropdown', 'Tahu Konsulin dari mana?', info?.pilihanSumber)}

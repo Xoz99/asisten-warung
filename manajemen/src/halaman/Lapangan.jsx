@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { tgl, waktu } from '../lib/format.js';
 import { Gagal, Konfirmasi, Kosong, Memuat, Modal, Tabs, useData } from '../komponen/Ui.jsx';
 import { bacaSesi } from '../lib/api.js';
+import { keWebp } from '../lib/gambar.js';
 
 // Sales Lapangan: bank keberatan pelanggan + log kunjungan sales + insight. Akun peran sales cuma lihat punyanya sendiri.
 const TABS = [
@@ -58,6 +59,7 @@ export default function Lapangan({ api, admin, tab }) {
         <FormLog
           api={api}
           awal={form.awal}
+          wajibGps={sales}
           onTutup={() => setForm(null)}
           onSelesai={(t) => {
             setForm(null);
@@ -96,12 +98,12 @@ function Log({ api, sales, versi, onBuka, onCatat }) {
   const kategori = useMemo(() => [...new Set([...(bank || []).map((k) => k.kategori), ...(data || []).map((l) => l.kategori)])].sort(), [bank, data]);
 
   const ekspor = () => {
-    const kepala = ['No', 'Tanggal', 'Sales', 'Kategori', 'Ucapan pelanggan', 'Fakta produk', 'Respon sales', 'Respon customer', 'Hasil', 'Catatan / insight', 'No kunjungan / ID cust', 'Link lokasi', 'Jumlah foto'];
+    const kepala = ['No', 'Tanggal', 'Sales', 'Kategori', 'Ucapan pelanggan', 'Fakta produk', 'Respon sales', 'Respon customer', 'Hasil', 'Catatan / insight', 'No kunjungan / ID cust', 'Link lokasi', 'Akurasi GPS (m)', 'Jumlah foto'];
     const sel = (v) => {
       const s = v == null ? '' : String(v);
       return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const baris = data.map((l) => [l.nomor, l.tanggal, l.sales_nama, l.kategori, l.ucapan, l.fakta, l.respon_sales, l.respon_customer, HASIL[l.hasil]?.pendek, l.catatan, l.id_kunjungan, l.lokasi_url, l.foto.length]);
+    const baris = data.map((l) => [l.nomor, l.tanggal, l.sales_nama, l.kategori, l.ucapan, l.fakta, l.respon_sales, l.respon_customer, HASIL[l.hasil]?.pendek, l.catatan, l.id_kunjungan, l.lokasi_url, l.akurasi_m, l.foto.length]);
     const url = URL.createObjectURL(new Blob(['﻿' + [kepala, ...baris].map((r) => r.map(sel).join(',')).join('\n')], { type: 'text/csv;charset=utf-8' }));
     Object.assign(document.createElement('a'), { href: url, download: `sales-lapangan-${hariIniWib()}.csv` }).click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -361,11 +363,26 @@ function Detail({ api, l, admin, onTutup, onUbah, onHapus }) {
               Nggak ada foto.
             </p>
           )}
-          {l.lokasi_url && (
+          {l.lat != null ? (
             <p style={{ margin: '8px 0 0' }}>
               <a href={l.lokasi_url} target="_blank" rel="noopener noreferrer" className="adm-link">
-                Buka link lokasi (Sharelock / Ugorex)
+                Lihat lokasi kunjungan di peta
               </a>
+              <span className="adm-redup">
+                {' '}
+                · GPS{l.akurasi_m != null ? ` ±${l.akurasi_m} m` : ''}
+                {l.lokasi_at ? ` · ${waktu(l.lokasi_at)}` : ''}
+              </span>
+            </p>
+          ) : l.lokasi_url ? (
+            <p style={{ margin: '8px 0 0' }}>
+              <a href={l.lokasi_url} target="_blank" rel="noopener noreferrer" className="adm-link">
+                Buka link lokasi
+              </a>
+            </p>
+          ) : (
+            <p className="adm-redup" style={{ margin: '8px 0 0' }}>
+              Nggak ada lokasi.
             </p>
           )}
         </div>
@@ -412,22 +429,60 @@ function Detail({ api, l, admin, onTutup, onUbah, onHapus }) {
   );
 }
 
-// Foto dari kamera HP bisa 5-10 MB. Dikecilin ke sisi terpanjang 1600px JPEG sebelum dikirim.
-async function kecilinFoto(file) {
-  if (!file.type.startsWith('image/')) throw new Error('File bukan gambar');
-  const bmp = await createImageBitmap(file);
-  const skala = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
-  const c = document.createElement('canvas');
-  c.width = Math.round(bmp.width * skala);
-  c.height = Math.round(bmp.height * skala);
-  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
-  bmp.close?.();
-  const data = c.toDataURL('image/jpeg', 0.82);
-  return { data, ukuran: Math.round((data.length - 23) * 0.75) };
+// Titik GPS HP. Diambil otomatis pas form dibuka; butuh izin lokasi & HTTPS (makalin.konsulin.com udah HTTPS).
+function ambilGps() {
+  return new Promise((ok, gagal) => {
+    if (!('geolocation' in navigator)) return gagal(new Error('Browser ini nggak bisa baca lokasi'));
+    if (!window.isSecureContext) return gagal(new Error('Lokasi cuma bisa dibaca lewat HTTPS'));
+    navigator.geolocation.getCurrentPosition(
+      (p) => ok({ lat: p.coords.latitude, lng: p.coords.longitude, akurasi: p.coords.accuracy, waktu: new Date(p.timestamp).toISOString() }),
+      (e) =>
+        gagal(
+          new Error(
+            e.code === 1
+              ? 'Izin lokasi ditolak. Buka pengaturan situs di browser, izinin Lokasi, lalu ambil lagi.'
+              : e.code === 3
+                ? 'GPS kelamaan nyari sinyal. Coba di tempat terbuka, lalu ambil lagi.'
+                : 'Lokasi nggak kebaca. Pastiin GPS HP nyala, lalu ambil lagi.'
+          )
+        ),
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 30000 }
+    );
+  });
+}
+
+function LokasiGps({ gps, status, error, lama, onAmbil }) {
+  const titik = gps || lama;
+  return (
+    <div className="adm-kartu" style={{ boxShadow: 'none', padding: 12, marginTop: 12 }} aria-live="polite">
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span className="adm-label" style={{ fontSize: 11 }}>
+          Lokasi GPS
+        </span>
+        <button type="button" className="btn kecil" onClick={onAmbil} disabled={status === 'jalan'}>
+          {status === 'jalan' ? 'Mencari lokasi…' : titik ? 'Ambil ulang' : 'Ambil lokasi'}
+        </button>
+      </div>
+      {titik ? (
+        <p style={{ margin: '6px 0 0' }}>
+          <b>{gps ? 'Lokasi terkunci' : 'Lokasi tersimpan'}</b>
+          {titik.akurasi != null && <span className={titik.akurasi > 100 ? '' : 'adm-redup'} style={titik.akurasi > 100 ? { color: 'var(--merah)' } : undefined}> · akurasi ±{Math.round(titik.akurasi)} m</span>}
+          {' · '}
+          <a href={`https://www.google.com/maps?q=${titik.lat},${titik.lng}`} target="_blank" rel="noopener noreferrer" className="adm-link">
+            lihat di peta
+          </a>
+        </p>
+      ) : status === 'jalan' ? (
+        <p className="adm-redup" style={{ margin: '6px 0 0' }}>Nyari sinyal GPS, biasanya beberapa detik…</p>
+      ) : null}
+      {titik?.akurasi > 100 && <p className="adm-redup" style={{ margin: '4px 0 0' }}>Akurasinya kurang bagus. Kalau bisa, keluar ruangan lalu ambil ulang.</p>}
+      {error && <p className="adm-error" style={{ margin: '6px 0 0' }}>{error}</p>}
+    </div>
+  );
 }
 
 // ---------------- Form catat / ubah ----------------
-function FormLog({ api, awal, onTutup, onSelesai }) {
+function FormLog({ api, awal, wajibGps, onTutup, onSelesai }) {
   const edit = Boolean(awal.id);
   const { data: bank } = useData(api, '/lapangan/keberatan');
   const [isi, setIsi] = useState(() => ({
@@ -440,7 +495,6 @@ function FormLog({ api, awal, onTutup, onSelesai }) {
     respon_customer: awal.respon_customer || '',
     hasil: awal.hasil || '',
     catatan: awal.catatan || '',
-    lokasi_url: awal.lokasi_url || '',
   }));
   const [lainnya, setLainnya] = useState(edit && !awal.keberatan_id);
   const [fotoLama, setFotoLama] = useState(awal.foto || []);
@@ -448,6 +502,28 @@ function FormLog({ api, awal, onTutup, onSelesai }) {
   const [fotoBaru, setFotoBaru] = useState([]);
   const [error, setError] = useState('');
   const [sibuk, setSibuk] = useState(false);
+  const [gps, setGps] = useState(null);
+  const [gpsStatus, setGpsStatus] = useState('');
+  const [gpsError, setGpsError] = useState('');
+  const lokasiLama = awal.lat != null ? { lat: awal.lat, lng: awal.lng, akurasi: awal.akurasi_m } : null;
+  const ambilLokasi = () => {
+    setGpsStatus('jalan');
+    setGpsError('');
+    ambilGps()
+      .then((g) => {
+        setGps(g);
+        setGpsStatus('ok');
+      })
+      .catch((e) => {
+        setGpsError(e.message);
+        setGpsStatus('gagal');
+      });
+  };
+  // Catatan baru: lokasi langsung diambil begitu form dibuka.
+  useEffect(() => {
+    if (!edit) ambilLokasi();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const ubah = (k) => (e) => setIsi((x) => ({ ...x, [k]: e.target.value }));
   const dipilih = bank?.find((k) => k.id === isi.keberatan_id) || null;
   const sisaFoto = MAKS_FOTO - fotoLama.length - fotoBaru.length;
@@ -476,7 +552,7 @@ function FormLog({ api, awal, onTutup, onSelesai }) {
     setError('');
     try {
       const hasil = [];
-      for (const f of files) hasil.push(await kecilinFoto(f));
+      for (const f of files) hasil.push(await keWebp(f, 1600));
       setFotoBaru((x) => [...x, ...hasil]);
     } catch (err) {
       setError('Foto gagal dibaca: ' + err.message);
@@ -491,7 +567,7 @@ function FormLog({ api, awal, onTutup, onSelesai }) {
           setError('');
           setSibuk(true);
           try {
-            const body = { ...isi, keberatan_id: lainnya ? null : isi.keberatan_id || null };
+            const body = { ...isi, keberatan_id: lainnya ? null : isi.keberatan_id || null, ...(gps ? { gps } : {}) };
             if (edit) {
               await api('PATCH', `/lapangan/log/${awal.id}`, { ...body, foto_baru: fotoBaru, hapus_foto: hapusFoto });
               onSelesai(`Kunjungan #${awal.nomor} disimpan.`);
@@ -572,10 +648,7 @@ function FormLog({ api, awal, onTutup, onSelesai }) {
           <label htmlFor="l-catatan">Catatan / insight</label>
           <textarea id="l-catatan" value={isi.catatan} onChange={ubah('catatan')} rows={2} maxLength={2000} placeholder="Yang bikin berhasil / gagal, pola yang kamu lihat" />
         </div>
-        <div className="field">
-          <label htmlFor="l-lokasi">Link lokasi (Sharelock / Ugorex)</label>
-          <input id="l-lokasi" type="url" inputMode="url" value={isi.lokasi_url} onChange={ubah('lokasi_url')} maxLength={500} placeholder="https://maps.app.goo.gl/…" />
-        </div>
+        <LokasiGps gps={gps} status={gpsStatus} error={gpsError} lama={lokasiLama} onAmbil={ambilLokasi} />
 
         <div className="field">
           <span className="adm-label" style={{ fontSize: 11, display: 'block', marginBottom: 6 }}>
@@ -622,7 +695,8 @@ function FormLog({ api, awal, onTutup, onSelesai }) {
           <button type="button" className="btn" onClick={onTutup}>
             Batal
           </button>
-          <button type="submit" className="btn utama" disabled={sibuk || !isi.hasil || isi.ucapan.trim().length < 3 || isi.respon_sales.trim().length < 3}>
+          {wajibGps && !edit && !gps && <span className="adm-redup" style={{ alignSelf: 'center', marginRight: 'auto' }}>Ambil lokasi GPS dulu buat nyimpen.</span>}
+          <button type="submit" className="btn utama" disabled={sibuk || !isi.hasil || isi.ucapan.trim().length < 3 || isi.respon_sales.trim().length < 3 || (wajibGps && !edit && !gps)}>
             {sibuk ? 'Menyimpan…' : 'Simpan'}
           </button>
         </div>

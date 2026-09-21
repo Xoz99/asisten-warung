@@ -45,7 +45,8 @@ masuk git. **Ikutin folder ini di backup server.** Batas per file 300 MB (`ARTIF
 
 Akun di Makalin punya peran **admin** (semua halaman) atau **sales** (cuma Sales Lapangan & profilnya sendiri). Bikin
 akun sales dari Pengaturan > Pengguna & tim. Batasannya dikunci di server (`RUTE_SALES` di `server/auth.js`), jadi
-halaman/API baru otomatis tertutup buat sales. Foto bukti kunjungan disimpan di `data/lapangan/` (ikutin di backup).
+halaman/API baru otomatis tertutup buat sales. Foto bukti kunjungan (WEBP) disimpan di `data/lapangan/` (ikutin di backup). Lokasi kunjungan diambil
+otomatis dari GPS HP (wajib buat akun sales), jadi Makalin harus dibuka lewat HTTPS.
 
 ## Login admin
 

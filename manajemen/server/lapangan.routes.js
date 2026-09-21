@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import { catatLog, query, pool } from './db.js';
 
 // Sales Lapangan: bank keberatan pelanggan (kategori, ucapan, fakta produk buat ngejawab) + log kunjungan sales
-// (respon sales, respon pelanggan, hasil, insight, foto bukti, link lokasi Sharelock/Ugorex).
+// (respon sales, respon pelanggan, hasil, insight, foto bukti WEBP, titik GPS otomatis dari HP).
 // Akun peran "sales" cuma lihat & ngisi log miliknya sendiri; admin lihat semua dan ngurus bank keberatan.
 const router = Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -66,7 +66,7 @@ function pastikanTabel() {
         catatan TEXT,
         id_kunjungan TEXT, -- no kunjungan / id pelanggan / nama warung
         tanggal DATE NOT NULL,
-        lokasi_url TEXT, -- link Sharelock / Ugorex
+        lokasi_url TEXT, -- link Google Maps dari titik GPS (data lama: link Sharelock / Ugorex yang ditempel)
         created_at TIMESTAMPTZ DEFAULT now(), diubah_at TIMESTAMPTZ DEFAULT now()
       )`);
       await query(`CREATE TABLE IF NOT EXISTS mj_lapangan_foto (
@@ -76,6 +76,9 @@ function pastikanTabel() {
         created_at TIMESTAMPTZ DEFAULT now()
       )`);
       await query('CREATE INDEX IF NOT EXISTS idx_mj_lapangan_log_tgl ON mj_lapangan_log (tanggal DESC, created_at DESC)');
+      // Lokasi diambil otomatis dari GPS HP waktu nyatet (bukan link yang ditempel manual).
+      await query(`ALTER TABLE mj_lapangan_log ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION, ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION,
+        ADD COLUMN IF NOT EXISTS akurasi_m INT, ADD COLUMN IF NOT EXISTS lokasi_at TIMESTAMPTZ`);
       const { rows } = await query('SELECT count(*)::int AS n FROM mj_keberatan');
       if (!rows[0].n) {
         for (const b of BANK_AWAL) await query('INSERT INTO mj_keberatan (kategori, ucapan, fakta) VALUES ($1,$2,$3)', [b.kategori, b.ucapan, b.fakta]);
@@ -215,23 +218,26 @@ function bersihkanLog(b) {
     catatan: teks(b.catatan, 2000) || null,
     id_kunjungan: teks(b.id_kunjungan, 80) || null,
     tanggal: /^\d{4}-\d{2}-\d{2}$/.test(b.tanggal || '') ? b.tanggal : null,
-    lokasi_url: teks(b.lokasi_url, 500) || null,
   };
+  // Titik GPS dari browser. Link peta dibikin di server dari koordinatnya, jadi nggak ada link asing yang disimpen.
+  const g = b.gps;
+  if (g && typeof g === 'object') {
+    const lat = Number(g.lat);
+    const lng = Number(g.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) throw salah('Titik GPS nggak valid');
+    x.lat = lat;
+    x.lng = lng;
+    x.akurasi_m = Number.isFinite(Number(g.akurasi)) ? Math.min(100000, Math.max(0, Math.round(Number(g.akurasi)))) : null;
+    const t = new Date(g.waktu);
+    x.lokasi_at = Number.isFinite(t.getTime()) && t <= new Date(Date.now() + 60000) ? t.toISOString() : new Date().toISOString();
+    x.lokasi_url = `https://www.google.com/maps?q=${lat.toFixed(6)},${lng.toFixed(6)}`;
+  }
   if (!x.kategori) throw salah('Pilih kategori keberatan');
   if (x.ucapan.length < 3) throw salah('Tulis ucapan pelanggannya');
   if (x.respon_sales.length < 3) throw salah('Tulis respon kamu ke pelanggan');
   if (!HASIL.includes(x.hasil)) throw salah('Pilih hasilnya');
   if (!x.tanggal) throw salah('Tanggal kunjungan wajib diisi');
   if (x.tanggal > hariIni()) throw salah('Tanggal kunjungan nggak boleh di masa depan');
-  if (x.lokasi_url) {
-    let u;
-    try {
-      u = new URL(x.lokasi_url);
-    } catch {
-      throw salah('Link lokasi harus berupa alamat lengkap (https://...)');
-    }
-    if (!['http:', 'https:'].includes(u.protocol)) throw salah('Link lokasi harus diawali https://');
-  }
   return x;
 }
 
@@ -277,6 +283,8 @@ router.post('/lapangan/log', async (req, res, next) => {
     const b = req.body || {};
     const k = await keberatanValid(b.keberatan_id);
     const x = bersihkanLog({ ...b, kategori: k ? k.kategori : b.kategori });
+    // Bukti kunjungan: akun sales wajib nyalain GPS. Admin boleh nyatet tanpa lokasi (mis. input dari kantor).
+    if (req.admin.peran === 'sales' && x.lat === undefined) throw salah('Lokasi GPS belum kebaca. Nyalain GPS / izinin lokasi di browser, lalu ambil lokasi lagi.');
     const foto = (Array.isArray(b.foto) ? b.foto : []).map(bacaFoto);
     if (foto.length > MAKS_FOTO) throw salah(`Foto maksimal ${MAKS_FOTO}`);
     const c = await pool.connect();
@@ -284,9 +292,11 @@ router.post('/lapangan/log', async (req, res, next) => {
     try {
       await c.query('BEGIN');
       const { rows } = await c.query(
-        `INSERT INTO mj_lapangan_log (sales_id, keberatan_id, kategori, ucapan, respon_sales, respon_customer, hasil, catatan, id_kunjungan, tanggal, lokasi_url)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id, nomor`,
-        [req.admin.id, k?.id || null, x.kategori, x.ucapan, x.respon_sales, x.respon_customer, x.hasil, x.catatan, x.id_kunjungan, x.tanggal, x.lokasi_url]
+        `INSERT INTO mj_lapangan_log (sales_id, keberatan_id, kategori, ucapan, respon_sales, respon_customer, hasil, catatan, id_kunjungan, tanggal,
+           lokasi_url, lat, lng, akurasi_m, lokasi_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id, nomor`,
+        [req.admin.id, k?.id || null, x.kategori, x.ucapan, x.respon_sales, x.respon_customer, x.hasil, x.catatan, x.id_kunjungan, x.tanggal,
+          x.lokasi_url || null, x.lat ?? null, x.lng ?? null, x.akurasi_m ?? null, x.lokasi_at || null]
       );
       await simpanFoto(c, rows[0].id, foto);
       await c.query('COMMIT');
@@ -331,9 +341,20 @@ router.patch('/lapangan/log/:id', async (req, res, next) => {
       await c.query('BEGIN');
       await c.query(
         `UPDATE mj_lapangan_log SET keberatan_id=$2, kategori=$3, ucapan=$4, respon_sales=$5, respon_customer=$6, hasil=$7, catatan=$8,
-           id_kunjungan=$9, tanggal=$10, lokasi_url=$11, diubah_at=now() WHERE id=$1`,
-        [l.id, k?.id || null, x.kategori, x.ucapan, x.respon_sales, x.respon_customer, x.hasil, x.catatan, x.id_kunjungan, x.tanggal, x.lokasi_url]
+           id_kunjungan=$9, tanggal=$10, diubah_at=now() WHERE id=$1`,
+        [l.id, k?.id || null, x.kategori, x.ucapan, x.respon_sales, x.respon_customer, x.hasil, x.catatan, x.id_kunjungan, x.tanggal]
       );
+      // Lokasi cuma diganti kalau diambil ulang - ngedit teks nggak ngubah titik kunjungan aslinya.
+      if (x.lat !== undefined) {
+        await c.query('UPDATE mj_lapangan_log SET lokasi_url=$2, lat=$3, lng=$4, akurasi_m=$5, lokasi_at=$6 WHERE id=$1', [
+          l.id,
+          x.lokasi_url,
+          x.lat,
+          x.lng,
+          x.akurasi_m,
+          x.lokasi_at,
+        ]);
+      }
       if (hapusFoto.length) {
         ({ rows: dibuang } = await c.query('DELETE FROM mj_lapangan_foto WHERE log_id=$1 AND id = ANY($2::uuid[]) RETURNING lokasi', [l.id, hapusFoto]));
       }
