@@ -18,6 +18,7 @@
 // TIDAK - obrolan nggak kena batasan ini sama sekali, lihat komentar di aiQuota.service.js).
 import { cekJatahAi, catatPemakaianAi } from './aiQuota.service.js';
 import { ATURAN_MEMORI } from './memori.service.js';
+import { ATURAN_KULAKAN } from './kulakan.service.js';
 
 const MODEL = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini';
 const TIMEOUT_MS = 12000;
@@ -165,6 +166,8 @@ foto itu bukti visual LANGSUNG yang beneran kamu liat (bukan "data" yang mungkin
 JADI kamu WAJIB deskripsiin/baca apa yang kelihatan di foto itu kalau ditanya - itu BUKAN
 "menebak-nebak", itu ngejawab dari apa yang beneran ada di gambar.
 
+${ATURAN_KULAKAN}
+
 USUL AKSI (null kalau obrolannya BUKAN minta tambah/ubah/hapus barang, catat modal, atau bikin
 daftar belanja - contoh nanya info/ngobrol
 biasa): kalau user KELIHATAN JELAS minta salah satu dari itu, isi "aksi" - kamu cuma USULIN, BELUM
@@ -195,7 +198,9 @@ MENENTUKAN BARANG MANA yang dimaksud (produkId) kamu WAJIB yakin dulu, jangan as
   Yang kejadian pas user setuju: dia dibawa ke layar Catat jualan dengan TARGET keisi segitu, terus
   dia sendiri yang nyentang barangnya sampai totalnya pas. Bilang gitu aja di "jawaban" - singkat,
   jangan kepanjangan.
-- tipe "belanja_banyak": dipakai kalau user minta DIBIKININ daftar belanja / mau borong banyak
+- tipe "belanja_banyak": KHUSUS buat nambahin barang BARU yang BELUM ADA di "Daftar barang" (warung baru, mau
+  nambah jenis dagangan) - BUKAN buat kulakan/nyetok ulang barang yang udah ada (itu aturan KULAKAN di atas).
+  Dipakai kalau user minta DIBIKININ daftar belanja / mau borong banyak
   barang sekaligus dan NYERAHIN pilihan barangnya ke kamu ("modal 100jt belanjain apa aja", "bebas
   kamu aja yang tentuin"). Isi "data.barang" = daftar barang wajar buat JENIS USAHA di "Profil usaha" (belum diisi = warung kelontong Indonesia)
   Maksimal 25 barang biar masih enak dicek satu-satu.

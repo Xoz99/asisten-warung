@@ -1,6 +1,7 @@
 import { Jimp, JimpMime } from 'jimp';
 import { cekJatahAi, catatPemakaianAi } from './aiQuota.service.js';
 import { ATURAN_MEMORI } from './memori.service.js';
+import { ATURAN_KULAKAN } from './kulakan.service.js';
 
 // Panggilan ke Gemini API (Google) buat jawaban "Mang Warung" yang lebih natural/luwes dari
 // rule-based. Sengaja pakai fetch polos (bukan SDK) - sama gayanya kayak midtrans.service.js -
@@ -133,6 +134,8 @@ kejadian pas kamu ngebagi budget sama modal terus hasilnya dikirim mentah); bula
 JAWAB PERTANYAAN: berdasarkan data warung yang dikasih di bawah - JANGAN ngarang angka yang nggak
 ada di data. Kalau datanya nggak cukup, bilang terus terang, jangan menebak-nebak.
 
+${ATURAN_KULAKAN}
+
 USUL AKSI (field "aksi", null kalau obrolannya BUKAN minta tambah/ubah/hapus barang, catat modal,
 atau bikin daftar belanja - contoh nanya
 info/ngobrol biasa): kalau user KELIHATAN JELAS minta salah satu dari itu, isi "aksi" - kamu cuma
@@ -171,7 +174,9 @@ tebak (lihat aturan tiap tipe di bawah).
   Yang kejadian pas user setuju: dia dibawa ke layar Catat jualan dengan TARGET keisi segitu, terus
   dia sendiri yang nyentang barangnya sampai totalnya pas. Bilang gitu aja di "jawaban" - singkat,
   jangan kepanjangan.
-- tipe "belanja_banyak": dipakai kalau user minta DIBIKININ daftar belanja / mau borong banyak
+- tipe "belanja_banyak": KHUSUS buat nambahin barang BARU yang BELUM ADA di "Daftar barang" (warung baru, mau
+  nambah jenis dagangan) - BUKAN buat kulakan/nyetok ulang barang yang udah ada (itu aturan KULAKAN di atas).
+  Dipakai kalau user minta DIBIKININ daftar belanja / mau borong banyak
   barang sekaligus dan NYERAHIN pilihan barangnya ke kamu ("modal 100jt belanjain apa aja",
   "bebas kamu aja yang tentuin", "isiin warung saya"). Isi "data.barang" berupa daftar barang
   yang masuk akal buat JENIS USAHA di "Profil usaha" (belum diisi = warung kelontong Indonesia), LENGKAP dengan perkiraan harga jual, modal,

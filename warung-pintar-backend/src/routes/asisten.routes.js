@@ -3,6 +3,7 @@ import { query } from '../db.js';
 import { tanyaGemini } from '../services/gemini.service.js';
 import { tanyaOpenRouter } from '../services/openrouter.service.js';
 import { ambilProfilUsaha, profilUntukKonteks } from '../services/profilUsaha.service.js';
+import { hitungKulakan, kulakanUntukAI, usulBeliTeks } from '../services/kulakan.service.js';
 import { ambilMemori, simpanMemori, hapusMemori, hapusSemuaMemori, memoriUntukKonteks, perintahIngat } from '../services/memori.service.js';
 
 const router = Router();
@@ -287,13 +288,13 @@ async function jawabRuleBased(teks, wid) {
     return rows.map((r) => `${r.nama} ${rp(r.jumlah)}`).join(', ') + `. Total ${rp(total)}.`;
   }
 
-  if (teks.includes('stok') || teks.includes('belanja') || teks.includes('habis') || teks.includes('pasar')) {
-    const { rows } = await query(
-      `SELECT nama, stok FROM produk WHERE warung_id=$1 AND aktif
-       ORDER BY (CASE WHEN laku_per_hari > 0 THEN stok / laku_per_hari ELSE 999 END) ASC LIMIT 5`,
-      [wid]
-    );
-    return rows.length ? rows.map((r) => `${r.nama} sisa ${r.stok}`).join(', ') : 'Stok masih aman semua.';
+  if (['stok', 'belanja', 'habis', 'pasar', 'kulak', 'grosir', 'tipis'].some((k) => teks.includes(k))) {
+    // Sama persis sama yang dikasih ke Mang AI (kulakan.service.js) - dari stok & penjualan asli.
+    const k = await hitungKulakan(wid);
+    if (!k.tipis.length) {
+      return 'Stok masih aman semua.' + (k.berikutnya.length ? ` Yang paling cepet abis: ${k.berikutnya.map((p) => `${p.nama} (sisa ${p.stok})`).join(', ')}.` : '');
+    }
+    return 'Yang perlu dikulak:\n' + k.tipis.slice(0, 15).map((p) => `- **${p.nama}** sisa ${p.stok} ${p.satuan || 'pcs'} - beli ${usulBeliTeks(p)}`).join('\n');
   }
 
   if (teks.includes('jaga') || teks.includes('shift') || teks.includes('giliran')) {
@@ -334,7 +335,7 @@ async function bangunKonteks(wid, pertanyaan = '') {
   const awal = new Date();
   awal.setHours(0, 0, 0, 0);
 
-  const [untungR, kasbonR, produkR, jagaR, pelangganR] = await Promise.all([
+  const [untungR, kasbonR, produkR, jagaR, pelangganR, kulakan] = await Promise.all([
     query(
       `SELECT COALESCE(SUM(total) FILTER (WHERE mode='bayar'),0) AS omzet,
               COALESCE(SUM(total) FILTER (WHERE mode='bayar' AND COALESCE(metode,'Tunai')='Tunai'),0) AS tunai,
@@ -350,6 +351,7 @@ async function bangunKonteks(wid, pertanyaan = '') {
     // makai nomor HP pelanggan - AI cuma butuh id + nama buat ngenalin orangnya. Ngirim nomor
     // tetangga ke Gemini/OpenRouter tanpa ada yang makai itu paparan data cuma-cuma.
     query('SELECT id, nama FROM pelanggan WHERE warung_id=$1 ORDER BY nama LIMIT 60', [wid]),
+    hitungKulakan(wid),
   ]);
 
   const kasbonRows = kasbonR.rows;
@@ -399,10 +401,13 @@ async function bangunKonteks(wid, pertanyaan = '') {
       produkRows
         .map(
           (p) =>
-            `- ${p.id} | ${p.nama} | ${p.harga} | ${p.modal} | ${p.stok} | ${Number(p.laku_per_hari).toFixed(1)} | ${p.satuan || 'pcs'} | ${p.isi_kemasan || 1} | ${p.nama_kemasan || '-'}`
+            `- ${p.id} | ${p.nama} | ${p.harga} | ${p.modal} | ${p.stok} | ${(kulakan.laku.get(p.id) || 0).toFixed(1)} | ${p.satuan || 'pcs'} | ${p.isi_kemasan || 1} | ${p.nama_kemasan || '-'}`
         )
         .join('\n')
   );
+  // Daftar kulakan dari data asli - ini yang WAJIB dipakai pas user nanya mau belanja/kulakan apa (lihat aturan
+  // KULAKAN di prompt). Tanpa blok ini AI ngarang barang yang bahkan nggak ada di katalog.
+  baris.push(kulakanUntukAI(kulakan));
   baris.push(
     // Dipakai buat aksi "tambah_pelanggan" (cek dulu nama yang disebut udah ada apa belum, biar
     // nggak dobel-daftarin orang yang sama) & buat nentuin pelangganId kalau nanti kasbon-nya
@@ -431,6 +436,7 @@ async function bangunKonteks(wid, pertanyaan = '') {
   return {
     teks: baris.join('\n\n'),
     produkIds: new Set(produkRows.map((p) => p.id)),
+    produkNama: new Set(produkRows.map((p) => namaRapi(p.nama))),
     kasbonIds: new Set(kasbonRows.map((r) => r.id)),
     pelangganIds: new Set(pelangganRows.map((r) => r.id)),
   };
@@ -441,7 +447,9 @@ async function bangunKonteks(wid, pertanyaan = '') {
 // testing, terutama pas jalur OpenRouter yang skema JSON-nya nggak seketat Gemini), aksi-nya
 // DIBUANG di sini - amannya nggak percaya validasi dari model manapun secara mentah, model APAPUN
 // bisa halusinasi id yang nggak beneran ada. `data` dibiarin (frontend tetap bisa isi ulang manual).
-function validasiAksi(aksi, { produkIds, kasbonIds }) {
+const namaRapi = (n) => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+function validasiAksi(aksi, { produkIds, produkNama, kasbonIds }) {
   if (!aksi) return null;
   // Nama tipe LAMA ('ubah'/'hapus') MASIH diterima bareng nama baru ('ubah_produk' dst) - prompt AI
   // (gemini.service.js/openrouter.service.js) belum ikut diganti ke penamaan baru, jadi yang beneran
@@ -466,8 +474,10 @@ function validasiAksi(aksi, { produkIds, kasbonIds }) {
   // "belanja_banyak" dipangkas di sini, BUKAN cuma diandelin ke prompt: batas 25 nahan sheet yang
   // kepanjangan, dan barang tanpa nama nggak mungkin dieksekusi jadi dibuang duluan.
   if (aksi.tipe === 'belanja_banyak') {
+    // Barang yang UDAH ADA di katalog dibuang: "belanja_banyak" itu buat nambah barang BARU - kalau barang lama ikut,
+    // pas disetujui jadinya barang dobel dengan harga/stok tebakan. Kulakan barang lama dijawab dari daftar kulakan.
     const barang = Array.isArray(aksi.data?.barang)
-      ? aksi.data.barang.filter((b) => b && String(b.nama || '').trim()).slice(0, 25)
+      ? aksi.data.barang.filter((b) => b && String(b.nama || '').trim() && !produkNama?.has(namaRapi(b.nama))).slice(0, 25)
       : [];
     if (!barang.length) return null;
     return { ...aksi, data: { ...aksi.data, barang } };
