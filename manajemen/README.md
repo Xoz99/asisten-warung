@@ -1,7 +1,8 @@
 # Makalin Ops
 
 Aplikasi operasional internal (dulu "Konsulin Manajemen"). Tahap 1: Dashboard, Leads (warung dari sales + CRM manual + sales),
-Keuangan (Midtrans + catatan manual), Notifikasi, Pengaturan (tim & akun demo), Profile. HR, Rekrutmen, Artifact, AI Chat: menyusul.
+Keuangan (Midtrans + catatan manual), Notifikasi, Pengaturan (tim & akun demo), Profile, Rekrutmen Sales Partner, dan Karyawan
+(data kepegawaian, kehadiran harian, cuti & izin dengan persetujuan, payroll bulanan, struktur organisasi). Artifact, AI Chat: menyusul.
 Arah desain: `DESIGN.md` (neo-brutalism); filter anti-slop: `.claude/skills/antislop*` di root repo. **Sengaja terpisah** dari
 aplikasi produknya: proses pm2, port, dan domain sendiri. Aplikasi Warung Pintar nggak punya halaman/API admin sama sekali.
 Manajemen baca/tulis langsung ke database produk.

@@ -7,11 +7,12 @@ import Notifikasi from './halaman/Notifikasi.jsx';
 import Pengaturan from './halaman/Pengaturan.jsx';
 import Profile from './halaman/Profile.jsx';
 import Rekrutmen from './halaman/Rekrutmen.jsx';
+import Karyawan from './halaman/Karyawan.jsx';
 import DaftarPublik from './halaman/DaftarPublik.jsx';
 
 // Makalin Ops: kerangka (sidebar + topbar), login per admin, dan navigasi lewat alamat (#/leads/crm dst) biar
 // halaman yang lagi dibuka tetap kebuka pas di-refresh & bisa dibagiin linknya.
-const NAMA_HALAMAN = { dashboard: 'Dashboard', leads: 'Leads', rekrutmen: 'Rekrutmen', keuangan: 'Keuangan', notifikasi: 'Notifikasi', pengaturan: 'Pengaturan', profile: 'Profile' };
+const NAMA_HALAMAN = { dashboard: 'Dashboard', leads: 'Leads', rekrutmen: 'Rekrutmen', karyawan: 'Karyawan', keuangan: 'Keuangan', notifikasi: 'Notifikasi', pengaturan: 'Pengaturan', profile: 'Profile' };
 
 function bacaRute() {
   const [halaman, tab] = window.location.hash.replace(/^#\/?/, '').split('/');
@@ -138,6 +139,7 @@ export default function App() {
           {halaman === 'dashboard' && <Dashboard {...props} />}
           {halaman === 'leads' && <Leads key={tab} {...props} />}
           {halaman === 'rekrutmen' && <Rekrutmen key={tab} {...props} />}
+          {halaman === 'karyawan' && <Karyawan key={tab} {...props} />}
           {halaman === 'keuangan' && <Keuangan key={tab} {...props} />}
           {halaman === 'notifikasi' && <Notifikasi {...props} onDibaca={cekNotif} />}
           {halaman === 'pengaturan' && <Pengaturan key={tab} {...props} />}
@@ -183,7 +185,9 @@ function Samping({ halaman, admin, notifBaru, buka }) {
           <a href="#/rekrutmen" className={'adm-nav anak' + (halaman === 'rekrutmen' ? ' on' : '')} aria-current={halaman === 'rekrutmen' ? 'page' : undefined}>
             <span>Rekrutmen</span>
           </a>
-          {segera('Karyawan', true)}
+          <a href="#/karyawan" className={'adm-nav anak' + (halaman === 'karyawan' ? ' on' : '')} aria-current={halaman === 'karyawan' ? 'page' : undefined}>
+            <span>Karyawan</span>
+          </a>
           {link('keuangan', 'Keuangan')}
         </div>
         <div className="adm-nav-grup">

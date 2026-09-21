@@ -323,6 +323,17 @@ function Detail({ api, id, onTutup, onBerubah, onBuka }) {
             {!selesai && <AksiTahap l={l} attempt={d.attempt} hariClosing={d.hariClosing} kirim={kirim} />}
             {!selesai && <FollowUp l={l} hari={d.hariNoResponse} kirim={kirim} />}
             {!selesai && <Keluarkan kirim={kirim} />}
+            {l.status === 'hired' && (
+              <div className="adm-kartu" style={{ boxShadow: 'none', padding: 12, marginTop: 14 }}>
+                <b>Udah jadi Sales Partner.</b>
+                <p className="adm-redup" style={{ margin: '6px 0' }}>
+                  Masukkan ke data karyawan biar kehadiran, kontrak, dan rekeningnya tercatat di halaman Karyawan.
+                </p>
+                <a className="btn kecil utama" href="#/karyawan">
+                  Buka halaman Karyawan
+                </a>
+              </div>
+            )}
             {KELUAR[l.status] && (
               <div className="adm-kartu" style={{ boxShadow: 'none', padding: 12, marginTop: 14 }}>
                 <b>Alasan: </b>

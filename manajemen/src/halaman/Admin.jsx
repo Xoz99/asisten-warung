@@ -31,6 +31,15 @@ export const NAMA_AKSI = {
   'rekrutmen.kampanye.tambah': 'bikin kampanye rekrutmen',
   'rekrutmen.titik.tambah': 'nambah titik sebar',
   'rekrutmen.titik.status': 'ubah status posting',
+  'hr.karyawan.tambah': 'nambah karyawan',
+  'hr.karyawan.ubah': 'ubah data karyawan',
+  'hr.karyawan.status': 'ubah status karyawan',
+  'hr.kehadiran.simpan': 'nyatet kehadiran',
+  'hr.cuti.ajukan': 'nyatet pengajuan cuti',
+  'hr.cuti.putus': 'mutusin pengajuan cuti',
+  'hr.payroll.draf': 'bikin draf payroll',
+  'hr.payroll.ubah': 'ubah potongan payroll',
+  'hr.payroll.dibayar': 'nandain gaji dibayar',
   'ops.keuangan.hapus': 'hapus transaksi',
 };
 export const ringkasDetail = (d) =>
