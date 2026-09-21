@@ -3,15 +3,18 @@ import { Router } from 'express';
 import { catatLog, query } from './db.js';
 import { cekPassword, rapikanUsername } from './auth.js';
 
-// Kelola akun admin manajemen + lihat catatan aktivitas. Semua admin setara (belum ada peran-peranan).
+// Kelola akun Makalin + lihat catatan aktivitas. Peran: admin (semua halaman) atau sales (cuma Sales Lapangan).
 const router = Router();
 const POLA_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-router.get('/saya', (req, res) => res.json({ id: req.admin.id, username: req.admin.username, nama: req.admin.nama }));
+router.get('/saya', (req, res) =>
+  res.json({ id: req.admin.id, username: req.admin.username, nama: req.admin.nama, peran: req.admin.peran, terakhir_masuk: req.admin.terakhir_masuk })
+);
+const PERAN = ['admin', 'sales'];
 
 router.get('/admin', async (req, res, next) => {
   try {
-    const { rows } = await query('SELECT id, username, nama, aktif, terakhir_masuk, created_at FROM mj_admin ORDER BY created_at');
+    const { rows } = await query('SELECT id, username, nama, peran, aktif, terakhir_masuk, created_at FROM mj_admin ORDER BY created_at');
     res.json(rows);
   } catch (e) {
     next(e);
@@ -27,8 +30,8 @@ router.post('/admin', async (req, res, next) => {
     const salah = cekPassword(req.body.password);
     if (salah) return res.status(400).json({ error: salah });
     const { rows } = await query(
-      'INSERT INTO mj_admin (username, nama, password_hash) VALUES ($1,$2,$3) ON CONFLICT (username) DO NOTHING RETURNING id, username, nama, aktif, created_at',
-      [username, nama, await bcrypt.hash(req.body.password, 10)]
+      'INSERT INTO mj_admin (username, nama, password_hash, peran) VALUES ($1,$2,$3,$4) ON CONFLICT (username) DO NOTHING RETURNING id, username, nama, peran, aktif, created_at',
+      [username, nama, await bcrypt.hash(req.body.password, 10), PERAN.includes(req.body.peran) ? req.body.peran : 'admin']
     );
     if (!rows.length) return res.status(409).json({ error: `Username ${username} udah dipakai` });
     await catatLog(req, 'admin.tambah', { username, nama });
@@ -38,12 +41,14 @@ router.post('/admin', async (req, res, next) => {
   }
 });
 
-// Nonaktifin/aktifin admin lain, atau reset password-nya. Dua-duanya bikin sesi lama orang itu langsung putus.
+// Nonaktifin/aktifin akun lain, reset password-nya, atau ganti perannya. Semuanya bikin sesi lama orang itu langsung putus.
 router.patch('/admin/:id', async (req, res, next) => {
   try {
     if (!POLA_UUID.test(req.params.id)) return res.status(404).json({ error: 'Admin tidak ditemukan' });
-    const { aktif, password } = req.body;
+    const { aktif, password, peran } = req.body;
     if (aktif === false && req.params.id === req.admin.id) return res.status(400).json({ error: 'Nggak bisa nonaktifin akun sendiri' });
+    if (peran !== undefined && !PERAN.includes(peran)) return res.status(400).json({ error: 'Peran nggak dikenal' });
+    if (peran !== undefined && req.params.id === req.admin.id) return res.status(400).json({ error: 'Nggak bisa ganti peran akun sendiri' });
     if (password !== undefined) {
       const salah = cekPassword(password);
       if (salah) return res.status(400).json({ error: salah });
@@ -51,12 +56,16 @@ router.patch('/admin/:id', async (req, res, next) => {
     const { rows } = await query(
       `UPDATE mj_admin SET aktif = COALESCE($2, aktif),
          password_hash = COALESCE($3, password_hash),
+         peran = COALESCE($4, peran),
          versi_sesi = versi_sesi + 1
-       WHERE id=$1 RETURNING id, username, nama, aktif`,
-      [req.params.id, typeof aktif === 'boolean' ? aktif : null, password !== undefined ? await bcrypt.hash(password, 10) : null]
+       WHERE id=$1 RETURNING id, username, nama, peran, aktif`,
+      [req.params.id, typeof aktif === 'boolean' ? aktif : null, password !== undefined ? await bcrypt.hash(password, 10) : null, peran ?? null]
     );
     if (!rows.length) return res.status(404).json({ error: 'Admin tidak ditemukan' });
-    await catatLog(req, password !== undefined ? 'admin.reset_password' : aktif ? 'admin.aktifkan' : 'admin.nonaktifkan', { username: rows[0].username });
+    await catatLog(req, peran !== undefined ? 'admin.ubah_peran' : password !== undefined ? 'admin.reset_password' : aktif ? 'admin.aktifkan' : 'admin.nonaktifkan', {
+      username: rows[0].username,
+      ...(peran !== undefined ? { peran } : {}),
+    });
     res.json(rows[0]);
   } catch (e) {
     next(e);

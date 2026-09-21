@@ -378,3 +378,33 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
   .adm-art-donut{width:92px;height:92px}
   .adm-art-grid{grid-template-columns:minmax(0,1fr)}
 }
+
+/* ---- Sales Lapangan ---- */
+.adm-lap-sel{min-width:180px;max-width:280px;white-space:pre-wrap;overflow-wrap:anywhere;display:table-cell}
+.adm-lap-kartu{display:none;list-style:none;margin:0;padding:0;flex-direction:column;gap:10px}
+.adm-lap-kartu .adm-kartu{display:flex;flex-direction:column;gap:6px;width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer}
+.adm-lap-kartu b{overflow-wrap:anywhere}
+.adm-lap-galeri{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+.adm-lap-foto{position:relative;width:110px;height:110px;border:var(--garis-tipis);background:var(--kertas);display:grid;place-items:center;overflow:hidden;padding:0;cursor:pointer;font-size:12px;text-align:center}
+.adm-lap-foto img{width:100%;height:100%;object-fit:cover;display:block}
+.adm-lap-foto-wadah{display:flex;flex-direction:column;gap:6px;align-items:stretch;width:110px}
+.adm-lap-tambah{display:flex;flex-direction:column;gap:2px;border-style:dashed}
+.adm-lap-tambah:focus-within{box-shadow:4px 4px 0 var(--biru)}
+.adm-lap-hasil{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:var(--garis)}
+.adm-lap-hasil button{border:0;background:var(--putih);padding:10px 8px;min-height:48px;font-weight:700;cursor:pointer;font:inherit;font-weight:700;font-size:14px}
+.adm-lap-hasil button+button{border-left:var(--garis)}
+.adm-lap-hasil button.on.berhasil{background:var(--hijau)}
+.adm-lap-hasil button.on.tertarik{background:var(--biru);color:var(--putih)}
+.adm-lap-hasil button.on.pikir{background:var(--kuning)}
+.adm-lap-hasil button.on.ditolak{background:var(--merah);color:var(--putih)}
+.adm-lap-bank{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+.adm-lap-bar{display:flex;border:2px solid var(--hitam);background:var(--putih);overflow:hidden}
+.adm-lap-bar div+div{border-left:2px solid var(--hitam)}
+@media (max-width:700px){
+  .adm-lap-tabel{display:none}
+  .adm-lap-kartu{display:flex}
+  .adm-lap-hasil{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .adm-lap-hasil button:nth-child(3){border-left:0}
+  .adm-lap-hasil button:nth-child(n+3){border-top:var(--garis)}
+  .adm-lap-bank{grid-template-columns:minmax(0,1fr)}
+}

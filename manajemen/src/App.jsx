@@ -9,15 +9,19 @@ import Profile from './halaman/Profile.jsx';
 import Rekrutmen from './halaman/Rekrutmen.jsx';
 import Karyawan from './halaman/Karyawan.jsx';
 import Artifact from './halaman/Artifact.jsx';
+import Lapangan from './halaman/Lapangan.jsx';
 import DaftarPublik from './halaman/DaftarPublik.jsx';
 
 // Makalin Ops: kerangka (sidebar + topbar), login per admin, dan navigasi lewat alamat (#/leads/crm dst) biar
 // halaman yang lagi dibuka tetap kebuka pas di-refresh & bisa dibagiin linknya.
-const NAMA_HALAMAN = { dashboard: 'Dashboard', leads: 'Leads', rekrutmen: 'Rekrutmen', karyawan: 'Karyawan', artifact: 'Artifact', keuangan: 'Keuangan', notifikasi: 'Notifikasi', pengaturan: 'Pengaturan', profile: 'Profile' };
+const NAMA_HALAMAN = { dashboard: 'Dashboard', leads: 'Leads', lapangan: 'Sales Lapangan', rekrutmen: 'Rekrutmen', karyawan: 'Karyawan', artifact: 'Artifact', keuangan: 'Keuangan', notifikasi: 'Notifikasi', pengaturan: 'Pengaturan', profile: 'Profile' };
+
+// Akun peran sales cuma boleh ke dua halaman ini (server juga ngunci API-nya, lihat RUTE_SALES di server/auth.js).
+const HALAMAN_SALES = ['lapangan', 'profile'];
 
 function bacaRute() {
   const [halaman, tab] = window.location.hash.replace(/^#\/?/, '').split('/');
-  return { halaman: NAMA_HALAMAN[halaman] ? halaman : 'dashboard', tab: tab || '' };
+  return { halaman: NAMA_HALAMAN[halaman] ? halaman : '', tab: tab || '' };
 }
 
 export default function App() {
@@ -46,6 +50,7 @@ export default function App() {
   }, []);
 
   const token = sesi?.token;
+  const sales = sesi?.admin?.peran === 'sales';
   // Sesi ditolak di tengah jalan (habis 12 jam, password diganti, dinonaktifin) -> balik ke layar masuk.
   const api = useCallback(
     async (method, path, body) => {
@@ -60,7 +65,7 @@ export default function App() {
   );
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || sales) return;
     let batal = false;
     panggil(token, 'GET', '/produk')
       .then((p) => !batal && setProduk(p))
@@ -68,15 +73,15 @@ export default function App() {
     return () => {
       batal = true;
     };
-  }, [token, keluar]);
+  }, [token, sales, keluar]);
 
   // Angka di lonceng: dicek pas buka & tiap menit.
   const cekNotif = useCallback(() => {
-    if (!token) return;
+    if (!token || sales) return;
     panggil(token, 'GET', '/notifikasi/jumlah')
       .then((r) => setNotifBaru(r.belumDibaca))
       .catch(() => {});
-  }, [token]);
+  }, [token, sales]);
   useEffect(() => {
     cekNotif();
     const t = setInterval(cekNotif, 60000);
@@ -110,12 +115,13 @@ export default function App() {
     );
   }
 
-  const { halaman, tab } = rute;
+  const halaman = sales ? (HALAMAN_SALES.includes(rute.halaman) ? rute.halaman : 'lapangan') : rute.halaman || 'dashboard';
+  const { tab } = rute;
   const props = { api, apiProduk, produkWp, admin: sesi.admin, tab };
 
   return (
     <div className="adm">
-      <Samping halaman={halaman} tab={tab} admin={sesi.admin} notifBaru={notifBaru} buka={lacibuka} />
+      <Samping halaman={halaman} tab={tab} admin={sesi.admin} sales={sales} notifBaru={notifBaru} buka={lacibuka} />
       {lacibuka && <div className="adm-latar" style={{ zIndex: 25, padding: 0 }} onClick={() => setLaciBuka(false)} aria-hidden="true" />}
       <div className="adm-utama">
         <header className="adm-topbar">
@@ -125,6 +131,7 @@ export default function App() {
           <div className="adm-crumb">
             Makalin Ops / <b>{NAMA_HALAMAN[halaman]}</b>
           </div>
+          {!sales && (
           <a className="adm-bel" href="#/notifikasi" aria-label={notifBaru ? `Notifikasi, ${notifBaru} belum dibaca` : 'Notifikasi'}>
             <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="square">
               <path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4z" />
@@ -132,11 +139,13 @@ export default function App() {
             </svg>
             {notifBaru > 0 && <span className="adm-hitung">{notifBaru > 99 ? '99+' : notifBaru}</span>}
           </a>
+          )}
           <a className="adm-inisial" href="#/profile" aria-label={`Profile ${sesi.admin.nama}`} style={{ textDecoration: 'none', color: 'inherit' }}>
             {sesi.admin.nama?.[0]?.toUpperCase()}
           </a>
         </header>
         <main className="adm-isi" id="isi">
+          {halaman === 'lapangan' && <Lapangan key={tab} {...props} />}
           {halaman === 'dashboard' && <Dashboard {...props} />}
           {halaman === 'leads' && <Leads key={tab} {...props} />}
           {halaman === 'rekrutmen' && <Rekrutmen key={tab} {...props} />}
@@ -153,7 +162,7 @@ export default function App() {
 }
 
 // Menu yang belum dibangun ditulis "Segera" & nggak bisa diklik - bukan link ke halaman kosong (antislop R-24).
-function Samping({ halaman, admin, notifBaru, buka }) {
+function Samping({ halaman, admin, sales, notifBaru, buka }) {
   const link = (id, nama, ekstra) => (
     <a key={id} href={`#/${id}`} className={'adm-nav' + (halaman === id ? ' on' : '')} aria-current={halaman === id ? 'page' : undefined}>
       <span>{nama}</span>
@@ -177,10 +186,19 @@ function Samping({ halaman, admin, notifBaru, buka }) {
           <small>Workspace internal</small>
         </div>
       </div>
+      {sales ? (
+        <nav>
+          <div className="adm-nav-grup">
+            {link('lapangan', 'Sales Lapangan')}
+            {link('profile', 'Profile')}
+          </div>
+        </nav>
+      ) : (
       <nav>
         <div className="adm-nav-grup">
           {link('dashboard', 'Dashboard')}
           {link('leads', 'Leads')}
+          {link('lapangan', 'Sales Lapangan')}
           <span className="adm-nav-produk" style={{ marginTop: 8 }}>
             HR
           </span>
@@ -202,6 +220,7 @@ function Samping({ halaman, admin, notifBaru, buka }) {
           {link('profile', 'Profile')}
         </div>
       </nav>
+      )}
       <a className="adm-akun" href="#/profile" style={{ textDecoration: 'none', color: 'inherit' }}>
         <span className="adm-inisial" aria-hidden="true">
           {admin.nama?.[0]?.toUpperCase()}

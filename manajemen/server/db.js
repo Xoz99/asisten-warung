@@ -37,6 +37,8 @@ export function pastikanTabel() {
         created_at TIMESTAMPTZ DEFAULT now()
       )`);
       await query('CREATE INDEX IF NOT EXISTS idx_mj_log_waktu ON mj_log (created_at DESC)');
+      // Peran akun: admin (semua halaman) atau sales (cuma halaman Sales Lapangan + profilnya sendiri).
+      await query("ALTER TABLE mj_admin ADD COLUMN IF NOT EXISTS peran TEXT NOT NULL DEFAULT 'admin'");
     })().catch((e) => {
       siap = null;
       throw e;

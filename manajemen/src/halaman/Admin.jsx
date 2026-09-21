@@ -31,6 +31,12 @@ export const NAMA_AKSI = {
   'rekrutmen.kampanye.tambah': 'bikin kampanye rekrutmen',
   'rekrutmen.titik.tambah': 'nambah titik sebar',
   'rekrutmen.titik.status': 'ubah status posting',
+  'admin.ubah_peran': 'ganti peran akun',
+  'lapangan.keberatan.tambah': 'nambah keberatan di bank',
+  'lapangan.keberatan.ubah': 'ubah keberatan di bank',
+  'lapangan.log.tambah': 'nyatet kunjungan lapangan',
+  'lapangan.log.ubah': 'ubah log kunjungan',
+  'lapangan.log.hapus': 'hapus log kunjungan',
   'hr.karyawan.tambah': 'nambah karyawan',
   'hr.karyawan.ubah': 'ubah data karyawan',
   'hr.karyawan.status': 'ubah status karyawan',
@@ -115,7 +121,10 @@ export default function Admin({ api, admin }) {
 
       <div className="adm-kolom">
         <section className="adm-kartu">
-          <h2>Akun admin</h2>
+          <h2>Akun</h2>
+          <p className="adm-redup" style={{ marginTop: 0 }}>
+            Admin bisa buka semua halaman. Sales cuma bisa buka Sales Lapangan &amp; profilnya sendiri.
+          </p>
           {!daftar ? (
             <p className="adm-sub">Memuat…</p>
           ) : (
@@ -127,11 +136,12 @@ export default function Admin({ api, admin }) {
                   diriSendiri={a.id === admin?.id}
                   onAktif={(aktif) => aksi(() => api('PATCH', '/admin/' + a.id, { aktif }), `${a.nama} ${aktif ? 'diaktifin' : 'dinonaktifin'}`)}
                   onReset={(password) => aksi(() => api('PATCH', '/admin/' + a.id, { password }), `Password ${a.nama} direset ✓`)}
+                  onPeran={(peran) => aksi(() => api('PATCH', '/admin/' + a.id, { peran }), `${a.nama} sekarang ${peran}. Dia perlu masuk ulang.`)}
                 />
               ))}
             </ul>
           )}
-          <FormTambah onTambah={(isi) => aksi(() => api('POST', '/admin', isi), `Admin ${isi.nama} ditambah ✓ - kasih tau username & password-nya`)} />
+          <FormTambah onTambah={(isi) => aksi(() => api('POST', '/admin', isi), `Akun ${isi.peran} ${isi.nama} ditambah ✓ - kasih tau username & password-nya`)} />
         </section>
 
         <section className="adm-kartu">
@@ -161,7 +171,7 @@ export default function Admin({ api, admin }) {
   );
 }
 
-function BarisAdmin({ a, diriSendiri, onAktif, onReset }) {
+function BarisAdmin({ a, diriSendiri, onAktif, onReset, onPeran }) {
   const [reset, setReset] = useState(false);
   const [pw, setPw] = useState('');
   return (
@@ -169,6 +179,9 @@ function BarisAdmin({ a, diriSendiri, onAktif, onReset }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
           <b style={a.aktif ? undefined : { color: 'var(--abu)' }}>{a.nama}</b> <span className="adm-redup">@{a.username}</span>
+          <span className={`adm-chip ${a.peran === 'sales' ? 'kuning' : ''}`} style={{ marginLeft: 6 }}>
+            {a.peran === 'sales' ? 'Sales' : 'Admin'}
+          </span>
           {diriSendiri && <span className="adm-lencana" style={{ marginLeft: 6 }}>kamu</span>}
           <div className="adm-redup">
             {a.aktif ? 'Aktif' : 'Nonaktif'} · terakhir masuk {waktu(a.terakhir_masuk)}
@@ -178,6 +191,9 @@ function BarisAdmin({ a, diriSendiri, onAktif, onReset }) {
           <div className="adm-tombol" style={{ marginTop: 0 }}>
             <button className="btn kecil" onClick={() => setReset((v) => !v)}>
               Reset password
+            </button>
+            <button className="btn kecil" onClick={() => window.confirm(`Jadiin ${a.nama} ${a.peran === 'sales' ? 'admin (bisa buka semua halaman)' : 'sales (cuma Sales Lapangan)'}?`) && onPeran(a.peran === 'sales' ? 'admin' : 'sales')}>
+              Jadiin {a.peran === 'sales' ? 'admin' : 'sales'}
             </button>
             <button className="btn kecil" onClick={() => onAktif(!a.aktif)}>
               {a.aktif ? 'Nonaktifkan' : 'Aktifkan'}
@@ -207,7 +223,7 @@ function BarisAdmin({ a, diriSendiri, onAktif, onReset }) {
 }
 
 function FormTambah({ onTambah }) {
-  const kosong = { nama: '', username: '', password: '' };
+  const kosong = { nama: '', username: '', password: '', peran: 'sales' };
   const [isi, setIsi] = useState(kosong);
   const ubah = (k) => (e) => setIsi((x) => ({ ...x, [k]: e.target.value }));
   return (
@@ -218,7 +234,7 @@ function FormTambah({ onTambah }) {
         if (await onTambah(isi)) setIsi(kosong);
       }}
     >
-      <h3>Tambah admin</h3>
+      <h3>Tambah akun</h3>
       <div className="adm-baris">
         <div className="field">
           <label>Nama</label>
@@ -232,9 +248,16 @@ function FormTambah({ onTambah }) {
           <label>Password (min. 8)</label>
           <input value={isi.password} onChange={ubah('password')} autoComplete="new-password" />
         </div>
+        <div className="field">
+          <label htmlFor="t-peran">Peran</label>
+          <select id="t-peran" value={isi.peran} onChange={ubah('peran')} style={{ maxWidth: 'none', width: '100%', minHeight: 44 }}>
+            <option value="sales">Sales (cuma Sales Lapangan)</option>
+            <option value="admin">Admin (semua halaman)</option>
+          </select>
+        </div>
       </div>
       <button className="btn utama" style={{ marginTop: 12 }} type="submit" disabled={!isi.nama.trim() || isi.username.trim().length < 3 || isi.password.length < 8}>
-        Tambah admin
+        Tambah {isi.peran === 'sales' ? 'sales' : 'admin'}
       </button>
     </form>
   );

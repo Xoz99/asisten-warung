@@ -24,7 +24,7 @@ const masukLimiter = rateLimit({
 
 const hash = (s) => crypto.createHash('sha256').update(String(s)).digest();
 const samaAman = (a, b) => crypto.timingSafeEqual(hash(a), hash(b));
-const adminPublik = (a) => ({ id: a.id, username: a.username, nama: a.nama });
+const adminPublik = (a) => ({ id: a.id, username: a.username, nama: a.nama, peran: a.peran || 'admin' });
 const buatToken = (a) => jwt.sign({ adminId: a.id, v: a.versi_sesi }, RAHASIA(), { expiresIn: `${SESI_JAM}h` });
 
 export function cekPassword(p) {
@@ -104,6 +104,8 @@ authRouter.post('/masuk', masukLimiter, async (req, res, next) => {
 });
 
 // Semua /api selain /api/auth/* wajib login.
+const RUTE_SALES = /^\/(lapangan(\/|$)|saya(\/(password|aktivitas))?$)/;
+
 export async function requireAdmin(req, res, next) {
   try {
     if (!cekKonfigurasi(res)) return;
@@ -118,6 +120,11 @@ export async function requireAdmin(req, res, next) {
     const { rows } = await query('SELECT * FROM mj_admin WHERE id=$1', [p.adminId]);
     const a = rows[0];
     if (!a || !a.aktif || a.versi_sesi !== p.v) return res.status(401).json({ error: 'Sesi udah nggak berlaku, masuk lagi ya' });
+    // Akun sales cuma boleh ke halaman Sales Lapangan & profilnya sendiri. Dikunci di sini (daftar yang BOLEH), jadi
+    // rute baru yang ditambah nanti otomatis tertutup buat sales.
+    if (a.peran === 'sales' && !RUTE_SALES.test(req.path)) {
+      return res.status(403).json({ error: 'Akun sales cuma bisa buka halaman Sales Lapangan' });
+    }
     req.admin = a;
     next();
   } catch (e) {

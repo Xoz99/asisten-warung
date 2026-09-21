@@ -10,6 +10,7 @@ import opsRoutes from './ops.routes.js';
 import rekrutmenRoutes, { publikRouter, DAFTAR_URL } from './rekrutmen.routes.js';
 import karyawanRoutes from './karyawan.routes.js';
 import artifactRoutes, { berkasRouter as artifactBerkas } from './artifact.routes.js';
+import lapanganRoutes from './lapangan.routes.js';
 import { PRODUK } from './produk/index.js';
 
 // Server aplikasi manajemen Konsulin: API /api/* (wajib login admin, lihat auth.js) + nyajiin hasil build tampilannya (dist/).
@@ -24,6 +25,8 @@ app.use((req, res, next) => {
 });
 // Form daftar publik boleh bawa CV + foto (maks 3 MB masing-masing, dikirim base64) - batas lebih longgar khusus rute ini.
 app.use('/api/publik/daftar', express.json({ limit: '9mb' }));
+// Log Sales Lapangan bawa sampai 3 foto bukti (base64, udah dikecilin di HP).
+app.use('/api/lapangan', express.json({ limit: '13mb' }));
 app.use(express.json({ limit: '100kb' }));
 
 app.get('/health', (req, res) => res.json({ ok: true }));
@@ -39,6 +42,7 @@ app.use('/api', opsRoutes);
 app.use('/api', rekrutmenRoutes);
 app.use('/api', karyawanRoutes);
 app.use('/api', artifactRoutes);
+app.use('/api', lapanganRoutes);
 app.get('/api/produk', (req, res) => {
   res.json(PRODUK.filter((p) => p.aktif).map(({ id, nama, url }) => ({ id, nama, url })));
 });

@@ -3,7 +3,8 @@
 Aplikasi operasional internal (dulu "Konsulin Manajemen"). Tahap 1: Dashboard, Leads (warung dari sales + CRM manual + sales),
 Keuangan (Midtrans + catatan manual), Notifikasi, Pengaturan (tim & akun demo), Profile, Rekrutmen Sales Partner, dan Karyawan
 (data kepegawaian, kehadiran harian, cuti & izin dengan persetujuan, payroll bulanan, struktur organisasi), dan Artifact
-(gudang SOP/dokumen/aset/video/catatan per folder, dengan riwayat versi & sampah). AI Chat: menyusul.
+(gudang SOP/dokumen/aset/video/catatan per folder, dengan riwayat versi & sampah), dan Sales Lapangan (bank keberatan
+pelanggan + log kunjungan sales + insight). AI Chat: menyusul.
 Arah desain: `DESIGN.md` (neo-brutalism); filter anti-slop: `.claude/skills/antislop*` di root repo. **Sengaja terpisah** dari
 aplikasi produknya: proses pm2, port, dan domain sendiri. Aplikasi Warung Pintar nggak punya halaman/API admin sama sekali.
 Manajemen baca/tulis langsung ke database produk.
@@ -39,6 +40,12 @@ Rekrutmen pakai alamat itu, dan link lama `makalin.konsulin.com/daftar?s=...` di
 
 File yang diunggah di halaman Artifact disimpan di `data/artifact/` (atau `ARTIFACT_DIR`), bukan di database, dan nggak
 masuk git. **Ikutin folder ini di backup server.** Batas per file 300 MB (`ARTIFACT_MAKS_MB`).
+
+### Akun sales
+
+Akun di Makalin punya peran **admin** (semua halaman) atau **sales** (cuma Sales Lapangan & profilnya sendiri). Bikin
+akun sales dari Pengaturan > Pengguna & tim. Batasannya dikunci di server (`RUTE_SALES` di `server/auth.js`), jadi
+halaman/API baru otomatis tertutup buat sales. Foto bukti kunjungan disimpan di `data/lapangan/` (ikutin di backup).
 
 ## Login admin
 

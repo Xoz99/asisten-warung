@@ -4,9 +4,8 @@ import { Gagal, Memuat, useData } from '../komponen/Ui.jsx';
 import { NAMA_AKSI, ringkasDetail } from './Admin.jsx';
 
 export default function Profile({ api, admin, onKeluar }) {
-  const { data: daftar } = useData(api, '/admin');
+  const { data: saya } = useData(api, '/saya');
   const { data: aktivitas, error, muat } = useData(api, '/saya/aktivitas');
-  const saya = daftar?.find((a) => a.id === admin.id);
 
   return (
     <>
@@ -29,7 +28,7 @@ export default function Profile({ api, admin, onKeluar }) {
               </span>
               <div>
                 <h2 style={{ margin: 0, fontSize: 24 }}>{admin.nama}</h2>
-                <div className="adm-redup">@{admin.username} · admin</div>
+                <div className="adm-redup">@{admin.username} · {admin.peran === 'sales' ? 'sales' : 'admin'}</div>
                 <div className="adm-redup">Terakhir masuk {saya ? waktu(saya.terakhir_masuk) : '…'}</div>
               </div>
             </div>
