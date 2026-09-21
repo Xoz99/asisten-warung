@@ -224,10 +224,10 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
 .adm-crm-tahap{display:grid;grid-template-columns:repeat(5,minmax(0,1fr)) minmax(0,1.3fr);border:var(--garis);box-shadow:var(--bayang);margin-bottom:22px;background:var(--putih)}
 .adm-crm-kartu{display:flex;flex-direction:column;gap:6px;text-align:left;padding:14px;border:0;border-right:var(--garis);background:var(--putih);font:inherit;color:inherit;cursor:pointer;min-width:0}
 .adm-crm-kartu b{font-size:34px;line-height:1}
-.adm-crm-kartu.tahap-kualifikasi{background:var(--kuning)}
-.adm-crm-kartu.tahap-proposal{background:var(--ungu)}
-.adm-crm-kartu.tahap-negosiasi{background:var(--hijau)}
-.adm-crm-kartu.tahap-closing{background:var(--biru);color:var(--putih)}
+.adm-crm-kartu.tahap-trial{background:var(--kuning)}
+.adm-crm-kartu.tahap-konversi{background:var(--hijau)}
+.adm-crm-kartu.tahap-repeat_order{background:var(--biru);color:var(--putih)}
+.adm-crm-kartu.tahap-stuck{background:var(--merah);color:var(--putih)}
 .adm-crm-kartu.on{outline:4px solid var(--hitam);outline-offset:-7px}
 .adm-crm-kartu:hover{filter:brightness(.97)}
 .adm-crm-kartu.total{background:var(--hitam);color:var(--putih);border-right:0;cursor:default}
@@ -253,10 +253,10 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
 .adm-kanban-kolom{background:var(--putih);border:var(--garis);box-shadow:var(--bayang);min-height:320px;display:flex;flex-direction:column}
 .adm-kanban-kolom.atas{background:#EEF2FF}
 .adm-kanban-kepala{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:var(--garis);font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-size:13px}
-.adm-kanban-kepala.tahap-kualifikasi{background:var(--kuning)}
-.adm-kanban-kepala.tahap-proposal{background:var(--ungu)}
-.adm-kanban-kepala.tahap-negosiasi{background:var(--hijau)}
-.adm-kanban-kepala.tahap-closing{background:var(--biru);color:var(--putih)}
+.adm-kanban-kepala.tahap-trial{background:var(--kuning)}
+.adm-kanban-kepala.tahap-konversi{background:var(--hijau)}
+.adm-kanban-kepala.tahap-repeat_order{background:var(--biru);color:var(--putih)}
+.adm-kanban-kepala.tahap-stuck{background:var(--merah);color:var(--putih)}
 .adm-kanban-daftar{display:flex;flex-direction:column;gap:10px;padding:12px;flex:1}
 .adm-kanban-kartu{border:var(--garis-tipis);background:var(--putih);padding:10px;box-shadow:3px 3px 0 var(--hitam);cursor:grab}
 .adm-kanban-kartu:active{cursor:grabbing}
@@ -277,5 +277,6 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
 }
 @media (max-width:560px){
   .adm-crm-tahap{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .adm-crm-kartu.total,.adm-crm-kartu.tahap-closing{grid-column:span 2}
+  .adm-crm-kartu.total,.adm-crm-kartu.tahap-stuck{grid-column:span 2}
 }
+.adm-tahap button.stuck.on{background:var(--merah);color:var(--putih)}

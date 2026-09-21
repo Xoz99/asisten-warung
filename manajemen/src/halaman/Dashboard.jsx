@@ -5,7 +5,7 @@ import { NAMA_AKSI, ringkasDetail } from './Admin.jsx';
 
 // Dashboard: satu layar buat mutusin "apa yang perlu diurus hari ini". Titik fokusnya pemasukan bulan ini; di
 // bawahnya yang butuh tindakan (trial habis, tagihan belum dibayar), baru konteks (arus kas, pipeline, aktivitas).
-const NAMA_TAHAP_CRM = { baru: 'Baru', kualifikasi: 'Kualifikasi', proposal: 'Proposal', negosiasi: 'Negosiasi', closing: 'Closing' };
+const NAMA_TAHAP_CRM = { awareness: 'Awareness', trial: 'Trial 7 hari', konversi: 'Konversi', repeat_order: 'Repeat order', stuck: 'Stuck' };
 
 export default function Dashboard({ api }) {
   const { data: d, error, muat } = useData(api, '/dashboard');

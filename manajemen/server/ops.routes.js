@@ -8,7 +8,17 @@ const router = Router();
 const POLA_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const qWp = (text, params) => (poolWp ? poolWp.query(text, params) : Promise.resolve({ rows: [] }));
 
-export const TAHAP_CRM = ['baru', 'kualifikasi', 'proposal', 'negosiasi', 'closing'];
+// Tahap pipeline CRM: awareness -> trial 7 hari -> konversi (bayar pertama) -> repeat order; stuck = macet, perlu didorong.
+export const TAHAP_CRM = ['awareness', 'trial', 'konversi', 'repeat_order', 'stuck'];
+// Nama tahap lama -> baru (lead yang dibikin sebelum tahapnya diganti ikut dipindah sekali pas server nyala).
+const TAHAP_LAMA = { baru: 'awareness', kualifikasi: 'trial', proposal: 'konversi', negosiasi: 'konversi', closing: 'repeat_order' };
+// Biar impor CSV nerima tulisan yang umum dipakai orang.
+const ALIAS_TAHAP = { ...TAHAP_LAMA, 'trial 7 hari': 'trial', repeat: 'repeat_order', 'repeat order': 'repeat_order', macet: 'stuck' };
+const NAMA_TAHAP = { awareness: 'Awareness', trial: 'Trial 7 hari', konversi: 'Konversi', repeat_order: 'Repeat order', stuck: 'Stuck' };
+const tahapDari = (v) => {
+  const t = String(v || '').trim().toLowerCase();
+  return TAHAP_CRM.includes(t) ? t : ALIAS_TAHAP[t] || 'awareness';
+};
 const KATEGORI_KELUAR = ['gaji', 'operasional', 'marketing', 'server', 'pajak', 'lainnya'];
 const KATEGORI_MASUK = ['penjualan', 'proyek', 'investasi', 'lainnya'];
 
@@ -25,7 +35,7 @@ function pastikanTabelOps() {
         telepon TEXT,
         sumber TEXT,
         nilai NUMERIC NOT NULL DEFAULT 0,
-        tahap TEXT NOT NULL DEFAULT 'baru',
+        tahap TEXT NOT NULL DEFAULT 'awareness',
         hasil TEXT, -- null = masih jalan | 'menang' | 'gagal'
         pemilik_id UUID REFERENCES mj_admin(id) ON DELETE SET NULL,
         created_at TIMESTAMPTZ DEFAULT now(),
@@ -34,6 +44,8 @@ function pastikanTabelOps() {
       // Nomor urut buat ID yang enak disebut (LD-2026-0001) & kapan masuk tahap sekarang (umur di tahap, di Kanban).
       await query('ALTER TABLE mj_lead ADD COLUMN IF NOT EXISTS nomor BIGSERIAL');
       await query('ALTER TABLE mj_lead ADD COLUMN IF NOT EXISTS tahap_sejak TIMESTAMPTZ NOT NULL DEFAULT now()');
+      await query("ALTER TABLE mj_lead ALTER COLUMN tahap SET DEFAULT 'awareness'");
+      for (const [lama, baru] of Object.entries(TAHAP_LAMA)) await query('UPDATE mj_lead SET tahap=$2 WHERE tahap=$1', [lama, baru]);
       await query(`CREATE TABLE IF NOT EXISTS mj_lead_aktivitas (
         id BIGSERIAL PRIMARY KEY,
         lead_id UUID NOT NULL REFERENCES mj_lead(id) ON DELETE CASCADE,
@@ -256,7 +268,7 @@ router.post('/leads/massal', async (req, res, next) => {
          WHERE id = ANY($1) RETURNING id`,
         [ids, nilai]
       );
-      for (const r of rows) await query("INSERT INTO mj_lead_aktivitas (lead_id, admin_nama, jenis, isi) VALUES ($1,$2,'tahap',$3)", [r.id, req.admin.nama, `Tahap diubah massal jadi ${nilai}`]);
+      for (const r of rows) await query("INSERT INTO mj_lead_aktivitas (lead_id, admin_nama, jenis, isi) VALUES ($1,$2,'tahap',$3)", [r.id, req.admin.nama, `Tahap diubah massal jadi ${NAMA_TAHAP[nilai]}`]);
       n = rows.length;
     } else if (aksi === 'pemilik') {
       if (!POLA_UUID.test(nilai || '')) return res.status(400).json({ error: 'Pilih admin yang ditugaskan' });
@@ -279,7 +291,7 @@ router.post('/leads/impor', async (req, res, next) => {
     const baris = (Array.isArray(req.body.baris) ? req.body.baris : []).slice(0, 500);
     let masuk = 0;
     for (const b of baris) {
-      const x = bersihkanLead({ ...b, tahap: TAHAP_CRM.includes(String(b.tahap || '').toLowerCase()) ? String(b.tahap).toLowerCase() : 'baru' });
+      const x = bersihkanLead({ ...b, tahap: tahapDari(b.tahap) });
       if (!x.perusahaan) continue;
       const { rows } = await query(
         `INSERT INTO mj_lead (perusahaan, pic_nama, pic_jabatan, email, telepon, sumber, nilai, tahap, pemilik_id)
@@ -302,7 +314,7 @@ function bersihkanLead(b, sebagian = false) {
     if (b[k] !== undefined || !sebagian) x[k] = teks(b[k], n) || null;
   }
   if (b.nilai !== undefined || !sebagian) x.nilai = angkaPositif(b.nilai) ?? 0;
-  if (b.tahap !== undefined) x.tahap = TAHAP_CRM.includes(b.tahap) ? b.tahap : 'baru';
+  if (b.tahap !== undefined) x.tahap = tahapDari(b.tahap);
   if (b.hasil !== undefined) x.hasil = ['menang', 'gagal'].includes(b.hasil) ? b.hasil : null;
   if (b.pemilik_id !== undefined) x.pemilik_id = POLA_UUID.test(b.pemilik_id || '') ? b.pemilik_id : null;
   return x;
@@ -315,7 +327,7 @@ router.post('/leads', async (req, res, next) => {
     const { rows } = await query(
       `INSERT INTO mj_lead (perusahaan, pic_nama, pic_jabatan, email, telepon, sumber, nilai, tahap, pemilik_id)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *, nilai::float AS nilai`,
-      [x.perusahaan, x.pic_nama, x.pic_jabatan, x.email, x.telepon, x.sumber, x.nilai, x.tahap || 'baru', x.pemilik_id || req.admin.id]
+      [x.perusahaan, x.pic_nama, x.pic_jabatan, x.email, x.telepon, x.sumber, x.nilai, x.tahap || 'awareness', x.pemilik_id || req.admin.id]
     );
     await query("INSERT INTO mj_lead_aktivitas (lead_id, admin_nama, jenis, isi) VALUES ($1,$2,'tahap','Lead dibuat')", [rows[0].id, req.admin.nama]);
     await catatLog(req, 'ops.lead.tambah', { perusahaan: x.perusahaan });
@@ -341,7 +353,7 @@ router.patch('/leads/:id', async (req, res, next) => {
     );
     // Pindah tahap / ditutup kecatat di riwayat lead-nya.
     const catat = [];
-    if (x.tahap && x.tahap !== lama[0].tahap) catat.push(`Tahap: ${lama[0].tahap} → ${x.tahap}`);
+    if (x.tahap && x.tahap !== lama[0].tahap) catat.push(`Tahap: ${NAMA_TAHAP[lama[0].tahap] || lama[0].tahap} → ${NAMA_TAHAP[x.tahap]}`);
     if (x.hasil !== undefined && x.hasil !== lama[0].hasil) catat.push(x.hasil ? `Ditandai ${x.hasil.toUpperCase()}` : 'Dibuka lagi');
     for (const isi of catat) await query("INSERT INTO mj_lead_aktivitas (lead_id, admin_nama, jenis, isi) VALUES ($1,$2,'tahap',$3)", [req.params.id, req.admin.nama, isi]);
     await catatLog(req, 'ops.lead.ubah', { perusahaan: rows[0].perusahaan, ...(catat.length ? { perubahan: catat.join('; ') } : {}) });

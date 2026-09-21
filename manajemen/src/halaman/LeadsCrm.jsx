@@ -5,11 +5,11 @@ import { Gagal, Konfirmasi, Kosong, Memuat, Modal } from '../komponen/Ui.jsx';
 // CRM leads (sesuai referensi Leads Management): kartu tahap + total pipeline, toolbar tabel/kanban + filter, tabel
 // dengan pilih-banyak & aksi massal, kanban drag & drop, panel inspector di samping, impor CSV & ekspor.
 export const TAHAP_CRM = [
-  { id: 'baru', nama: 'Baru', warna: '', ket: 'Total prospek' },
-  { id: 'kualifikasi', nama: 'Kualifikasi', warna: 'kuning', ket: 'Tervalidasi' },
-  { id: 'proposal', nama: 'Proposal', warna: 'ungu', ket: 'Proposal terkirim' },
-  { id: 'negosiasi', nama: 'Negosiasi', warna: 'hijau', ket: 'Lagi nego harga' },
-  { id: 'closing', nama: 'Closing', warna: 'biru', ket: 'Tinggal tanda tangan' },
+  { id: 'awareness', nama: 'Awareness', warna: '', ket: 'Udah kenal, belum nyoba' },
+  { id: 'trial', nama: 'Trial 7 hari', warna: 'kuning', ket: 'Lagi nyoba gratis' },
+  { id: 'konversi', nama: 'Konversi', warna: 'hijau', ket: 'Udah bayar pertama' },
+  { id: 'repeat_order', nama: 'Repeat order', warna: 'biru', ket: 'Perpanjang / beli lagi' },
+  { id: 'stuck', nama: 'Stuck', warna: 'merah', ket: 'Macet, perlu didorong' },
 ];
 const namaTahap = (id) => TAHAP_CRM.find((t) => t.id === id) || TAHAP_CRM[0];
 const SUMBER = ['Referral', 'Website', 'Instagram', 'WhatsApp', 'Pameran', 'Telepon', 'Cold call', 'Lainnya'];
@@ -664,12 +664,16 @@ function Inspector({ api, lead, admins, onTutup, onBerubah }) {
               Alur pipeline
             </p>
             <div className="adm-tahap" role="group" aria-label="Pindah tahap">
-              {TAHAP_CRM.map((t, i) => (
-                <button key={t.id} className={i === idxTahap ? 'on' : i < idxTahap ? 'lewat' : ''} onClick={() => i !== idxTahap && ubah({ tahap: t.id })} aria-pressed={i === idxTahap}>
-                  {i < idxTahap ? '✓ ' : ''}
-                  {t.nama}
-                </button>
-              ))}
+              {TAHAP_CRM.map((t, i) => {
+                // Stuck bukan kelanjutan repeat order - kalau lagi stuck, tahap lain nggak dicentang "udah lewat".
+                const lewat = lead.tahap !== 'stuck' && t.id !== 'stuck' && i < idxTahap;
+                return (
+                  <button key={t.id} className={(i === idxTahap ? 'on' : lewat ? 'lewat' : '') + (t.id === 'stuck' ? ' stuck' : '')} onClick={() => i !== idxTahap && ubah({ tahap: t.id })} aria-pressed={i === idxTahap}>
+                    {lewat ? '✓ ' : ''}
+                    {t.nama}
+                  </button>
+                );
+              })}
             </div>
             <p className="adm-redup" style={{ margin: '6px 0 0' }}>
               Di tahap ini {hariSejak(lead.tahap_sejak)} hari
@@ -756,7 +760,7 @@ function Inspector({ api, lead, admins, onTutup, onBerubah }) {
             style={{ marginTop: 6, minHeight: 70, resize: 'vertical' }}
             value={catatan}
             onChange={(e) => setCatatan(e.target.value)}
-            placeholder="Tulis catatan aktivitas, follow up, atau update negosiasi"
+            placeholder="Tulis catatan aktivitas, follow up, atau kenapa macet"
           />
           <div className="adm-tombol" style={{ justifyContent: 'space-between' }}>
             <select value={jenis} onChange={(e) => setJenis(e.target.value)} aria-label="Jenis catatan">
@@ -993,7 +997,7 @@ function ModalImpor({ onTutup, onImpor }) {
       <p style={{ marginTop: 0 }}>
         Kolom yang dibaca: <span className="adm-mono">{KOLOM_CSV.join(', ')}</span>. Cuma "perusahaan" yang wajib. Maksimal 500 baris sekali impor.
       </p>
-      <button className="adm-link" onClick={() => unduh('templat-lead.csv', KOLOM_CSV.join(',') + '\nContoh PT,Nama PIC,Manager,email@contoh.com,0812xxxx,Referral,15000000,baru')}>
+      <button className="adm-link" onClick={() => unduh('templat-lead.csv', KOLOM_CSV.join(',') + '\nContoh PT,Nama PIC,Manager,email@contoh.com,0812xxxx,Referral,15000000,awareness')}>
         Unduh templat CSV
       </button>
       <label className="adm-unggah">
