@@ -428,3 +428,104 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
 .adm-lap-qr-besar{width:min(300px,100%);aspect-ratio:1;border:var(--garis-tipis);image-rendering:pixelated;background:#fff}
 .adm-lap-link-ciut{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;margin-bottom:14px}
 .adm-lap-link-ciut .adm-label{font-size:11px}
+
+/* ================= Tampilan sales (src/sales/SalesApp.jsx) =================
+   App HP buat lapangan: satu kolom, kartu membulat, menu bawah. Warna & font tetap keluarga Makalin,
+   tapi susunannya beda dari panel admin (sidebar, tabel, bayangan tebal) biar sales nggak kebingungan. */
+.sl-app{min-height:100vh;background:var(--kertas);padding-bottom:calc(84px + env(safe-area-inset-bottom))}
+.sl-atas{position:sticky;top:0;z-index:15;display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:var(--putih);border-bottom:2px solid var(--hitam)}
+.sl-merek{display:flex;align-items:center;gap:10px;color:var(--tinta);text-decoration:none;font-size:17px}
+.sl-merek-kotak{width:32px;height:32px;display:grid;place-items:center;background:var(--hitam);color:var(--kuning);font-weight:700;border-radius:8px}
+.sl-avatar{width:40px;height:40px;display:grid;place-items:center;border-radius:50%;background:var(--kuning);border:2px solid var(--hitam);font-weight:700;color:var(--tinta);text-decoration:none;flex:none}
+.sl-avatar.on{outline:3px solid var(--biru);outline-offset:2px}
+.sl-avatar.besar{width:64px;height:64px;font-size:26px}
+.sl-isi{max-width:560px;margin:0 auto;padding:16px}
+.sl-h1{font-size:26px;margin:4px 0 14px;letter-spacing:-.01em}
+.sl-sapa{margin:4px 0 14px}
+.sl-sapa p{margin:0;font-size:26px;line-height:1.15}
+.sl-sapa span{color:var(--redup);font-size:14px}
+.sl-kartu{background:var(--putih);border:2px solid var(--hitam);border-radius:14px;box-shadow:0 3px 0 var(--hitam);padding:14px}
+.sl-angka{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.sl-angka>*{background:var(--putih);border:2px solid var(--hitam);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:2px;color:var(--tinta);text-decoration:none;min-width:0}
+.sl-angka b{font-size:24px;line-height:1.1;overflow-wrap:anywhere}
+.sl-angka span{font-size:12px;color:var(--redup);line-height:1.25}
+.sl-cta{width:100%;display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left;background:var(--biru);color:var(--putih);border:2px solid var(--hitam);border-radius:16px;box-shadow:0 4px 0 var(--hitam);padding:16px 18px;margin-bottom:16px;cursor:pointer;font:inherit}
+.sl-cta b{display:block;font-size:20px}
+.sl-cta small{display:block;opacity:.9;font-size:13px;margin-top:2px}
+.sl-cta svg{width:34px;height:34px;flex:none;background:var(--kuning);color:var(--hitam);border-radius:50%;padding:6px;border:2px solid var(--hitam)}
+.sl-cta:active,.sl-menu-catat:active{transform:translateY(3px);box-shadow:0 1px 0 var(--hitam)}
+.sl-link{margin-bottom:18px}
+.sl-label{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--redup)}
+.sl-kode{display:block;font-size:34px;line-height:1.1;margin:2px 0 10px;letter-spacing:.03em}
+.sl-salin{display:flex;border:2px solid var(--hitam);border-radius:10px;overflow:hidden}
+.sl-salin input{flex:1;min-width:0;border:0;background:var(--kertas);padding:10px 12px;font:inherit;font-size:14px;min-height:46px;color:var(--tinta)}
+.sl-salin input:focus{outline:2px solid var(--biru);outline-offset:-2px}
+.sl-salin button{border:0;border-left:2px solid var(--hitam);background:var(--kuning);font:inherit;font-weight:700;padding:0 16px;min-width:88px;cursor:pointer}
+.sl-aksi{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.sl-aksi>*,.sl-tombol{display:flex;align-items:center;justify-content:center;min-height:46px;border:2px solid var(--hitam);border-radius:10px;background:var(--putih);color:var(--tinta);font:inherit;font-weight:700;text-decoration:none;cursor:pointer;width:100%}
+.sl-aksi>*:disabled,.sl-tombol:disabled{opacity:.5;cursor:not-allowed}
+.sl-tombol{background:var(--biru);color:var(--putih);box-shadow:0 3px 0 var(--hitam)}
+.sl-tombol.keluar{background:var(--putih);color:var(--merah);margin-top:14px;box-shadow:none}
+.sl-judul{display:flex;justify-content:space-between;align-items:baseline;margin:18px 0 10px}
+.sl-judul h2{font-size:18px;margin:0}
+.sl-judul a{color:var(--biru);font-weight:700;font-size:14px}
+.sl-daftar{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.sl-log,.sl-contekan-buka{width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer;display:flex;flex-direction:column;gap:6px}
+.sl-log b,.sl-contekan-buka b{font-size:16px;overflow-wrap:anywhere}
+.sl-baris{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.sl-baris b{overflow-wrap:anywhere}
+.sl-redup{color:var(--redup);font-size:13px;display:block}
+.sl-tag{align-self:flex-start;font-size:12px;font-weight:700;background:var(--kertas);border:1.5px solid var(--hitam);border-radius:999px;padding:2px 10px}
+.sl-hasil,.sl-status{font-size:12px;font-weight:700;border-radius:999px;padding:3px 10px;border:1.5px solid var(--hitam);white-space:nowrap;background:var(--putih)}
+.sl-hasil.berhasil,.sl-status.langganan{background:var(--hijau)}
+.sl-hasil.tertarik,.sl-status.trial{background:var(--biru);color:var(--putih)}
+.sl-hasil.pikir{background:var(--kuning)}
+.sl-hasil.ditolak,.sl-status.berhenti{background:var(--merah);color:var(--putih)}
+.sl-status.permanen{background:var(--ungu)}
+.sl-toko{display:flex;flex-direction:column;gap:4px}
+.sl-wa{margin-top:6px;font-weight:700;color:var(--biru)}
+.sl-bayar{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sl-bayar b{overflow-wrap:anywhere}
+.sl-chip-gulir{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 10px;margin:0 -16px 4px;padding-left:16px;padding-right:16px;scrollbar-width:none}
+.sl-chip-gulir::-webkit-scrollbar{display:none}
+.sl-chip-gulir button{flex:none;border:2px solid var(--hitam);border-radius:999px;background:var(--putih);font:inherit;font-size:14px;font-weight:700;padding:8px 14px;min-height:40px;cursor:pointer}
+.sl-chip-gulir button.on{background:var(--hitam);color:var(--putih)}
+.sl-contekan{padding:0;overflow:hidden}
+.sl-contekan-buka{background:none;border:0;padding:14px}
+.sl-fakta{border-top:2px dashed var(--hitam);padding:12px 14px 14px;background:#FFFBEA}
+.sl-fakta p{margin:4px 0 12px}
+.sl-kosong{border:2px dashed var(--hitam);border-radius:14px;padding:18px;text-align:center;color:var(--redup);background:var(--putih)}
+.sl-peringatan{background:#FFF4C2;margin-bottom:16px}
+.sl-profil{display:flex;gap:14px;align-items:center;margin-bottom:14px}
+.sl-profil b{font-size:20px;display:block}
+.sl-profil+form{margin-bottom:0}
+.sl-toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom));z-index:30;background:var(--hitam);color:var(--putih);padding:10px 16px;border-radius:999px;font-weight:700;max-width:calc(100% - 32px);text-align:center}
+.sl-menu{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(5,1fr);align-items:end;background:var(--putih);border-top:2px solid var(--hitam);padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+.sl-menu a,.sl-menu-catat{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;font-weight:700;color:var(--redup);text-decoration:none;padding:6px 0;min-height:52px;justify-content:center}
+.sl-menu a.on{color:var(--biru)}
+.sl-menu a.on svg{background:#DBE4FF;border-radius:10px}
+.sl-menu svg{width:44px;height:28px;padding:2px 10px}
+.sl-menu-catat{background:none;border:0;font:inherit;font-size:11px;font-weight:700;color:var(--tinta);cursor:pointer;margin-top:-26px}
+.sl-menu-catat svg{width:56px;height:56px;padding:13px;background:var(--kuning);border:2px solid var(--hitam);border-radius:50%;box-shadow:0 3px 0 var(--hitam)}
+/* Form & detail dipakai ulang dari halaman admin; di tampilan sales dibikin kayak lembar dari bawah. */
+.sl-app .adm-latar{align-items:flex-end;padding:0}
+.sl-app .adm-modal{border-radius:18px 18px 0 0;box-shadow:none;max-height:92vh;overflow-y:auto;border-bottom:0}
+.sl-app .adm-laci{border-left:0;box-shadow:none;width:100%!important;max-width:560px;left:auto;right:0;border-radius:0}
+@media (min-width:700px){
+  .sl-app .adm-latar{align-items:center;padding:24px}
+  .sl-app .adm-modal{border-radius:18px;border-bottom:var(--garis)}
+  .sl-menu{max-width:560px;margin:0 auto;border:2px solid var(--hitam);border-bottom:0;border-radius:18px 18px 0 0}
+}
+.sl-h1{text-transform:none}
+.sl-app .adm-modal,.sl-app .adm-laci{padding:0 16px 20px}
+.sl-app .adm-modal-kepala{position:sticky;top:0;z-index:2;background:var(--putih);color:var(--tinta);margin:0 -16px 8px;padding:14px 16px;border-bottom:2px solid var(--hitam)}
+.sl-app .adm-modal-kepala h2{text-transform:none;letter-spacing:0;font-size:19px}
+.sl-app .adm-tutup{border-radius:50%;width:40px;height:40px;background:var(--kertas);color:var(--tinta);border:2px solid var(--hitam)}
+.sl-app .field input,.sl-app .field select,.sl-app .field textarea{border-radius:10px;border-width:2px}
+.sl-app .field label{text-transform:none;letter-spacing:0;font-size:14px}
+.sl-app .adm-lap-hasil{border-radius:12px;overflow:hidden;border-width:2px}
+.sl-app .adm-lap-hasil button+button{border-left-width:2px}
+.sl-app .adm-kartu{border-radius:12px;box-shadow:none;border-width:2px}
+.sl-app .btn{border-radius:10px;border-width:2px;box-shadow:0 3px 0 var(--hitam)}
+.sl-app .adm-lap-foto{border-radius:10px}
+.sl-app .adm-chip{border-radius:999px}

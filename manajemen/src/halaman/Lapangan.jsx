@@ -12,7 +12,7 @@ const tabsUntuk = (sales) => [
   { id: 'bank', nama: 'Bank keberatan' },
   { id: 'insight', nama: 'Insight' },
 ];
-const STATUS_TOKO = {
+export const STATUS_TOKO = {
   langganan: { nama: 'Langganan aktif', warna: 'hijau' },
   permanen: { nama: 'Permanen', warna: 'ungu' },
   trial: { nama: 'Trial', warna: 'biru' },
@@ -287,7 +287,7 @@ function Log({ api, sales, versi, onBuka, onCatat }) {
 }
 
 // Foto bukti butuh login, jadi diambil lewat fetch + token lalu ditampilin sebagai blob.
-function Foto({ id, onBuka }) {
+export function Foto({ id, onBuka }) {
   const [url, setUrl] = useState(null);
   const [gagal, setGagal] = useState(false);
   useEffect(() => {
@@ -315,7 +315,7 @@ function Foto({ id, onBuka }) {
   );
 }
 
-function Detail({ api, l, admin, onTutup, onUbah, onHapus }) {
+export function Detail({ api, l, admin, onTutup, onUbah, onHapus }) {
   const [besar, setBesar] = useState(null);
   const [hapus, setHapus] = useState(false);
   const [err, setErr] = useState('');
@@ -500,7 +500,7 @@ function LokasiGps({ gps, status, error, lama, onAmbil }) {
 }
 
 // ---------------- Form catat / ubah ----------------
-function FormLog({ api, awal, wajibGps, onTutup, onSelesai }) {
+export function FormLog({ api, awal, wajibGps, onTutup, onSelesai }) {
   const edit = Boolean(awal.id);
   const { data: bank } = useData(api, '/lapangan/keberatan');
   const [isi, setIsi] = useState(() => ({
@@ -725,7 +725,7 @@ function FormLog({ api, awal, wajibGps, onTutup, onSelesai }) {
 
 // ---------------- Toko saya ----------------
 const rupiah = (n) => 'Rp ' + Math.round(n || 0).toLocaleString('id-ID');
-function sisaHari(t) {
+export function sisaHari(t) {
   if (!t) return '';
   const h = Math.ceil((new Date(t) - Date.now()) / 86400000);
   return h >= 0 ? `sisa ${h} hari` : `lewat ${-h} hari`;
