@@ -185,7 +185,7 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
 .adm-tutup{border:2px solid var(--putih);background:none;color:var(--putih);width:36px;height:36px;font-size:20px;line-height:1;cursor:pointer}
 .adm-laci{position:fixed;top:0;right:0;bottom:0;width:min(460px,100%);background:var(--putih);border-left:var(--garis);box-shadow:-6px 0 0 var(--hitam);z-index:20;overflow-y:auto;padding:18px}
 .adm-tahap{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border:var(--garis)}
-.adm-tahap button{border:0;padding:8px 4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:var(--putih);cursor:pointer;min-height:44px}
+.adm-tahap button{border:0;padding:8px 2px;font-size:10px;overflow-wrap:anywhere;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:var(--putih);cursor:pointer;min-height:44px}
 .adm-tahap button+button{border-left:var(--garis-tipis)}
 .adm-tahap button.lewat{background:var(--kertas)}
 .adm-tahap button.on{background:var(--biru);color:var(--putih)}
@@ -219,3 +219,63 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
 }
 .span-2{grid-column:span 2}
 @media (max-width:900px){.span-2{grid-column:auto}}
+
+/* ---------- Leads CRM (sesuai referensi Leads Management) ---------- */
+.adm-crm-tahap{display:grid;grid-template-columns:repeat(5,minmax(0,1fr)) minmax(0,1.3fr);border:var(--garis);box-shadow:var(--bayang);margin-bottom:22px;background:var(--putih)}
+.adm-crm-kartu{display:flex;flex-direction:column;gap:6px;text-align:left;padding:14px;border:0;border-right:var(--garis);background:var(--putih);font:inherit;color:inherit;cursor:pointer;min-width:0}
+.adm-crm-kartu b{font-size:34px;line-height:1}
+.adm-crm-kartu.tahap-kualifikasi{background:var(--kuning)}
+.adm-crm-kartu.tahap-proposal{background:var(--ungu)}
+.adm-crm-kartu.tahap-negosiasi{background:var(--hijau)}
+.adm-crm-kartu.tahap-closing{background:var(--biru);color:var(--putih)}
+.adm-crm-kartu.on{outline:4px solid var(--hitam);outline-offset:-7px}
+.adm-crm-kartu:hover{filter:brightness(.97)}
+.adm-crm-kartu.total{background:var(--hitam);color:var(--putih);border-right:0;cursor:default}
+.adm-crm-kartu.total b{font-size:28px;overflow-wrap:anywhere}
+.adm-toggle-tampil{display:flex;border:var(--garis-tipis)}
+.adm-toggle-tampil button{border:0;background:var(--putih);padding:8px 14px;min-height:40px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-size:12px;cursor:pointer}
+.adm-toggle-tampil button+button{border-left:var(--garis-tipis)}
+.adm-toggle-tampil button.on{background:var(--hitam);color:var(--putih)}
+.adm-chip-filter{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 16px}
+.adm-chip-filter .adm-chip{cursor:pointer;font:inherit;font-size:11px;font-weight:700;text-transform:none;letter-spacing:0}
+.adm-crm-isi{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;align-items:start}
+.adm-crm-isi.ada-inspector{grid-template-columns:minmax(0,1fr) 380px}
+.adm-centang{width:20px;height:20px;accent-color:var(--biru);cursor:pointer;margin:0}
+.adm-tabel tbody tr.dicentang td{background:#E0E7FF}
+.adm-massal{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;background:var(--kuning);border-bottom:var(--garis)}
+.adm-massal b{margin-right:auto;text-transform:uppercase;letter-spacing:.04em;font-size:13px}
+.adm-halaman{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border-top:var(--garis)}
+.adm-inspector{background:var(--putih);border:var(--garis);box-shadow:var(--bayang-besar);position:sticky;top:86px;max-height:calc(100vh - 110px);overflow-y:auto}
+.adm-inspector:focus{outline:none}
+.adm-riwayat{display:flex;flex-direction:column;gap:8px}
+.adm-riwayat-item{border:var(--garis-tipis);padding:10px;box-shadow:3px 3px 0 var(--hitam)}
+.adm-kanban{display:grid;grid-template-columns:repeat(5,minmax(220px,1fr));gap:14px;overflow-x:auto;padding-bottom:10px}
+.adm-kanban-kolom{background:var(--putih);border:var(--garis);box-shadow:var(--bayang);min-height:320px;display:flex;flex-direction:column}
+.adm-kanban-kolom.atas{background:#EEF2FF}
+.adm-kanban-kepala{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:var(--garis);font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-size:13px}
+.adm-kanban-kepala.tahap-kualifikasi{background:var(--kuning)}
+.adm-kanban-kepala.tahap-proposal{background:var(--ungu)}
+.adm-kanban-kepala.tahap-negosiasi{background:var(--hijau)}
+.adm-kanban-kepala.tahap-closing{background:var(--biru);color:var(--putih)}
+.adm-kanban-daftar{display:flex;flex-direction:column;gap:10px;padding:12px;flex:1}
+.adm-kanban-kartu{border:var(--garis-tipis);background:var(--putih);padding:10px;box-shadow:3px 3px 0 var(--hitam);cursor:grab}
+.adm-kanban-kartu:active{cursor:grabbing}
+.adm-kanban-kartu.diseret{opacity:.4}
+.adm-kanban-lepas{border:3px dashed var(--hitam);padding:14px;text-align:center;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+.adm-inspector-laci{position:fixed;top:0;right:0;bottom:0;width:min(420px,100%);z-index:20;box-shadow:-6px 0 0 var(--hitam)}
+.adm-inspector-laci .adm-inspector{position:static;max-height:100vh;height:100%;box-shadow:none}
+.adm-unggah{display:flex;flex-direction:column;align-items:center;gap:4px;border:3px dashed var(--hitam);padding:22px;margin-top:12px;cursor:pointer;text-align:center}
+.adm-unggah input{font-size:13px;margin-bottom:6px}
+@media (max-width:1280px){
+  .adm-crm-tahap{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .adm-crm-kartu{border-bottom:var(--garis)}
+  .adm-crm-kartu.total{grid-column:auto}
+}
+@media (max-width:1200px){
+  .adm-crm-isi.ada-inspector{grid-template-columns:minmax(0,1fr)}
+  .adm-crm-isi .adm-inspector{position:fixed;top:0;right:0;bottom:0;width:min(420px,100%);max-height:none;z-index:20;box-shadow:-6px 0 0 var(--hitam)}
+}
+@media (max-width:560px){
+  .adm-crm-tahap{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .adm-crm-kartu.total,.adm-crm-kartu.tahap-closing{grid-column:span 2}
+}

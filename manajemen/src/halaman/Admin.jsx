@@ -19,6 +19,8 @@ export const NAMA_AKSI = {
   'ops.lead.tambah': 'nambah lead CRM',
   'ops.lead.ubah': 'ubah lead CRM',
   'ops.lead.hapus': 'hapus lead CRM',
+  'ops.lead.massal': 'ubah lead CRM sekaligus',
+  'ops.lead.impor': 'impor lead CRM dari CSV',
   'ops.keuangan.catat': 'catat transaksi',
   'ops.keuangan.hapus': 'hapus transaksi',
 };

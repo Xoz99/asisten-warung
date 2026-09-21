@@ -31,6 +31,9 @@ function pastikanTabelOps() {
         created_at TIMESTAMPTZ DEFAULT now(),
         updated_at TIMESTAMPTZ DEFAULT now()
       )`);
+      // Nomor urut buat ID yang enak disebut (LD-2026-0001) & kapan masuk tahap sekarang (umur di tahap, di Kanban).
+      await query('ALTER TABLE mj_lead ADD COLUMN IF NOT EXISTS nomor BIGSERIAL');
+      await query('ALTER TABLE mj_lead ADD COLUMN IF NOT EXISTS tahap_sejak TIMESTAMPTZ NOT NULL DEFAULT now()');
       await query(`CREATE TABLE IF NOT EXISTS mj_lead_aktivitas (
         id BIGSERIAL PRIMARY KEY,
         lead_id UUID NOT NULL REFERENCES mj_lead(id) ON DELETE CASCADE,
@@ -181,25 +184,113 @@ router.get('/dashboard', async (req, res, next) => {
 });
 
 // ---- CRM leads (manual) ----
+// Filter, urutan, & halaman dikerjain di server. `semua=1` = tanpa halaman (buat Kanban & ekspor, maks 2000).
+const URUTAN_LEAD = {
+  terbaru: 'l.updated_at DESC',
+  terlama: 'l.updated_at ASC',
+  nilai_tinggi: 'l.nilai DESC, l.updated_at DESC',
+  nilai_rendah: 'l.nilai ASC, l.updated_at DESC',
+  nama: 'l.perusahaan ASC',
+};
+const RENTANG_NILAI = { kecil: [0, 10e6], sedang: [10e6, 100e6], besar: [100e6, null] };
+
 router.get('/leads', async (req, res, next) => {
   try {
-    const tahap = TAHAP_CRM.includes(req.query.tahap) ? req.query.tahap : null;
-    const status = ['jalan', 'menang', 'gagal'].includes(req.query.status) ? req.query.status : 'jalan';
-    const q = teks(req.query.q, 60);
+    const f = req.query;
+    const tahap = TAHAP_CRM.includes(f.tahap) ? f.tahap : null;
+    const status = ['jalan', 'menang', 'gagal', 'semua'].includes(f.status) ? f.status : 'jalan';
+    const q = teks(f.q, 60);
     const pola = q ? '%' + q.replace(/[\\%_]/g, (c) => '\\' + c) + '%' : null;
-    const { rows } = await query(
-      `SELECT l.*, l.nilai::float AS nilai, a.nama AS pemilik_nama
-       FROM mj_lead l LEFT JOIN mj_admin a ON a.id = l.pemilik_id
-       WHERE ($1::text IS NULL OR l.tahap = $1)
-         AND (CASE $2 WHEN 'jalan' THEN l.hasil IS NULL ELSE l.hasil = $2 END)
-         AND ($3::text IS NULL OR l.perusahaan ILIKE $3 OR l.pic_nama ILIKE $3 OR l.email ILIKE $3)
-       ORDER BY l.updated_at DESC LIMIT 300`,
-      [tahap, status, pola]
-    );
-    const { rows: ringkas } = await query(
-      `SELECT tahap, count(*)::int AS n, COALESCE(SUM(nilai),0)::float AS nilai FROM mj_lead WHERE hasil IS NULL GROUP BY tahap`
-    );
-    res.json({ leads: rows, ringkas: TAHAP_CRM.map((t) => ({ tahap: t, n: ringkas.find((r) => r.tahap === t)?.n || 0, nilai: ringkas.find((r) => r.tahap === t)?.nilai || 0 })) });
+    const sumber = teks(f.sumber, 40) || null;
+    const pemilik = POLA_UUID.test(f.pemilik || '') ? f.pemilik : null;
+    const nilai = RENTANG_NILAI[f.nilai] || [null, null];
+    const periode = [7, 30, 90].includes(Number(f.periode)) ? Number(f.periode) : null;
+    const urut = URUTAN_LEAD[f.urut] || URUTAN_LEAD.terbaru;
+    const semua = f.semua === '1';
+    const perHalaman = semua ? 2000 : 25;
+    const halaman = semua ? 1 : Math.max(1, Math.floor(Number(f.halaman) || 1));
+    const where = `($1::text IS NULL OR l.tahap = $1)
+         AND (CASE $2 WHEN 'jalan' THEN l.hasil IS NULL WHEN 'semua' THEN true ELSE l.hasil = $2 END)
+         AND ($3::text IS NULL OR l.perusahaan ILIKE $3 OR l.pic_nama ILIKE $3 OR l.email ILIKE $3 OR l.telepon ILIKE $3)
+         AND ($4::text IS NULL OR l.sumber = $4)
+         AND ($5::uuid IS NULL OR l.pemilik_id = $5)
+         AND ($6::numeric IS NULL OR l.nilai >= $6) AND ($7::numeric IS NULL OR l.nilai < $7)
+         AND ($8::int IS NULL OR l.created_at >= now() - make_interval(days => $8))`;
+    const params = [tahap, status, pola, sumber, pemilik, nilai[0], nilai[1], periode];
+    const [{ rows }, { rows: jumlah }, { rows: ringkas }, { rows: sumberAda }] = await Promise.all([
+      query(
+        `SELECT l.*, l.nilai::float AS nilai, a.nama AS pemilik_nama,
+                'LD-' || to_char(l.created_at, 'YYYY') || '-' || lpad(l.nomor::text, 4, '0') AS kode
+         FROM mj_lead l LEFT JOIN mj_admin a ON a.id = l.pemilik_id
+         WHERE ${where} ORDER BY ${urut} LIMIT ${perHalaman} OFFSET ${(halaman - 1) * perHalaman}`,
+        params
+      ),
+      query(`SELECT count(*)::int AS n FROM mj_lead l WHERE ${where}`, params),
+      query(`SELECT tahap, count(*)::int AS n, COALESCE(SUM(nilai),0)::float AS nilai FROM mj_lead WHERE hasil IS NULL GROUP BY tahap`),
+      query(`SELECT DISTINCT sumber FROM mj_lead WHERE sumber IS NOT NULL ORDER BY sumber`),
+    ]);
+    res.json({
+      leads: rows,
+      total: jumlah[0].n,
+      halaman,
+      perHalaman,
+      sumber: sumberAda.map((r) => r.sumber),
+      ringkas: TAHAP_CRM.map((t) => ({ tahap: t, n: ringkas.find((r) => r.tahap === t)?.n || 0, nilai: ringkas.find((r) => r.tahap === t)?.nilai || 0 })),
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Aksi massal dari tabel (centang beberapa lead): ubah tahap, tugaskan ke admin, atau hapus.
+router.post('/leads/massal', async (req, res, next) => {
+  try {
+    const ids = (Array.isArray(req.body.ids) ? req.body.ids : []).filter((id) => POLA_UUID.test(id)).slice(0, 500);
+    if (!ids.length) return res.status(400).json({ error: 'Pilih lead dulu' });
+    const { aksi, nilai } = req.body;
+    let n = 0;
+    if (aksi === 'tahap') {
+      if (!TAHAP_CRM.includes(nilai)) return res.status(400).json({ error: 'Tahap nggak dikenal' });
+      const { rows } = await query(
+        `UPDATE mj_lead SET tahap=$2, tahap_sejak = CASE WHEN tahap <> $2 THEN now() ELSE tahap_sejak END, updated_at=now()
+         WHERE id = ANY($1) RETURNING id`,
+        [ids, nilai]
+      );
+      for (const r of rows) await query("INSERT INTO mj_lead_aktivitas (lead_id, admin_nama, jenis, isi) VALUES ($1,$2,'tahap',$3)", [r.id, req.admin.nama, `Tahap diubah massal jadi ${nilai}`]);
+      n = rows.length;
+    } else if (aksi === 'pemilik') {
+      if (!POLA_UUID.test(nilai || '')) return res.status(400).json({ error: 'Pilih admin yang ditugaskan' });
+      n = (await query('UPDATE mj_lead SET pemilik_id=$2, updated_at=now() WHERE id = ANY($1)', [ids, nilai])).rowCount;
+    } else if (aksi === 'hapus') {
+      n = (await query('DELETE FROM mj_lead WHERE id = ANY($1)', [ids])).rowCount;
+    } else {
+      return res.status(400).json({ error: 'Aksi nggak dikenal' });
+    }
+    await catatLog(req, 'ops.lead.massal', { aksi, jumlah: n, ...(aksi !== 'hapus' ? { nilai } : {}) });
+    res.json({ ok: true, n });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Impor dari CSV (sudah di-parse di browser jadi array objek). Baris tanpa nama perusahaan dilewati.
+router.post('/leads/impor', async (req, res, next) => {
+  try {
+    const baris = (Array.isArray(req.body.baris) ? req.body.baris : []).slice(0, 500);
+    let masuk = 0;
+    for (const b of baris) {
+      const x = bersihkanLead({ ...b, tahap: TAHAP_CRM.includes(String(b.tahap || '').toLowerCase()) ? String(b.tahap).toLowerCase() : 'baru' });
+      if (!x.perusahaan) continue;
+      const { rows } = await query(
+        `INSERT INTO mj_lead (perusahaan, pic_nama, pic_jabatan, email, telepon, sumber, nilai, tahap, pemilik_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+        [x.perusahaan, x.pic_nama, x.pic_jabatan, x.email, x.telepon, x.sumber, x.nilai, x.tahap, req.admin.id]
+      );
+      await query("INSERT INTO mj_lead_aktivitas (lead_id, admin_nama, jenis, isi) VALUES ($1,$2,'tahap','Lead diimpor dari CSV')", [rows[0].id, req.admin.nama]);
+      masuk++;
+    }
+    await catatLog(req, 'ops.lead.impor', { jumlah: masuk, dilewati: baris.length - masuk });
+    res.json({ masuk, dilewati: baris.length - masuk });
   } catch (e) {
     next(e);
   }
@@ -244,7 +335,8 @@ router.patch('/leads/:id', async (req, res, next) => {
     const { rows: lama } = await query('SELECT tahap, hasil, perusahaan FROM mj_lead WHERE id=$1', [req.params.id]);
     if (!lama.length) return res.status(404).json({ error: 'Lead tidak ditemukan' });
     const { rows } = await query(
-      `UPDATE mj_lead SET ${kolom.map((k, i) => `${k}=$${i + 2}`).join(', ')}, updated_at=now() WHERE id=$1 RETURNING *, nilai::float AS nilai`,
+      `UPDATE mj_lead SET ${kolom.map((k, i) => `${k}=$${i + 2}`).join(', ')}, updated_at=now()${x.tahap && x.tahap !== lama[0].tahap ? ', tahap_sejak=now()' : ''}
+       WHERE id=$1 RETURNING *, nilai::float AS nilai`,
       [req.params.id, ...kolom.map((k) => x[k])]
     );
     // Pindah tahap / ditutup kecatat di riwayat lead-nya.
