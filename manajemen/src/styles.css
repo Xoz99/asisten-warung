@@ -529,3 +529,40 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
 .sl-app .btn{border-radius:10px;border-width:2px;box-shadow:0 3px 0 var(--hitam)}
 .sl-app .adm-lap-foto{border-radius:10px}
 .sl-app .adm-chip{border-radius:999px}
+
+/* ================= Layar masuk (Masuk di src/App.jsx) =================
+   Panel biru + lembar putih membulat. Lebih lembut dari panel admin, karena ini pintu masuk admin & sales. */
+.mk{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;background:var(--putih)}
+.mk-hero{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:48px 24px 72px;color:var(--putih);text-align:center;
+  background:radial-gradient(circle at 50% 38%,rgba(255,255,255,.14) 0 22%,transparent 22.5%),radial-gradient(circle at 50% 38%,rgba(255,255,255,.08) 0 34%,transparent 34.5%),var(--biru);min-height:36vh}
+.mk-logo{width:76px;height:76px;display:grid;place-items:center;border-radius:22px;background:var(--kuning);color:var(--hitam);font-size:40px;font-weight:700;border:3px solid var(--hitam);box-shadow:0 5px 0 rgba(0,0,0,.35);margin-bottom:8px}
+.mk-hero b{font-size:30px;letter-spacing:-.01em}
+.mk-hero span:last-child{font-size:15px;opacity:.9}
+.mk-lembar{flex:1;display:flex;flex-direction:column;background:var(--putih);border-radius:28px 28px 0 0;margin-top:-32px;position:relative;padding:28px 20px 20px}
+.mk-form{width:100%;max-width:400px;margin:0 auto}
+.mk-form h1{font-size:28px;margin:0;text-transform:none;letter-spacing:-.01em}
+.mk-sub{color:var(--redup);margin:6px 0 18px;font-size:15px}
+.mk-field{margin-top:14px}
+.mk-field label{display:block;font-weight:600;font-size:15px;margin-bottom:6px}
+.mk-field input{width:100%;min-height:50px;border:1.5px solid #E4E4E7;background:#F4F4F5;border-radius:999px;padding:0 20px;font:inherit;font-size:16px;color:var(--tinta)}
+.mk-field input:focus{outline:none;border-color:var(--biru);background:var(--putih);box-shadow:0 0 0 3px rgba(29,78,216,.18)}
+.mk-sandi{position:relative}
+.mk-sandi input{padding-right:56px}
+.mk-sandi button{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:44px;height:44px;border:0;background:none;border-radius:50%;color:var(--redup);cursor:pointer;display:grid;place-items:center}
+.mk-sandi button:hover{color:var(--tinta);background:#E4E4E7}
+.mk-sandi button:focus-visible{outline:2px solid var(--biru)}
+.mk-tombol{width:100%;min-height:52px;margin-top:22px;border:0;border-radius:999px;background:var(--biru);color:var(--putih);font:inherit;font-size:17px;font-weight:700;cursor:pointer;box-shadow:0 6px 16px -6px rgba(29,78,216,.6)}
+.mk-tombol:hover:not(:disabled){background:#1E40AF}
+.mk-tombol:focus-visible{outline:3px solid var(--kuning);outline-offset:2px}
+.mk-tombol:disabled{opacity:.55;cursor:not-allowed;box-shadow:none}
+.mk-lupa{text-align:center;color:var(--redup);font-size:14px;margin:16px 0 0}
+.mk-error{color:var(--merah);font-weight:600;margin:12px 0 0;font-size:14px}
+.mk-kaki{text-align:center;color:var(--redup);font-size:13px;margin:auto 0 0;padding-top:28px}
+@media (min-width:900px){
+  .mk{flex-direction:row}
+  .mk-hero{flex:1;min-height:100vh;padding:48px;background:radial-gradient(circle at 50% 44%,rgba(255,255,255,.14) 0 14%,transparent 14.5%),radial-gradient(circle at 50% 44%,rgba(255,255,255,.08) 0 24%,transparent 24.5%),var(--biru)}
+  .mk-logo{width:96px;height:96px;font-size:50px;border-radius:26px}
+  .mk-hero b{font-size:40px}
+  .mk-lembar{flex:0 0 min(520px,46%);margin:0;border-radius:0;justify-content:center;padding:48px}
+  .mk-kaki{margin-top:0;position:absolute;bottom:24px;left:0;right:0}
+}

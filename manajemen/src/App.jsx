@@ -224,9 +224,12 @@ function Samping({ halaman, admin, notifBaru, buka }) {
   );
 }
 
+// Layar masuk (admin & sales). Gaya lembut: panel biru + kolom membulat - beda dari panel admin yang kotak-kotak.
+// Nggak ada "daftar" / login Google: akun dibikin admin, dan reset password juga lewat admin.
 function Masuk({ error, onMasuk }) {
   const [perluSetup, setPerluSetup] = useState(null);
   const [isi, setIsi] = useState({ username: '', password: '', nama: '', kunciSetup: '' });
+  const [lihat, setLihat] = useState(false);
   const [salah, setSalah] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -254,50 +257,77 @@ function Masuk({ error, onMasuk }) {
   };
 
   const field = (k, label, props = {}) => (
-    <div className="field">
+    <div className="mk-field">
       <label htmlFor={k}>{label}</label>
       <input id={k} value={isi[k]} onChange={ubah(k)} {...props} />
     </div>
   );
 
   return (
-    <div className="adm-tengah">
-      <form className="adm-kartu adm-masuk" onSubmit={kirim} style={{ boxShadow: '8px 8px 0 #000' }}>
-        <div className="adm-kartu-kepala hitam">
-          <div className="adm-merek">
-            <span className="adm-merek-kotak" style={{ border: '2px solid #fff' }} aria-hidden="true">
-              M
-            </span>
-            Makalin Ops
-          </div>
-        </div>
-        {perluSetup === null ? (
-          <p className="adm-sub">{salah || 'Memuat…'}</p>
-        ) : (
-          <>
-            <p className="adm-sub" style={{ marginTop: 0 }}>
-              {perluSetup
-                ? 'Belum ada admin. Bikin akun admin pertama pakai kunci setup (ADMIN_KEY di .env server).'
-                : 'Khusus tim internal. Masuk pakai akun adminmu.'}
-            </p>
-            {perluSetup && field('kunciSetup', 'Kunci setup', { type: 'password', autoComplete: 'off' })}
-            {perluSetup && field('nama', 'Nama kamu')}
-            {field('username', 'Username', { autoCapitalize: 'none', autoComplete: 'username', autoFocus: !perluSetup })}
-            {field('password', perluSetup ? 'Password (min. 8 karakter)' : 'Password', {
-              type: 'password',
-              autoComplete: perluSetup ? 'new-password' : 'current-password',
-            })}
-            {(salah || error) && (
-              <p className="adm-error" role="alert">
-                {salah || error}
+    <div className="mk">
+      <section className="mk-hero" aria-hidden="true">
+        <span className="mk-logo">M</span>
+        <b>Makalin Ops</b>
+        <span>Workspace internal Konsulin</span>
+      </section>
+
+      <main className="mk-lembar">
+        <form className="mk-form" onSubmit={kirim}>
+          <h1>{perluSetup ? 'Bikin admin pertama' : 'Masuk'}</h1>
+          <p className="mk-sub">
+            {perluSetup === null
+              ? ''
+              : perluSetup
+                ? 'Belum ada admin. Isi kunci setup (ADMIN_KEY di .env server) buat bikin akun admin pertama.'
+                : 'Pakai akun yang dikasih admin: tim manajemen atau sales.'}
+          </p>
+
+          {perluSetup === null ? (
+            salah ? (
+              <p className="mk-error" role="alert">
+                {salah}
               </p>
-            )}
-            <button className="btn utama" style={{ width: '100%', marginTop: 18 }} type="submit" disabled={loading}>
-              {loading ? 'Memproses…' : perluSetup ? 'Buat admin & masuk' : 'Masuk'}
-            </button>
-          </>
-        )}
-      </form>
+            ) : (
+              <p className="mk-sub">Memuat…</p>
+            )
+          ) : (
+            <>
+              {perluSetup && field('kunciSetup', 'Kunci setup', { type: 'password', autoComplete: 'off' })}
+              {perluSetup && field('nama', 'Nama kamu', { autoComplete: 'name' })}
+              {field('username', 'Username', { autoCapitalize: 'none', autoComplete: 'username', autoFocus: !perluSetup, placeholder: 'misal: agung' })}
+              <div className="mk-field">
+                <label htmlFor="password">{perluSetup ? 'Password (min. 8 karakter)' : 'Password'}</label>
+                <div className="mk-sandi">
+                  <input
+                    id="password"
+                    type={lihat ? 'text' : 'password'}
+                    value={isi.password}
+                    onChange={ubah('password')}
+                    autoComplete={perluSetup ? 'new-password' : 'current-password'}
+                  />
+                  <button type="button" onClick={() => setLihat((v) => !v)} aria-label={lihat ? 'Sembunyikan password' : 'Tampilkan password'} aria-pressed={lihat}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" />
+                      <circle cx="12" cy="12" r="3" />
+                      {lihat && <path d="M4 4l16 16" />}
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              {(salah || error) && (
+                <p className="mk-error" role="alert">
+                  {salah || error}
+                </p>
+              )}
+              <button className="mk-tombol" type="submit" disabled={loading || !isi.username.trim() || !isi.password}>
+                {loading ? 'Memproses…' : perluSetup ? 'Buat admin & masuk' : 'Masuk'}
+              </button>
+              {!perluSetup && <p className="mk-lupa">Lupa password? Minta admin buat reset.</p>}
+            </>
+          )}
+        </form>
+        <p className="mk-kaki">© {new Date().getFullYear()} Konsulin</p>
+      </main>
     </div>
   );
 }
