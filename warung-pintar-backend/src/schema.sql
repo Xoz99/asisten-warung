@@ -453,3 +453,17 @@ CREATE TABLE IF NOT EXISTS pendaftaran_otp (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_pendaftaran_otp_hp ON pendaftaran_otp (no_hp, created_at DESC);
+
+-- Sales lapangan yang bawa warung (lihat services/sales.service.js & routes/admin.routes.js - dibikin otomatis juga
+-- di sana). Warung yang daftar lewat link /?ref=KODE atau ngisi kode sales nempel ke sales-nya lewat warung.sales_id.
+CREATE TABLE IF NOT EXISTS sales (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  kode TEXT UNIQUE NOT NULL,
+  nama TEXT NOT NULL,
+  no_hp TEXT,
+  aktif BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE warung ADD COLUMN IF NOT EXISTS sales_id UUID REFERENCES sales(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_warung_sales ON warung (sales_id);
+ALTER TABLE pendaftaran_otp ADD COLUMN IF NOT EXISTS sales_id UUID;

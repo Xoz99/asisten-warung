@@ -32,6 +32,7 @@ import koperasiRoutes from './routes/koperasi.routes.js';
 import langgananRoutes from './routes/langganan.routes.js';
 import tukarRoutes from './routes/tukar.routes.js';
 import komunitasRoutes from './routes/komunitas.routes.js';
+import adminRoutes from './routes/admin.routes.js';
 
 const app = express();
 // Berapa lapis proxy di depan server ini (ngrok/nginx/Cloudflare) - dibaca dari TRUST_PROXY.
@@ -60,6 +61,8 @@ app.get('/health', (req, res) => res.json({ ok: true, waktu: new Date().toISOStr
 app.use('/api/auth', authRoutes);
 // webhook Midtrans — publik (bukan pelanggan yang manggil), diamankan pakai verifikasi signature, bukan JWT
 app.use('/api/lisensi', lisensiWebhookRoutes);
+// halaman admin (rekap sales) - bukan akun warung, dikunci pakai ADMIN_KEY sendiri (lihat admin.routes.js)
+app.use('/api/admin', adminRoutes);
 
 // semua rute di bawah ini butuh login (1 akun warung, token JWT dipakai bareng di beberapa device)
 app.use('/api', requireAuth);

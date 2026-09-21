@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { api } from '../lib/api.js';
 import { EyeIcon } from '../lib/icons.jsx';
+import { hapusKodeSales, kodeSalesTersimpan } from '../lib/kodeSales.js';
 
 // Konsulin (landing page) ngarahin ke sini pakai link kayak /?plan=bulanan waktu orang klik
 // paket harga. Begitu berhasil daftar/masuk, langsung lanjut ke pembayaran Midtrans — nggak
@@ -19,7 +20,9 @@ function planDariUrl() {
 export default function Auth() {
   const { login, selesaiDaftar, mulaiCheckout } = useApp();
   const planUrl = planDariUrl();
-  const [mode, setMode] = useState(planUrl ? 'daftar' : 'login'); // 'login' | 'daftar' | 'lupa'
+  // Kode sales dari link /?ref= (lihat lib/kodeSales.js). Orang yang dateng lewat link sales hampir pasti mau daftar.
+  const [kodeSales, setKodeSales] = useState(kodeSalesTersimpan);
+  const [mode, setMode] = useState(() => (planUrl || kodeSalesTersimpan() ? 'daftar' : 'login')); // 'login' | 'daftar' | 'lupa'
   const [namaWarung, setNamaWarung] = useState('');
   const [username, setUsername] = useState('');
   const [noHp, setNoHp] = useState('');
@@ -31,12 +34,34 @@ export default function Auth() {
   const [pendaftaran, setPendaftaran] = useState(null); // { id, noHpSamar, berlakuMenit }
   const [kode, setKode] = useState('');
   const [tungguKirimUlang, setTungguKirimUlang] = useState(0); // detik
+  // Hasil cek kode sales: { kode, nama } kalau dikenal, { kode, nama: null } kalau nggak. Cuma ditampilin kalau
+  // `kode`-nya masih sama sama yang lagi diketik.
+  const [infoSales, setInfoSales] = useState(null);
+  const kodeSalesRapi = kodeSales.trim().toUpperCase();
+  const salesTampil = infoSales && infoSales.kode === kodeSalesRapi ? infoSales : null;
 
   useEffect(() => {
     if (tungguKirimUlang <= 0) return;
     const t = setTimeout(() => setTungguKirimUlang((d) => d - 1), 1000);
     return () => clearTimeout(t);
   }, [tungguKirimUlang]);
+
+  useEffect(() => {
+    if (mode !== 'daftar' || !/^[A-Z0-9]{3,20}$/.test(kodeSalesRapi)) return;
+    let batal = false;
+    const t = setTimeout(async () => {
+      try {
+        const s = await api.daftar.cekSales(kodeSalesRapi);
+        if (!batal) setInfoSales({ kode: kodeSalesRapi, nama: s.nama });
+      } catch (err) {
+        if (!batal && err.status === 404) setInfoSales({ kode: kodeSalesRapi, nama: null });
+      }
+    }, 400);
+    return () => {
+      batal = true;
+      clearTimeout(t);
+    };
+  }, [kodeSalesRapi, mode]);
 
   const lanjutCheckout = async () => {
     if (planUrl) {
@@ -46,7 +71,7 @@ export default function Auth() {
   };
 
   const kirimKodeDaftar = async () => {
-    const r = await api.daftar.kirimKode(namaWarung.trim(), username.trim(), password, noHp.trim());
+    const r = await api.daftar.kirimKode(namaWarung.trim(), username.trim(), password, noHp.trim(), kodeSalesRapi || undefined);
     setPendaftaran({ id: r.pendaftaranId, noHpSamar: r.noHpSamar, berlakuMenit: r.berlakuMenit });
     setKode('');
     setTungguKirimUlang(60);
@@ -59,6 +84,7 @@ export default function Auth() {
     setLoading(true);
     try {
       await selesaiDaftar(pendaftaran.id, kode.trim());
+      hapusKodeSales();
       await lanjutCheckout();
     } catch (err) {
       setError(err.message || 'Gagal, coba lagi');
@@ -234,6 +260,23 @@ export default function Auth() {
             <EyeIcon open={lihatPassword} />
           </button>
         </div>
+        {mode === 'daftar' && (
+          <div className="field">
+            <label>Kode sales (opsional)</label>
+            <input
+              value={kodeSales}
+              onChange={(e) => setKodeSales(e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 20).toUpperCase())}
+              placeholder="Kalau dibantu sales, isi kodenya"
+              autoCapitalize="characters"
+              autoComplete="off"
+            />
+            {salesTampil && (
+              <p className="p-sub" style={{ marginTop: 6, fontSize: 12, color: salesTampil.nama ? 'var(--ink)' : '#e5484d' }}>
+                {salesTampil.nama ? `Dibantu sales: ${salesTampil.nama} ✓` : 'Kode sales ini nggak dikenal. Cek lagi, atau kosongin aja.'}
+              </p>
+            )}
+          </div>
+        )}
 
         {error && (
           <p className="p-sub" style={{ color: '#e5484d', marginTop: 10 }}>

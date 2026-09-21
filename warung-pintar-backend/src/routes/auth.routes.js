@@ -8,6 +8,7 @@ import { normalisasiNoHp, samarkanNoHp } from '../utils/noHp.js';
 import { kirimOtpWa, waAktif } from '../services/wa.service.js';
 import { simpanMemori } from '../services/memori.service.js';
 import { ambilProfilUsaha, bersihkanProfil, pastikanKolomProfil } from '../services/profilUsaha.service.js';
+import { cariSalesAktif, pastikanTabelSales } from '../services/sales.service.js';
 
 const router = Router();
 const SECRET = process.env.JWT_SECRET || 'dev-secret-ganti-ini';
@@ -57,6 +58,9 @@ function pastikanTabelDaftar() {
         created_at TIMESTAMPTZ DEFAULT now()
       )`);
       await query('CREATE INDEX IF NOT EXISTS idx_pendaftaran_otp_hp ON pendaftaran_otp (no_hp, created_at DESC)');
+      // Sales yang bawa warung ini (kode sales dari link /?ref= atau diketik di form) - lihat sales.service.js.
+      await pastikanTabelSales();
+      await query('ALTER TABLE pendaftaran_otp ADD COLUMN IF NOT EXISTS sales_id UUID');
     })().catch((e) => {
       tabelDaftarSiap = null;
       throw e;
@@ -66,6 +70,18 @@ function pastikanTabelDaftar() {
 }
 
 const POLA_UUID_DAFTAR = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Cek kode sales dari halaman daftar (buat nampilin "Dibantu sales: Budi" sebelum kirim form). Yang dibalikin
+// cuma nama - nomor HP sales nggak ikut.
+router.get('/sales/:kode', otpIpLimiter, async (req, res, next) => {
+  try {
+    const s = await cariSalesAktif(req.params.kode);
+    if (!s) return res.status(404).json({ error: 'Kode sales nggak dikenal' });
+    res.json({ kode: s.kode, nama: s.nama });
+  } catch (e) {
+    next(e);
+  }
+});
 
 // Username & nomor HP belum dipakai warung lain? Balikin pesan error, atau null kalau aman.
 async function cekBelumDipakai(username, hp) {
@@ -78,7 +94,7 @@ async function cekBelumDipakai(username, hp) {
 
 router.post('/register/kirim-kode', otpIpLimiter, otpLimiter, async (req, res, next) => {
   try {
-    const { namaWarung, username, password, noHp } = req.body;
+    const { namaWarung, username, password, noHp, kodeSales } = req.body;
     const nama = typeof namaWarung === 'string' ? namaWarung.trim() : '';
     const user = typeof username === 'string' ? username.trim() : '';
     if (!nama || !user || !password || !noHp) {
@@ -89,6 +105,13 @@ router.post('/register/kirim-kode', otpIpLimiter, otpLimiter, async (req, res, n
     if (!hp) return res.status(400).json({ error: 'Nomor HP tidak valid. Contoh: 0812-3456-7890' });
     const dipakai = await cekBelumDipakai(user, hp);
     if (dipakai) return res.status(409).json({ error: dipakai });
+    // Kode sales opsional, tapi kalau diisi harus bener - salah ketik jangan diem-diem bikin warungnya nggak
+    // kecatat ke sales mana pun.
+    let sales = null;
+    if (typeof kodeSales === 'string' && kodeSales.trim()) {
+      sales = await cariSalesAktif(kodeSales);
+      if (!sales) return res.status(400).json({ error: 'Kode sales nggak dikenal. Cek lagi, atau kosongin aja kalau nggak ada.' });
+    }
 
     await pastikanTabelDaftar();
     // Batas kirim per NOMOR dihitung dari tabel (sama alasannya kayak buatDanKirimOtp) - tiap kirim itu pesan WA
@@ -105,9 +128,9 @@ router.post('/register/kirim-kode', otpIpLimiter, otpLimiter, async (req, res, n
     await query('UPDATE pendaftaran_otp SET dipakai=true WHERE no_hp=$1 AND dipakai=false', [hp]);
     const kode = String(Math.floor(100000 + Math.random() * 900000));
     const { rows } = await query(
-      `INSERT INTO pendaftaran_otp (nama, username, no_hp, password_hash, kode_hash, kedaluwarsa)
-       VALUES ($1,$2,$3,$4,$5, now() + ($6 || ' minutes')::interval) RETURNING id`,
-      [nama, user, hp, await bcrypt.hash(password, 10), await bcrypt.hash(kode, 10), String(OTP_MENIT)]
+      `INSERT INTO pendaftaran_otp (nama, username, no_hp, password_hash, kode_hash, kedaluwarsa, sales_id)
+       VALUES ($1,$2,$3,$4,$5, now() + ($6 || ' minutes')::interval, $7) RETURNING id`,
+      [nama, user, hp, await bcrypt.hash(password, 10), await bcrypt.hash(kode, 10), String(OTP_MENIT), sales?.id || null]
     );
     const terkirim = await kirimOtpWa(hp, kode, 'daftar');
     // Gateway WA aktif tapi pesannya ditolak (nomor nggak punya WhatsApp, dst): daftar nggak bisa lanjut, karena
@@ -147,8 +170,9 @@ router.post('/register/verifikasi', otpIpLimiter, otpLimiter, async (req, res, n
       return res.status(409).json({ error: dipakai });
     }
     const { rows: w } = await query(
-      'INSERT INTO warung (nama, username, password_hash, no_hp) VALUES ($1,$2,$3,$4) RETURNING *',
-      [p.nama, p.username, p.password_hash, p.no_hp]
+      `INSERT INTO warung (nama, username, password_hash, no_hp, sales_id)
+       VALUES ($1,$2,$3,$4, (SELECT id FROM sales WHERE id=$5)) RETURNING *`,
+      [p.nama, p.username, p.password_hash, p.no_hp, p.sales_id]
     );
     await query('UPDATE pendaftaran_otp SET dipakai=true WHERE id=$1', [p.id]);
     const warung = warungPublik(w[0]);

@@ -1,7 +1,18 @@
+import { lazy, Suspense } from 'react';
 import { AppProvider } from './state/AppContext.jsx';
 import PhoneShell from './components/PhoneShell.jsx';
-//claude --resume 61cd98b5-9401-4218-8b69-74e9e65d34d4 --permission-mode auto 
+
+// Halaman admin (rekap sales) dipisah jadi chunk sendiri - pemilik warung nggak pernah buka, jangan ikut dimuat.
+const Admin = lazy(() => import('./screens/Admin.jsx'));
+
 export default function App() {
+  if (window.location.pathname.replace(/\/+$/, '') === '/admin') {
+    return (
+      <Suspense fallback={null}>
+        <Admin />
+      </Suspense>
+    );
+  }
   return (
     <AppProvider>
       <PhoneShell />
