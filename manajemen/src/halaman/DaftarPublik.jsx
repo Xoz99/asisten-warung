@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { panggil } from '../lib/api.js';
 
-// Form lamaran calon Sales Partner - publik, tanpa login (konsulin.com/daftar?s=KODE, build terpisah: vite.daftar.config.js).
+// Form lamaran calon Sales Partner bawaan Makalin (/daftar). Di produksi form publiknya di konsulin.com/karir
+// (repo konsulin-landing-page) dan /daftar dialihin ke sana - form ini dipakai kalau DAFTAR_URL kosong (mis. lokal).
 // 3 langkah biar nggak kerasa panjang: data diri -> pengalaman & kesiapan -> dokumen & persetujuan.
 // ?s= = kode titik sebar (sumber keyakinan tinggi). Tanpa kode & tanpa referral, "tahu dari mana" wajib (§7.3).
 const LANGKAH = ['Data diri', 'Pengalaman & kesiapan', 'Dokumen & persetujuan'];

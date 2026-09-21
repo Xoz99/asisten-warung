@@ -46,22 +46,15 @@ app.use('/api', (req, res) => res.status(404).json({ error: 'Tidak ditemukan' })
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.resolve(__dirname, '../dist');
 
-// Form daftar publik (build terpisah, dist-daftar/). Di produksi dibuka lewat konsulin.com/daftar - reverse proxy
-// konsulin.com cuma nerusin /daftar* & /api/publik/* ke sini, jadi panel admin nggak kejangkau dari domain publik.
-// Link lama makalin.konsulin.com/daftar?s=... dialihin ke DAFTAR_URL.
-const DIST_DAFTAR = path.resolve(__dirname, '../dist-daftar');
-if (fs.existsSync(path.join(DIST_DAFTAR, 'daftar.html'))) {
-  const hostDaftar = DAFTAR_URL ? new URL(DAFTAR_URL).host : null;
-  app.use('/daftar/assets', express.static(path.join(DIST_DAFTAR, 'assets'), { immutable: true, maxAge: '1y', fallthrough: false }));
+// Form lamaran publik ada di konsulin.com/karir (repo konsulin-landing-page) - server landing yang nerusin kiriman
+// ke /api/publik/*. Link lama makalin.konsulin.com/daftar?s=... dialihin ke sana, kode ?s= ikut kebawa.
+if (DAFTAR_URL) {
   app.get(['/daftar', '/daftar/'], (req, res) => {
-    if (hostDaftar && req.get('host') !== hostDaftar) {
-      const qs = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
-      return res.redirect(301, DAFTAR_URL + qs);
-    }
-    res.setHeader('Cache-Control', 'no-cache');
-    res.sendFile(path.join(DIST_DAFTAR, 'daftar.html'));
+    const qs = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+    res.redirect(301, DAFTAR_URL + qs);
   });
 }
+
 if (fs.existsSync(path.join(DIST, 'index.html'))) {
   app.use(
     express.static(DIST, {

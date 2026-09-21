@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "node --watch server/index.js & vite",
     "dev:server": "node --watch server/index.js",
-    "build": "vite build && vite build -c vite.daftar.config.js",
+    "build": "vite build",
     "start": "node server/index.js",
     "lint": "oxlint",
     "buat-admin": "node server/buatAdmin.js",

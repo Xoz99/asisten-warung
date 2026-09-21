@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { Router } from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { catatLog, query, pool } from './db.js';
 import { normalisasiNoHp } from './utils/noHp.js';
 
@@ -210,7 +210,7 @@ const LABEL = {
   ketersediaan: 'Hari & jam tersedia', area: 'Area yang mau digarap', alasan: 'Alasan tertarik', bidangPengalaman: 'Bidang pengalaman', sosmed: 'Link sosmed',
   skemaKerja: 'Skema kerja yang diinginkan', waktuHubungi: 'Waktu terbaik dihubungi', tempatProspek: 'Tempat cari pelanggan', tempatProspekLain: 'Ide tempat cari pelanggan',
 };
-// Link form daftar yang dibagiin ke calon pelamar. Di produksi form-nya di domain publik (konsulin.com/daftar), bukan
+// Link form lamaran yang dibagiin ke calon pelamar. Di produksi form-nya di landing page (konsulin.com/karir), bukan
 // di domain internal makalin - lihat README.
 export const DAFTAR_URL = (process.env.DAFTAR_URL || '').replace(/\/+$/, '');
 
@@ -311,7 +311,21 @@ async function buatLamaran({ nama, noHp, email, domisili, s, dropdown, referral,
 
 // ---------------- Form daftar publik (tanpa login) ----------------
 export const publikRouter = Router();
-const daftarLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 20, standardHeaders: true, legacyHeaders: false, message: { error: 'Terlalu banyak percobaan. Coba lagi nanti.' } });
+// Kiriman dari server landing page (konsulin.com, jalan di mesin yang sama) datang dari loopback dan bawa IP asli
+// pelamar di X-Pelamar-IP. Header itu cuma dipercaya kalau koneksinya beneran dari loopback.
+const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+export const ipPelamar = (req) => {
+  const h = req.get('x-pelamar-ip');
+  return h && LOOPBACK.has(req.socket.remoteAddress) ? String(h).slice(0, 64) : req.ip;
+};
+const daftarLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => ipKeyGenerator(ipPelamar(req)),
+  message: { error: 'Terlalu banyak percobaan. Coba lagi nanti.' },
+});
 
 publikRouter.get('/daftar/info', async (req, res, next) => {
   try {
