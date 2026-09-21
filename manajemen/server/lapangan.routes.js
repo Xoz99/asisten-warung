@@ -429,6 +429,19 @@ const SQL_TAHAP = `CASE
   WHEN w.lisensi_berlaku_sampai > now() THEN 'langganan'
   ELSE 'berhenti' END`;
 
+// Link & kode referral akun yang lagi login (ditampilin di atas halaman Sales Lapangan buat akun sales).
+router.get('/lapangan/link', async (req, res, next) => {
+  try {
+    if (!req.admin.wp_sales_id) return res.json({ terhubung: false });
+    await pastikanTabelSales();
+    const { rows } = await queryWp('SELECT id, kode, nama, aktif FROM sales WHERE id=$1', [req.admin.wp_sales_id]);
+    if (!rows.length) return res.json({ terhubung: false });
+    res.json({ terhubung: true, sales: rows[0], link: `${URL_WARUNG()}/?ref=${encodeURIComponent(rows[0].kode)}` });
+  } catch (e) {
+    next(e);
+  }
+});
+
 // Toko yang dipegang sales sekarang + pembayaran yang masuk waktu toko itu miliknya (pemilik PADA SAAT bayar, §15.1).
 // Akun sales cuma bisa lihat punyanya; admin boleh milih akun sales lewat ?akun=.
 // NOT VERIFIED (NV-03): waktu bayar = waktu pembayaran dicatat lunas (updated_at), belum dari field Midtrans.

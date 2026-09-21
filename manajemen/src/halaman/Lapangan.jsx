@@ -55,6 +55,7 @@ export default function Lapangan({ api, admin, tab }) {
           + Catat kunjungan
         </button>
       </header>
+      {sales && <LinkSaya api={api} />}
       <Tabs daftar={TABS} aktif={aktif} href={(id) => `#/lapangan/${id}`} />
       {pesan && (
         <p className={pesan.startsWith('Gagal') ? 'adm-error' : 'adm-ok'} role="status">
@@ -804,6 +805,23 @@ function LinkSales({ link, sales, milikSendiri }) {
   );
 }
 
+// Kartu link di atas halaman buat akun sales - alat utama mereka di lapangan, jadi nggak disembunyiin di tab.
+function LinkSaya({ api }) {
+  const { data, error, muat } = useData(api, '/lapangan/link');
+  if (error) return <Gagal apa="link sales" pesan={error} onUlang={muat} />;
+  if (!data) return <Memuat apa="link sales" />;
+  if (!data.terhubung) {
+    return (
+      <div className="adm-gagal" style={{ background: 'var(--kuning)', marginBottom: 14 }} role="status">
+        <div>
+          <b>Link & kode sales kamu belum muncul.</b> Akunmu belum disambungin ke kode sales Warung Pintar. Minta admin buka Pengaturan, Pengguna &amp; tim, lalu pilih kode sales buat akunmu.
+        </div>
+      </div>
+    );
+  }
+  return <LinkSales link={data.link} sales={data.sales} milikSendiri />;
+}
+
 function Toko({ api, sales }) {
   const [akun, setAkun] = useState('');
   const { data: daftar } = useData(api, sales ? null : '/admin');
@@ -842,7 +860,7 @@ function Toko({ api, sales }) {
         </Kosong>
       ) : (
         <>
-          {data.link && <LinkSales link={data.link} sales={data.sales} milikSendiri={sales} />}
+          {data.link && !sales && <LinkSales link={data.link} sales={data.sales} milikSendiri={false} />}
           <section className="adm-lap-toko-atas">
             <div className="adm-kartu">
               <span className="adm-label">Toko dipegang</span>
