@@ -33,7 +33,7 @@ langsung mutus sesinya.
 
 ## Development
 
-`npm run dev:server` (API, port 4100) + `npm run dev` (tampilan, http://localhost:5174).
+`npm run dev` - nyalain API (port 4100) + tampilan (http://localhost:5174) sekaligus. Butuh `.env` (lihat `.env.example`).
 
 ## Nambah produk
 
