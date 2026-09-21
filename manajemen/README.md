@@ -9,7 +9,7 @@ Manajemen baca/tulis langsung ke database produk.
 ```bash
 cd manajemen
 npm install
-cp .env.example .env   # isi ADMIN_KEY (openssl rand -hex 24) & WARUNG_PINTAR_DATABASE_URL
+cp .env.example .env   # isi MANAJEMEN_JWT_SECRET, ADMIN_KEY & WARUNG_PINTAR_DATABASE_URL
 npm run build
 pm2 start server/index.js --name konsulin-manajemen
 ```
@@ -23,6 +23,13 @@ manajemen.konsulin.com {
 ```
 
 Update: `git pull && npm install && npm run build && pm2 restart konsulin-manajemen`.
+
+## Login admin
+
+Tiap orang punya akun sendiri (username + password), dan semua perubahan kecatat di **Admin & aktivitas**.
+Pertama kali dibuka muncul layar **Buat admin pertama** - isi pakai `ADMIN_KEY` dari `.env`. Admin berikutnya
+(temen, dst) ditambah dari halaman Admin & aktivitas. Sesi login berlaku 12 jam; reset password / nonaktifin admin
+langsung mutus sesinya.
 
 ## Development
 

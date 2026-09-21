@@ -483,3 +483,7 @@ CREATE TABLE IF NOT EXISTS ganti_nohp (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_ganti_nohp_warung ON ganti_nohp (warung_id, created_at DESC);
+
+-- Akun demo buat sales (lihat services/akunDemo.service.js - dibikin otomatis juga di sana): nggak bisa ganti kata
+-- sandi/nomor HP/PIN, nggak bisa lupa-password, nggak bisa langganan, lisensinya nggak pernah habis.
+ALTER TABLE warung ADD COLUMN IF NOT EXISTS demo BOOLEAN NOT NULL DEFAULT false;

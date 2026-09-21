@@ -1,4 +1,4 @@
-import warungPintarRoutes from './warung-pintar/sales.routes.js';
+import warungPintarRoutes from './warung-pintar/index.js';
 
 // Daftar produk Konsulin yang dikelola dari sini. Nambah produk baru = bikin folder produk/<id>/ berisi router-nya,
 // terus daftarin di sini. Produk yang database-nya belum diisi di .env nggak ditampilin.

@@ -4,10 +4,11 @@ import helmet from 'helmet';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { requireAdmin } from './auth.js';
+import { authRouter, requireAdmin } from './auth.js';
+import adminRoutes from './admin.routes.js';
 import { PRODUK } from './produk/index.js';
 
-// Server aplikasi manajemen Konsulin: API /api/* (dikunci ADMIN_KEY) + nyajiin hasil build tampilannya (dist/).
+// Server aplikasi manajemen Konsulin: API /api/* (wajib login admin, lihat auth.js) + nyajiin hasil build tampilannya (dist/).
 // SENGAJA terpisah dari aplikasi produk (warung-pintar-*): proses, port, dan domain sendiri.
 const app = express();
 app.set('trust proxy', Number(process.env.TRUST_PROXY || 0));
@@ -21,7 +22,9 @@ app.use(express.json({ limit: '100kb' }));
 
 app.get('/health', (req, res) => res.json({ ok: true }));
 
+app.use('/api/auth', authRouter);
 app.use('/api', requireAdmin);
+app.use('/api', adminRoutes);
 app.get('/api/produk', (req, res) => {
   res.json(PRODUK.filter((p) => p.aktif).map(({ id, nama, url }) => ({ id, nama, url })));
 });

@@ -9,6 +9,7 @@ import { kirimOtpWa, waAktif } from '../services/wa.service.js';
 import { simpanMemori } from '../services/memori.service.js';
 import { ambilProfilUsaha, bersihkanProfil, pastikanKolomProfil } from '../services/profilUsaha.service.js';
 import { cariSalesAktif, pastikanTabelSales } from '../services/sales.service.js';
+import { PESAN_DEMO, akunDemo, pastikanKolomDemo, tolakAkunDemo } from '../services/akunDemo.service.js';
 
 const router = Router();
 const SECRET = process.env.JWT_SECRET || 'dev-secret-ganti-ini';
@@ -25,7 +26,7 @@ function buatToken(warungId) {
 // Bentuk data warung yang aman dikirim ke frontend - JANGAN pernah sebar password_hash.
 function warungPublik(w) {
   return {
-    id: w.id, nama: w.nama, username: w.username, noHp: w.no_hp || null,
+    id: w.id, nama: w.nama, username: w.username, noHp: w.no_hp || null, demo: !!w.demo,
     tema: w.tema, warna: w.warna, font: w.font, ukuran: w.ukuran,
   };
 }
@@ -190,6 +191,7 @@ router.post('/register', (req, res) => {
 
 router.post('/login', loginLimiter, async (req, res, next) => {
   try {
+    await pastikanKolomDemo();
     const { username, password } = req.body;
     if (!username || !password) return res.status(400).json({ error: 'username dan password wajib diisi' });
     const { rows } = await query('SELECT * FROM warung WHERE username=$1', [username]);
@@ -204,7 +206,7 @@ router.post('/login', loginLimiter, async (req, res, next) => {
 });
 
 // ganti password akun warung (butuh login — dipakai dari layar Lainnya)
-router.patch('/password', requireAuth, loginLimiter, async (req, res, next) => {
+router.patch('/password', requireAuth, tolakAkunDemo, loginLimiter, async (req, res, next) => {
   try {
     const { passwordLama, passwordBaru } = req.body;
     if (!passwordLama || !passwordBaru || passwordBaru.length < 6) {
@@ -260,7 +262,7 @@ function pastikanTabelGantiHp() {
 const GANTI_HP_MAKS_KIRIM = 4; // per akun per OTP_JENDELA_MENIT - tiap permintaan bisa ngirim 2 pesan WA
 const buatKode = () => String(Math.floor(100000 + Math.random() * 900000));
 
-router.post('/no-hp/kirim-kode', requireAuth, otpIpLimiter, otpLimiter, async (req, res, next) => {
+router.post('/no-hp/kirim-kode', requireAuth, tolakAkunDemo, otpIpLimiter, otpLimiter, async (req, res, next) => {
   try {
     const { password, noHp } = req.body;
     const hp = normalisasiNoHp(noHp);
@@ -314,7 +316,7 @@ router.post('/no-hp/kirim-kode', requireAuth, otpIpLimiter, otpLimiter, async (r
   }
 });
 
-router.post('/no-hp/verifikasi', requireAuth, otpIpLimiter, otpLimiter, async (req, res, next) => {
+router.post('/no-hp/verifikasi', requireAuth, tolakAkunDemo, otpIpLimiter, otpLimiter, async (req, res, next) => {
   try {
     const { id, kodeLama, kodeBaru } = req.body;
     if (!POLA_UUID_DAFTAR.test(id || '') || !kodeBaru) return res.status(400).json({ error: 'Kode wajib diisi' });
@@ -437,6 +439,7 @@ async function verifikasiOtp(warungId, tujuan, kode) {
 // masalah beneran, yang dihapus cukup field `noHpSamar` - sisa alurnya nggak ikut berubah.
 router.post('/otp/kirim', otpIpLimiter, otpLimiter, async (req, res, next) => {
   try {
+    await pastikanKolomDemo();
     const { username, noHp } = req.body;
     const hp = normalisasiNoHp(noHp);
     if (!username && !hp) return res.status(400).json({ error: 'Username atau nomor HP wajib diisi' });
@@ -446,7 +449,8 @@ router.post('/otp/kirim', otpIpLimiter, otpLimiter, async (req, res, next) => {
       [username || null, hp || null]
     );
     const w = rows[0];
-    if (w && w.no_hp) await buatDanKirimOtp(w, 'reset');
+    // Akun demo nggak bisa di-reset (lihat akunDemo.service.js) - kodenya nggak dikirim, jawabannya tetap sama.
+    if (w && w.no_hp && !w.demo) await buatDanKirimOtp(w, 'reset');
 
     res.json({
       ok: true,
@@ -505,6 +509,8 @@ router.post('/reset-password', otpIpLimiter, otpLimiter, async (req, res, next) 
     }
     const cek = await query('SELECT id FROM kode_otp WHERE id=$1 AND warung_id=$2', [payload.otpId, payload.warungId]);
     if (!cek.rows.length) return res.status(401).json({ error: 'Sesi reset sudah dipakai. Ulangi dari awal.' });
+    // Jaga-jaga: akun yang ditandai demo SETELAH kodenya dikirim tetap nggak bisa di-reset.
+    if (await akunDemo(payload.warungId)) return res.status(403).json({ error: PESAN_DEMO });
 
     const hash = await bcrypt.hash(passwordBaru, 10);
     await query('UPDATE warung SET password_hash=$1 WHERE id=$2', [hash, payload.warungId]);
@@ -552,7 +558,7 @@ router.get('/pin', requireAuth, async (req, res, next) => {
 
 // Bikin PIN pertama kali. Cuma boleh kalau akun BELUM punya PIN - ganti PIN yang udah ada wajib lewat kode WA
 // (di bawah), biar orang yang kebetulan megang HP warung nggak bisa nimpa PIN pemilik.
-router.post('/pin/buat', requireAuth, loginLimiter, async (req, res, next) => {
+router.post('/pin/buat', requireAuth, tolakAkunDemo, loginLimiter, async (req, res, next) => {
   try {
     const { pin } = req.body;
     if (!pinValid(pin)) return res.status(400).json({ error: 'PIN harus 4 angka' });
@@ -584,7 +590,7 @@ router.post('/pin/cek', requireAuth, pinLimiter, async (req, res, next) => {
 // Gunanya OTP: orang yang kebetulan pegang HP warung yang lagi kebuka nggak bisa diam-diam ganti PIN
 // pelindung data modal tanpa akses ke WA pemiliknya. PIN barunya disimpan di server di langkah yang SAMA
 // dengan verifikasi kode - jadi nggak ada celah "kode udah lolos tapi PIN-nya diisi belakangan".
-router.post('/pin/otp/kirim', requireAuth, otpIpLimiter, otpLimiter, async (req, res, next) => {
+router.post('/pin/otp/kirim', requireAuth, tolakAkunDemo, otpIpLimiter, otpLimiter, async (req, res, next) => {
   try {
     const { rows } = await query('SELECT * FROM warung WHERE id=$1', [req.warungId]);
     const w = rows[0];
@@ -599,7 +605,7 @@ router.post('/pin/otp/kirim', requireAuth, otpIpLimiter, otpLimiter, async (req,
   }
 });
 
-router.post('/pin/otp/verifikasi', requireAuth, otpIpLimiter, otpLimiter, async (req, res, next) => {
+router.post('/pin/otp/verifikasi', requireAuth, tolakAkunDemo, otpIpLimiter, otpLimiter, async (req, res, next) => {
   try {
     const { kode, pinBaru } = req.body;
     if (!kode) return res.status(400).json({ error: 'Kode wajib diisi' });

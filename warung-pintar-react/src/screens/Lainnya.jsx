@@ -14,8 +14,11 @@ import { BARCODE, KEBUTUHAN, PENJAGA, labelJenisUsaha } from '../lib/profilUsaha
 import mangWarungImg from '../assets/mangwarung.webp';
 
 export default function Lainnya() {
-  const { S, dispatch, goTo, kosongkanCart, setPelangganTerpilih, logout, authWarung, profilUsaha } = useApp();
+  const { S, dispatch, goTo, kosongkanCart, setPelangganTerpilih, logout, authWarung, profilUsaha, lisensi } = useApp();
   const [sheet, setSheet] = useState(null); // 'warna' | 'font' | 'ukuran' | 'pass' | 'pin' | 'nohp' | null
+  // Akun demo buat sales (ditandai dari aplikasi manajemen): kata sandi, nomor HP & PIN dikunci - backend juga nolak.
+  // lisensi.demo ikut dicek biar HP yang udah login sebelum akunnya ditandai demo juga ikut kekunci tampilannya.
+  const akunDemo = !!(authWarung?.demo || lisensi?.demo);
   const ukuranAktif = UKURAN.find((u) => u.k === S.ukuran) || UKURAN[1];
 
   const warnaAktif = WARNA.find((w) => w.h === S.warna) || WARNA[0];
@@ -176,53 +179,70 @@ export default function Lainnya() {
             <span>Username: {authWarung?.username}</span>
           </span>
         </button>
-        <button className="mrow" onClick={() => setSheet('nohp')}>
-          <span className={authWarung?.noHp ? 'ic' : 'ic aksen'}>
-            <svg viewBox="0 0 24 24">
-              <rect x="7" y="3" width="10" height="18" rx="2.5" />
-              <path d="M11 18.5h2" />
-            </svg>
-          </span>
-          <span className="tx">
-            <b>Nomor HP pemulihan</b>
-            {/* Akun yang dibikin sebelum fitur ini ada nomornya masih kosong - dikasih peringatan
-                jelas, bukan cuma strip, karena tanpa nomor mereka nggak punya jalan pulih sama
-                sekali kalau lupa sandi (nggak ada CS yang bisa reset manual). */}
-            <span style={authWarung?.noHp ? undefined : { color: '#e5484d' }}>
-              {authWarung?.noHp ? tampilNoHp(authWarung.noHp) : 'Belum diisi - isi sekarang biar bisa pulih kalau lupa sandi'}
+        {akunDemo ? (
+          <div className="mrow" style={{ cursor: 'default' }}>
+            <span className="ic aksen">
+              <svg viewBox="0 0 24 24">
+                <rect x="4.5" y="10.5" width="15" height="9.5" rx="3" />
+                <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" />
+              </svg>
             </span>
-          </span>
-          <span className="ar">›</span>
-        </button>
-        <button className="mrow" onClick={() => setSheet('pass')}>
-          <span className="ic">
-            <svg viewBox="0 0 24 24">
-              <rect x="4.5" y="10.5" width="15" height="9.5" rx="3" />
-              <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" />
-            </svg>
-          </span>
-          <span className="tx">
-            <b>Ganti kata sandi</b>
-            <span>Terakhir diubah 2 bulan lalu</span>
-          </span>
-          <span className="ar">›</span>
-        </button>
-        <button className="mrow" onClick={() => setSheet('pin')}>
-          <span className="ic">
-            <svg viewBox="0 0 24 24">
-              <rect x="4" y="4" width="16" height="16" rx="4" />
-              <circle cx="9" cy="10" r="1.2" fill="currentColor" stroke="none" />
-              <circle cx="15" cy="10" r="1.2" fill="currentColor" stroke="none" />
-              <circle cx="9" cy="15" r="1.2" fill="currentColor" stroke="none" />
-              <circle cx="15" cy="15" r="1.2" fill="currentColor" stroke="none" />
-            </svg>
-          </span>
-          <span className="tx">
-            <b>Ganti PIN</b>
-            <span>PIN 4 angka untuk buka data modal</span>
-          </span>
-          <span className="ar">›</span>
-        </button>
+            <span className="tx">
+              <b>Akun demo</b>
+              <span>Kata sandi, nomor HP &amp; PIN dikunci admin</span>
+            </span>
+          </div>
+        ) : (
+          <>
+          <button className="mrow" onClick={() => setSheet('nohp')}>
+            <span className={authWarung?.noHp ? 'ic' : 'ic aksen'}>
+              <svg viewBox="0 0 24 24">
+                <rect x="7" y="3" width="10" height="18" rx="2.5" />
+                <path d="M11 18.5h2" />
+              </svg>
+            </span>
+            <span className="tx">
+              <b>Nomor HP pemulihan</b>
+              {/* Akun yang dibikin sebelum fitur ini ada nomornya masih kosong - dikasih peringatan
+                  jelas, bukan cuma strip, karena tanpa nomor mereka nggak punya jalan pulih sama
+                  sekali kalau lupa sandi (nggak ada CS yang bisa reset manual). */}
+              <span style={authWarung?.noHp ? undefined : { color: '#e5484d' }}>
+                {authWarung?.noHp ? tampilNoHp(authWarung.noHp) : 'Belum diisi - isi sekarang biar bisa pulih kalau lupa sandi'}
+              </span>
+            </span>
+            <span className="ar">›</span>
+          </button>
+          <button className="mrow" onClick={() => setSheet('pass')}>
+            <span className="ic">
+              <svg viewBox="0 0 24 24">
+                <rect x="4.5" y="10.5" width="15" height="9.5" rx="3" />
+                <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" />
+              </svg>
+            </span>
+            <span className="tx">
+              <b>Ganti kata sandi</b>
+              <span>Terakhir diubah 2 bulan lalu</span>
+            </span>
+            <span className="ar">›</span>
+          </button>
+          <button className="mrow" onClick={() => setSheet('pin')}>
+            <span className="ic">
+              <svg viewBox="0 0 24 24">
+                <rect x="4" y="4" width="16" height="16" rx="4" />
+                <circle cx="9" cy="10" r="1.2" fill="currentColor" stroke="none" />
+                <circle cx="15" cy="10" r="1.2" fill="currentColor" stroke="none" />
+                <circle cx="9" cy="15" r="1.2" fill="currentColor" stroke="none" />
+                <circle cx="15" cy="15" r="1.2" fill="currentColor" stroke="none" />
+              </svg>
+            </span>
+            <span className="tx">
+              <b>Ganti PIN</b>
+              <span>PIN 4 angka untuk buka data modal</span>
+            </span>
+            <span className="ar">›</span>
+          </button>
+          </>
+        )}
         <button className="mrow" onClick={() => dispatch({ type: 'KOSONGKAN_PENJAGA' })}>
           <span className="ic">
             <svg viewBox="0 0 24 24">
@@ -307,6 +327,24 @@ function SectionLangganan() {
   const [loading, setLoading] = useState(false);
 
   if (!lisensi) return null;
+  if (lisensi.demo) {
+    return (
+      <div className="menu">
+        <div className="mrow" style={{ cursor: 'default' }}>
+          <span className="ic aksen">
+            <svg viewBox="0 0 24 24">
+              <rect x="3.5" y="5.5" width="17" height="13" rx="3" />
+              <path d="M3.5 10h17" />
+            </svg>
+          </span>
+          <span className="tx">
+            <b>Akun demo</b>
+            <span>Aktif terus - nggak perlu langganan</span>
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   const sisaHari = Math.max(0, Math.ceil((new Date(lisensi.berlakuSampai) - new Date()) / 86400000));
   const labelPlan = { trial: 'Masa coba gratis', bulanan: 'Bulanan', triwulan: '3 Bulan', tahunan: 'Tahunan', permanen: 'Permanen' }[lisensi.plan] || lisensi.plan;

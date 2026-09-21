@@ -23,6 +23,8 @@ export function pastikanTabelSales() {
       )`);
       await query('ALTER TABLE warung ADD COLUMN IF NOT EXISTS sales_id UUID REFERENCES sales(id) ON DELETE SET NULL');
       await query('CREATE INDEX IF NOT EXISTS idx_warung_sales ON warung (sales_id)');
+      // Akun demo buat sales - lihat warung-pintar-backend/src/services/akunDemo.service.js.
+      await query('ALTER TABLE warung ADD COLUMN IF NOT EXISTS demo BOOLEAN NOT NULL DEFAULT false');
     })().catch((e) => {
       siap = null;
       throw e;

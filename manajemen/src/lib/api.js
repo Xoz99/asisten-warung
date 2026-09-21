@@ -1,28 +1,28 @@
-// Semua request ke server manajemen bawa kunci admin di header. Kuncinya cuma di sessionStorage - tab ditutup =
-// harus masukin lagi.
-const KUNCI_SESI = 'konsulin_manajemen_kunci';
+// Sesi login admin manajemen: token disimpen di sessionStorage doang - tab ditutup = masuk lagi.
+const KUNCI_SESI = 'konsulin_manajemen_sesi';
 
-export function bacaKunci() {
+export function bacaSesi() {
   try {
-    return sessionStorage.getItem(KUNCI_SESI) || '';
+    return JSON.parse(sessionStorage.getItem(KUNCI_SESI) || 'null');
   } catch {
-    return '';
+    return null;
   }
 }
 
-export function simpanKunci(k) {
+export function simpanSesi(sesi) {
   try {
-    if (k) sessionStorage.setItem(KUNCI_SESI, k);
+    if (sesi) sessionStorage.setItem(KUNCI_SESI, JSON.stringify(sesi));
     else sessionStorage.removeItem(KUNCI_SESI);
   } catch {
-    /* sessionStorage diblok - kuncinya cuma hidup di memori */
+    /* sessionStorage diblok - sesinya cuma hidup di memori */
   }
 }
 
-export async function panggil(kunci, method, path, body) {
+export async function panggil(token, method, path, body) {
   let res;
   try {
-    const opsi = { method, headers: { 'X-Admin-Key': kunci } };
+    const opsi = { method, headers: {} };
+    if (token) opsi.headers.Authorization = 'Bearer ' + token;
     if (body) {
       opsi.headers['Content-Type'] = 'application/json';
       opsi.body = JSON.stringify(body);

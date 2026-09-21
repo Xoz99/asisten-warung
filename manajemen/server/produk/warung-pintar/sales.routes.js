@@ -1,19 +1,11 @@
 import { Router } from 'express';
 import { normalisasiNoHp } from '../../utils/noHp.js';
-import { POLA_KODE_SALES, pastikanTabelSales, query, rapikanKodeSales } from './db.js';
+import { catatLog } from '../../db.js';
+import { POLA_KODE_SALES, query, rapikanKodeSales } from './db.js';
 
 // Warung Pintar: kelola sales + rekap sales mana bawa warung mana & siapa yang udah bayar langganan.
-// Dipasang di /api/warung-pintar (lihat produk/index.js), udah dikunci ADMIN_KEY dari server/index.js.
+// Dipasang lewat ./index.js di /api/warung-pintar - udah wajib login admin (server/auth.js).
 const router = Router();
-
-router.use(async (req, res, next) => {
-  try {
-    await pastikanTabelSales();
-    next();
-  } catch (e) {
-    next(e);
-  }
-});
 
 const POLA_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -70,6 +62,7 @@ router.post('/sales', async (req, res, next) => {
       hp,
     ]);
     if (!rows.length) return res.status(409).json({ error: `Kode ${kode} udah dipakai sales lain` });
+    await catatLog(req, 'warung-pintar.sales.tambah', { kode, nama: rows[0].nama });
     res.status(201).json(rows[0]);
   } catch (e) {
     next(e);
@@ -93,6 +86,7 @@ router.patch('/sales/:id', async (req, res, next) => {
       [req.params.id, nama !== undefined ? nama.trim().slice(0, 80) : null, noHp !== undefined, hp, typeof aktif === 'boolean' ? aktif : null]
     );
     if (!rows.length) return res.status(404).json({ error: 'Sales tidak ditemukan' });
+    await catatLog(req, 'warung-pintar.sales.ubah', { kode: rows[0].kode, ...req.body });
     res.json(rows[0]);
   } catch (e) {
     next(e);
@@ -154,8 +148,9 @@ router.put('/warung/:id/sales', async (req, res, next) => {
       if (!rows.length) return res.status(400).json({ error: 'Kode sales nggak dikenal' });
       salesId = rows[0].id;
     }
-    const { rowCount } = await query('UPDATE warung SET sales_id=$2 WHERE id=$1', [req.params.id, salesId]);
-    if (!rowCount) return res.status(404).json({ error: 'Warung tidak ditemukan' });
+    const { rows: w } = await query('UPDATE warung SET sales_id=$2 WHERE id=$1 RETURNING username', [req.params.id, salesId]);
+    if (!w.length) return res.status(404).json({ error: 'Warung tidak ditemukan' });
+    await catatLog(req, 'warung-pintar.warung.ganti_sales', { username: w[0].username, sales: req.body.kode || null });
     res.json({ ok: true });
   } catch (e) {
     next(e);

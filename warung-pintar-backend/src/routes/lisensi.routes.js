@@ -3,6 +3,8 @@ import { query } from '../db.js';
 import { buatTransaksiSnap, cekStatusTransaksi, HARGA_PLAN, KATALOG_PLAN } from '../services/midtrans.service.js';
 import { aktifkanPembayaran } from '../services/lisensi.service.js';
 import { JATAH_TOKEN_HARIAN } from '../services/aiQuota.service.js';
+import { PESAN_DEMO, pastikanKolomDemo } from '../services/akunDemo.service.js';
+import { pastikanTabelSales } from '../services/sales.service.js';
 
 const router = Router();
 
@@ -15,21 +17,23 @@ const router = Router();
 // endpoint ini (kalau nanti ada lagi) dapet angka yang udah aman dipakai langsung buat width bar.
 router.get('/status', async (req, res, next) => {
   try {
+    await pastikanKolomDemo();
     const { rows } = await query(
-      `SELECT plan, lisensi_berlaku_sampai,
+      `SELECT plan, lisensi_berlaku_sampai, demo,
               CASE WHEN ai_token_tanggal = CURRENT_DATE THEN ai_token_hari_ini ELSE 0 END AS ai_terpakai
        FROM warung WHERE id=$1`,
       [req.warungId]
     );
     const w = rows[0];
     if (!w) return res.status(404).json({ error: 'Akun tidak ditemukan' });
-    const aktif = new Date(w.lisensi_berlaku_sampai) >= new Date();
+    const aktif = w.demo || new Date(w.lisensi_berlaku_sampai) >= new Date();
     const jatah = JATAH_TOKEN_HARIAN[w.plan] ?? JATAH_TOKEN_HARIAN.trial;
     const terpakai = Number(w.ai_terpakai) || 0;
     res.json({
       plan: w.plan,
       berlakuSampai: w.lisensi_berlaku_sampai,
       aktif,
+      demo: !!w.demo,
       // Katalog paket ikut dikirim di sini (bukan endpoint terpisah) - frontend udah manggil
       // /status buat nampilin status langganan, jadi daftar harganya nebeng sekalian. Satu
       // request, dan yang lebih penting: harga di layar DIJAMIN sama sama yang ditagih Midtrans.
@@ -71,12 +75,28 @@ router.post('/checkout', async (req, res, next) => {
     const { plan } = req.body;
     if (!HARGA_PLAN[plan]) return res.status(400).json({ error: `plan wajib salah satu dari: ${Object.keys(HARGA_PLAN).join(', ')}` });
 
-    const { rows } = await query('SELECT nama, username FROM warung WHERE id=$1', [req.warungId]);
+    await Promise.all([pastikanKolomDemo(), pastikanTabelSales()]);
+    const { rows } = await query(
+      `SELECT w.nama, w.username, w.no_hp, w.demo, s.kode AS sales_kode
+       FROM warung w LEFT JOIN sales s ON s.id = w.sales_id WHERE w.id=$1`,
+      [req.warungId]
+    );
     const w = rows[0];
+    if (w.demo) return res.status(403).json({ error: PESAN_DEMO.replace('kata sandi, nomor HP & PIN', 'langganan') });
     const orderId = `wp-${req.warungId.slice(0, 8)}-${Date.now()}`;
     const jumlah = HARGA_PLAN[plan];
 
-    const { token, redirectUrl } = await buatTransaksiSnap({ orderId, plan, jumlah, namaWarung: w.nama });
+    // Identitas lengkap ikut dikirim biar di dashboard Midtrans kelihatan ini warung siapa (dulu cuma nama warung).
+    const { token, redirectUrl } = await buatTransaksiSnap({
+      orderId,
+      plan,
+      jumlah,
+      namaWarung: w.nama,
+      username: w.username,
+      noHp: w.no_hp,
+      warungId: req.warungId,
+      salesKode: w.sales_kode,
+    });
 
     await query('INSERT INTO pembayaran (warung_id, order_id, plan, jumlah) VALUES ($1,$2,$3,$4)', [req.warungId, orderId, plan, jumlah]);
 

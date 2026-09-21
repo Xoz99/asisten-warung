@@ -37,7 +37,17 @@ h1{font-size:28px;letter-spacing:-.03em;margin:0}
 .btn[disabled]{opacity:.4;cursor:default}
 .btn.utama{background:var(--ink);color:var(--bg);padding:13px 20px}
 .btn.kecil{padding:7px 13px;font-size:13px;background:var(--surface);border:1px solid var(--garis);border-radius:999px}
-.adm-keluar{align-self:flex-start}
+.adm-akun{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.adm-akun .btn{margin-top:6px}
+.adm-ok{color:#1a7f37;font-weight:600;margin:10px 0 0}
+.btn.kecil.bahaya{background:#e5484d;color:#fff;border-color:#e5484d}
+.adm-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.adm-saring{text-align:left;cursor:pointer;font:inherit;color:inherit}
+.adm-saring.on{outline:2px solid var(--ink);outline-offset:-2px}
+.adm-status{font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;background:var(--bg);color:var(--abu);white-space:nowrap}
+.adm-status.settlement{background:#1a7f37;color:#fff}
+.adm-status.pending{background:#f5a623;color:#111}
+.adm-status.gagal{background:#e5484d;color:#fff}
 .field{margin-top:14px}
 .field label{display:block;font-size:13px;font-weight:700;color:var(--abu);margin-bottom:6px}
 .field input,.adm select,.adm-cari input{padding:11px 12px;border-radius:12px;border:1.5px solid var(--garis);background:var(--surface);width:100%}
@@ -80,7 +90,9 @@ h1{font-size:28px;letter-spacing:-.03em;margin:0}
   .adm-nav-grup{display:flex;align-items:center;gap:4px}
   .adm-nav-produk{margin:0 4px 0 0}
   .adm-nav{width:auto}
-  .adm-keluar{align-self:center;margin-left:auto}
+  .adm-akun{flex-direction:row;align-items:center;margin-left:auto;gap:8px}
+  .adm-akun .btn{margin-top:0}
+  .adm-akun>.adm-redup{display:none}
   .adm-isi{padding:20px 16px 48px}
   .adm-kolom{grid-template-columns:minmax(0,1fr)}
   .adm-angka{grid-template-columns:repeat(2,1fr)}

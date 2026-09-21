@@ -109,11 +109,21 @@ export const KATALOG_PLAN = [
   },
 ];
 
-export async function buatTransaksiSnap({ orderId, plan, jumlah, namaWarung, email }) {
+export async function buatTransaksiSnap({ orderId, plan, jumlah, namaWarung, email, username, noHp, warungId, salesKode }) {
   const appUrl = process.env.APP_BASE_URL || 'http://localhost:5173';
   const body = {
     transaction_details: { order_id: orderId, gross_amount: jumlah },
-    customer_details: { first_name: namaWarung || 'Warung', email: email || undefined },
+    // Yang tampil di dashboard Midtrans (Transactions > detail): nama = nama warung, nama belakang = @username,
+    // telepon = nomor WA akun. custom_field1-3 ikut kesimpen di detail transaksi & bisa dicari di dashboard.
+    customer_details: {
+      first_name: (namaWarung || 'Warung').slice(0, 50),
+      last_name: username ? `(@${username})`.slice(0, 50) : undefined,
+      phone: noHp ? '+' + noHp : undefined,
+      email: email || undefined,
+    },
+    custom_field1: username ? `username: ${username}`.slice(0, 255) : undefined,
+    custom_field2: warungId ? `warung_id: ${warungId}` : undefined,
+    custom_field3: `sales: ${salesKode || '-'}`,
     item_details: [{ id: plan, price: jumlah, quantity: 1, name: `Langganan Warung Pintar - ${LABEL_PLAN[plan] || plan}` }],
     callbacks: { finish: `${appUrl}/?lisensi=selesai` },
   };
