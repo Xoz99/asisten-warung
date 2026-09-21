@@ -412,9 +412,19 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
 .adm-lap-toko-atas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:10px}
 .adm-lap-toko-atas .adm-kartu{display:flex;flex-direction:column;gap:4px;padding:14px}
 @media (max-width:700px){.adm-lap-toko-atas{grid-template-columns:minmax(0,1fr)}}
-.adm-lap-link{display:flex;gap:18px;align-items:flex-start;justify-content:space-between;margin-bottom:14px}
-.adm-lap-qr{display:flex;flex-direction:column;align-items:center;gap:8px;flex:none}
-.adm-lap-qr img{width:180px;height:180px;border:var(--garis-tipis);image-rendering:pixelated;background:#fff}
-@media (max-width:700px){.adm-lap-link{flex-direction:column}.adm-lap-qr{align-self:center}}
+.adm-lap-link{margin-bottom:16px;max-width:640px}
+.adm-lap-link-kepala{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.adm-lap-link-ciutkan{background:none;border:0;padding:8px 0 8px 8px;min-height:36px;font:inherit;font-size:13px;font-weight:700;color:var(--redup);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.adm-lap-link-ciutkan:hover{color:var(--tinta)}
+.adm-lap-link-kode{display:flex;align-items:baseline;gap:10px;margin:10px 0 12px}
+.adm-lap-link-kode b{font-size:30px;line-height:1;letter-spacing:.02em}
+.adm-lap-link-salin{display:flex;border:var(--garis)}
+.adm-lap-link-salin input{flex:1;min-width:0;border:0;padding:10px 12px;font-size:14px;background:var(--kertas);color:var(--tinta);min-height:46px}
+.adm-lap-link-salin input:focus{outline:2px solid var(--biru);outline-offset:-2px}
+.adm-lap-link-salin .btn{border:0;border-left:var(--garis);box-shadow:none;min-width:92px}
+.adm-lap-link-aksi{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
+.adm-lap-link-aksi.dua{grid-template-columns:repeat(2,minmax(0,1fr))}
+.adm-lap-link-aksi .btn{width:100%;padding-left:8px;padding-right:8px}
+.adm-lap-qr-besar{width:min(300px,100%);aspect-ratio:1;border:var(--garis-tipis);image-rendering:pixelated;background:#fff}
 .adm-lap-link-ciut{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 12px;margin-bottom:14px}
 .adm-lap-link-ciut .adm-label{font-size:11px}

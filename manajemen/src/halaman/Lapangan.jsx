@@ -736,6 +736,7 @@ const KUNCI_LINK_CIUT = 'makalin_link_sales_ciut';
 
 function LinkSales({ link, sales, milikSendiri }) {
   const [qr, setQr] = useState(null);
+  const [bukaQr, setBukaQr] = useState(false);
   const [pesan, setPesan] = useState('');
   // Disembunyiin / ditampilin - diingat di browser ini aja (preferensi tampilan, bukan data).
   const [ciut, setCiut] = useState(() => {
@@ -765,10 +766,14 @@ function LinkSales({ link, sales, milikSendiri }) {
   const teksWa = `Halo, ini link daftar Asisten Warung, aplikasi catat jualan, stok, dan kasbon warung di HP. Bisa coba gratis 7 hari: ${link}${sales?.kode ? ` (kode sales: ${sales.kode})` : ''}`;
   const salin = () =>
     navigator.clipboard?.writeText(link).then(
-      () => setPesan('Link disalin.'),
+      () => {
+        setPesan('Link disalin.');
+        setTimeout(() => setPesan(''), 2000);
+      },
       () => window.prompt('Salin link ini:', link)
     ) ?? window.prompt('Salin link ini:', link);
   const judul = milikSendiri ? 'Link & kode kamu' : 'Link & kode sales';
+  const bisaBagikan = typeof navigator !== 'undefined' && Boolean(navigator.share);
   if (ciut) {
     return (
       <section className="adm-kartu adm-lap-link-ciut" aria-label="Link dan kode sales">
@@ -792,60 +797,68 @@ function LinkSales({ link, sales, milikSendiri }) {
   }
   return (
     <section className="adm-kartu adm-lap-link" aria-label="Link dan kode sales">
-      <div style={{ minWidth: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
-          <span className="adm-label">{judul}</span>
-          <button className="btn kecil" onClick={() => gantiCiut(true)} aria-expanded={true}>
-            Sembunyikan
-          </button>
-        </div>
-        <p style={{ margin: '6px 0 0' }}>
-          Kode sales: <b className="adm-mono" style={{ fontSize: 22 }}>{sales?.kode}</b>
-        </p>
-        <p className="adm-mono" style={{ margin: '6px 0 0', overflowWrap: 'anywhere', fontSize: 14 }}>
-          {link}
-        </p>
-        {sales && !sales.aktif && (
-          <p className="adm-error" style={{ margin: '6px 0 0' }}>
-            Kode sales ini lagi nonaktif di Warung Pintar. Minta admin aktifin dulu sebelum dibagiin.
-          </p>
-        )}
-        <p className="adm-redup" style={{ margin: '8px 0 0' }}>
-          Warung yang daftar lewat link ini, scan QR-nya, atau ngetik kode {sales?.kode} di form daftar otomatis jadi {milikSendiri ? 'toko kamu' : 'toko sales ini'}.
-        </p>
-        <div className="adm-tombol">
-          <button className="btn utama" onClick={salin}>
-            Salin link
-          </button>
-          <a className="btn" href={`https://wa.me/?text=${encodeURIComponent(teksWa)}`} target="_blank" rel="noopener noreferrer">
-            Kirim lewat WhatsApp
-          </a>
-          {typeof navigator !== 'undefined' && navigator.share && (
-            <button className="btn" onClick={() => navigator.share({ title: 'Daftar Asisten Warung', text: teksWa }).catch(() => {})}>
-              Bagikan
-            </button>
-          )}
-        </div>
-        {pesan && (
-          <p className="adm-ok" role="status" style={{ margin: '8px 0 0' }}>
-            {pesan}
-          </p>
-        )}
+      <div className="adm-lap-link-kepala">
+        <span className="adm-label">{judul}</span>
+        <button className="adm-lap-link-ciutkan" onClick={() => gantiCiut(true)} aria-expanded={true}>
+          Sembunyikan
+        </button>
       </div>
-      <div className="adm-lap-qr">
-        {qr ? (
-          <>
-            <img src={qr} alt={`QR code link daftar dengan kode sales ${sales?.kode}`} />
-            <a className="btn kecil" href={qr} download={`qr-sales-${sales?.kode || 'link'}.png`}>
-              Unduh QR
-            </a>
-          </>
-        ) : qr === false ? (
-          <span className="adm-redup">QR gagal dibuat</span>
-        ) : (
-          <span className="adm-redup">Bikin QR…</span>
-        )}
+
+      <div className="adm-lap-link-kode">
+        <span className="adm-redup">Kode sales</span>
+        <b className="adm-mono">{sales?.kode}</b>
+        {sales && !sales.aktif && <span className="adm-chip merah">Nonaktif</span>}
       </div>
+
+      <div className="adm-lap-link-salin">
+        <input value={link} readOnly aria-label="Link daftar dengan kode sales" onFocus={(e) => e.target.select()} className="adm-mono" />
+        <button className="btn utama" onClick={salin}>
+          {pesan ? 'Tersalin' : 'Salin'}
+        </button>
+      </div>
+
+      <div className={'adm-lap-link-aksi' + (bisaBagikan ? '' : ' dua')}>
+        <a className="btn" href={`https://wa.me/?text=${encodeURIComponent(teksWa)}`} target="_blank" rel="noopener noreferrer">
+          WhatsApp
+        </a>
+        {bisaBagikan && (
+          <button className="btn" onClick={() => navigator.share({ title: 'Daftar Asisten Warung', text: teksWa }).catch(() => {})}>
+            Bagikan
+          </button>
+        )}
+        <button className="btn" onClick={() => setBukaQr(true)} disabled={!qr}>
+          QR code
+        </button>
+      </div>
+
+      {sales && !sales.aktif ? (
+        <p className="adm-error" style={{ margin: '10px 0 0' }}>
+          Kode ini lagi nonaktif di Warung Pintar. Minta admin aktifin dulu sebelum dibagiin.
+        </p>
+      ) : (
+        <p className="adm-redup" style={{ margin: '10px 0 0', fontSize: 13 }}>
+          Warung yang daftar lewat link / QR ini, atau ngetik kode {sales?.kode}, otomatis jadi {milikSendiri ? 'toko kamu' : 'toko sales ini'}.
+        </p>
+      )}
+
+      {bukaQr && qr && (
+        <Modal judul={`QR code ${sales?.kode || ''}`} onTutup={() => setBukaQr(false)} lebar={420}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+            <img src={qr} alt={`QR code link daftar dengan kode sales ${sales?.kode}`} className="adm-lap-qr-besar" />
+            <p className="adm-redup" style={{ margin: 0, textAlign: 'center' }}>
+              Minta pemilik warung scan pakai kamera HP-nya.
+            </p>
+            <div className="adm-tombol" style={{ marginTop: 0 }}>
+              <a className="btn utama" href={qr} download={`qr-sales-${sales?.kode || 'link'}.png`}>
+                Unduh QR
+              </a>
+              <button className="btn" onClick={() => setBukaQr(false)}>
+                Tutup
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </section>
   );
 }
