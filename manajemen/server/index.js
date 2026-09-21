@@ -9,6 +9,7 @@ import adminRoutes from './admin.routes.js';
 import opsRoutes from './ops.routes.js';
 import rekrutmenRoutes, { publikRouter, DAFTAR_URL } from './rekrutmen.routes.js';
 import karyawanRoutes from './karyawan.routes.js';
+import artifactRoutes, { berkasRouter as artifactBerkas } from './artifact.routes.js';
 import { PRODUK } from './produk/index.js';
 
 // Server aplikasi manajemen Konsulin: API /api/* (wajib login admin, lihat auth.js) + nyajiin hasil build tampilannya (dist/).
@@ -30,11 +31,14 @@ app.get('/health', (req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRouter);
 // Form daftar calon Sales Partner - publik (tanpa login), dibatasi rate limit (lihat rekrutmen.routes.js).
 app.use('/api/publik', publikRouter);
+// File Artifact dibuka lewat link bertoken sementara (buat <img>/<video>/<iframe>), bukan token sesi.
+app.use('/api', artifactBerkas);
 app.use('/api', requireAdmin);
 app.use('/api', adminRoutes);
 app.use('/api', opsRoutes);
 app.use('/api', rekrutmenRoutes);
 app.use('/api', karyawanRoutes);
+app.use('/api', artifactRoutes);
 app.get('/api/produk', (req, res) => {
   res.json(PRODUK.filter((p) => p.aktif).map(({ id, nama, url }) => ({ id, nama, url })));
 });

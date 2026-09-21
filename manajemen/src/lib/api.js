@@ -55,3 +55,31 @@ export async function bukaFile(path) {
   else window.location.href = url;
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
+
+// Upload file mentah (bukan JSON) dengan progres - dipakai Artifact. XHR karena fetch belum bisa lapor progres upload.
+// Balikin { promise, batal }.
+export function unggahBerkas(path, file, onProgres) {
+  const token = bacaSesi()?.token;
+  const xhr = new XMLHttpRequest();
+  const promise = new Promise((ok, gagal) => {
+    xhr.open('POST', '/api' + path);
+    if (token) xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    xhr.upload.onprogress = (e) => e.lengthComputable && onProgres?.(e.loaded / e.total);
+    xhr.onload = () => {
+      let d = null;
+      try {
+        d = JSON.parse(xhr.responseText);
+      } catch {
+        /* bukan JSON */
+      }
+      if (xhr.status >= 200 && xhr.status < 300) ok(d);
+      else if (xhr.status === 413 && !d) gagal(new Error('File kegedean buat server'));
+      else gagal(Object.assign(new Error(d?.error || `Gagal upload (${xhr.status})`), { status: xhr.status }));
+    };
+    xhr.onerror = () => gagal(new Error('Koneksi putus waktu upload'));
+    xhr.onabort = () => gagal(Object.assign(new Error('Upload dibatalkan'), { dibatalkan: true }));
+    xhr.send(file);
+  });
+  return { promise, batal: () => xhr.abort() };
+}

@@ -322,3 +322,55 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
   .adm-langkah li+li{border-left:0;border-top:var(--garis-tipis)}
   .adm-jawaban{grid-template-columns:minmax(0,1fr)}
 }
+
+/* ---- Artifact ---- */
+.adm-art-stat{display:grid;grid-template-columns:repeat(6,minmax(0,1fr)) minmax(0,1.4fr);gap:12px;margin:0 0 20px}
+.adm-art-stat .adm-kartu{display:flex;flex-direction:column;gap:4px;padding:12px 14px}
+.adm-art-stat b{font-size:24px;line-height:1.1}
+.adm-art-stat .hitam{background:var(--hitam);color:var(--putih)}
+.adm-art-stat .hitam .adm-label,.adm-art-stat .hitam .adm-redup{color:#D4D4D8}
+.adm-art{display:grid;grid-template-columns:260px minmax(0,1fr);gap:20px;align-items:start}
+.adm-art-pohon{padding-bottom:10px;position:sticky;top:84px}
+.adm-art-simpul{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border:2px solid transparent;color:var(--tinta);text-decoration:none;font-weight:600;font-size:14px}
+.adm-art-simpul span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adm-art-simpul:hover{border-color:var(--hitam)}
+.adm-art-simpul.on{background:var(--biru);color:var(--putih);border-color:var(--hitam)}
+.adm-art-simpul.on .adm-redup{color:#E4E4E7}
+.adm-art-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.adm-art-kartu{display:flex;flex-direction:column;gap:10px;padding:12px}
+.adm-art-kartu-atas{display:flex;justify-content:space-between;align-items:center}
+.adm-art-bintang{background:none;border:2px solid transparent;font-size:20px;line-height:1;width:44px;height:36px;cursor:pointer;color:var(--tinta);margin:-6px -6px -6px 0}
+.adm-art-bintang:hover{border-color:var(--hitam)}
+.adm-art-bintang[aria-pressed=true]{color:#B45309}
+.adm-art-kartu-isi{display:flex;flex-direction:column;gap:6px;text-align:left;background:none;border:0;padding:0;cursor:pointer;color:inherit;font:inherit}
+.adm-art-kartu-isi b{font-size:16px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.adm-art-kartu-isi:hover b{text-decoration:underline}
+.adm-art-format{align-self:flex-start;font-weight:700;font-size:12px;letter-spacing:.05em;border:var(--garis-tipis);padding:14px 10px;min-width:52px;text-align:center;background:var(--kertas)}
+.adm-art-kartu-bawah{display:flex;gap:8px;align-items:center;border-top:1px solid #E4E4E7;padding-top:8px;margin-top:auto;min-width:0;font-size:13px}
+.adm-inisial.kecil{width:26px;height:26px;font-size:11px}
+.adm-art-seret{position:fixed;inset:0;z-index:40;background:rgba(250,204,21,.85);display:grid;place-items:center;pointer-events:none}
+.adm-art-seret div{background:var(--putih);border:var(--garis);box-shadow:8px 8px 0 var(--hitam);padding:28px 36px;display:flex;flex-direction:column;gap:6px;text-align:center}
+.adm-art-seret b{font-size:22px}
+.adm-art-antre{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.adm-art-antre li{border:var(--garis-tipis);padding:10px 12px}
+.adm-art-progres{height:8px;border:2px solid var(--hitam);margin-top:8px;background:var(--putih)}
+.adm-art-progres div{height:100%;background:var(--hijau);transition:width .2s linear}
+.adm-art-pratinjau{border:var(--garis);background:var(--kertas);min-height:180px;display:grid;place-items:center;overflow:hidden}
+.adm-art-pratinjau img,.adm-art-pratinjau video{display:block;max-width:100%;max-height:60vh}
+.adm-art-pratinjau iframe{width:100%;height:60vh;border:0;background:var(--putih)}
+.adm-art-pratinjau pre{margin:0;padding:14px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;max-height:50vh;overflow:auto;width:100%;align-self:stretch;background:var(--putih)}
+.adm-art-tanpa{display:flex;flex-direction:column;gap:8px;align-items:center;text-align:center;padding:24px}
+.adm-art-tanpa b{font-size:28px;border:var(--garis);padding:14px 18px;background:var(--putih)}
+@media (max-width:1280px){.adm-art-stat{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:900px){
+  .adm-art{grid-template-columns:minmax(0,1fr)}
+  .adm-art-pohon{position:static}
+}
+@media (max-width:560px){
+  .adm-art-stat{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .adm-art-stat .adm-kartu{padding:8px 10px;box-shadow:3px 3px 0 var(--hitam)}
+  .adm-art-stat .adm-label{font-size:10px}
+  .adm-art-stat b{font-size:19px}
+  .adm-art-stat .hitam{grid-column:1 / -1}
+  .adm-art-grid{grid-template-columns:minmax(0,1fr)}
+}

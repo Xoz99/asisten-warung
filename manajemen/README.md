@@ -2,7 +2,8 @@
 
 Aplikasi operasional internal (dulu "Konsulin Manajemen"). Tahap 1: Dashboard, Leads (warung dari sales + CRM manual + sales),
 Keuangan (Midtrans + catatan manual), Notifikasi, Pengaturan (tim & akun demo), Profile, Rekrutmen Sales Partner, dan Karyawan
-(data kepegawaian, kehadiran harian, cuti & izin dengan persetujuan, payroll bulanan, struktur organisasi). Artifact, AI Chat: menyusul.
+(data kepegawaian, kehadiran harian, cuti & izin dengan persetujuan, payroll bulanan, struktur organisasi), dan Artifact
+(gudang SOP/dokumen/aset/video/catatan per folder, dengan riwayat versi & sampah). AI Chat: menyusul.
 Arah desain: `DESIGN.md` (neo-brutalism); filter anti-slop: `.claude/skills/antislop*` di root repo. **Sengaja terpisah** dari
 aplikasi produknya: proses pm2, port, dan domain sendiri. Aplikasi Warung Pintar nggak punya halaman/API admin sama sekali.
 Manajemen baca/tulis langsung ke database produk.
@@ -33,6 +34,11 @@ Form lamaran publik ada di landing page (`konsulin-landing-page`, halaman `/kari
 kirimannya ke `http://127.0.0.1:4100/api/publik/daftar` (env `MAKALIN_API_URL` di landing), jadi browser pelamar nggak
 pernah nyentuh domain makalin. Isi `DAFTAR_URL=https://konsulin.com/karir` di `.env` Makalin: link yang disalin di
 Rekrutmen pakai alamat itu, dan link lama `makalin.konsulin.com/daftar?s=...` dialihin ke sana.
+
+### File Artifact
+
+File yang diunggah di halaman Artifact disimpan di `data/artifact/` (atau `ARTIFACT_DIR`), bukan di database, dan nggak
+masuk git. **Ikutin folder ini di backup server.** Batas per file 300 MB (`ARTIFACT_MAKS_MB`).
 
 ## Login admin
 
