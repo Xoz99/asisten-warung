@@ -226,7 +226,26 @@ function Samping({ halaman, admin, notifBaru, buka }) {
 
 // Layar masuk (admin & sales). Gaya lembut: panel biru + kolom membulat - beda dari panel admin yang kotak-kotak.
 // Nggak ada "daftar" / login Google: akun dibikin admin, dan reset password juga lewat admin.
+// Bar status HP (jam, baterai) ikut biru di layar masuk biar panel birunya nyambung sampai atas. Safari iOS ngambil
+// warnanya dari latar halaman, browser lain dari meta theme-color - dua-duanya diset, lalu dibalikin pas keluar layar ini.
+function useWarnaBarStatus(warna) {
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    const lama = { meta: meta?.getAttribute('content'), html: document.documentElement.style.background, body: document.body.style.background };
+    meta?.setAttribute('content', warna);
+    // Atas biru (bar status & tarikan ke atas), bawah putih (tarikan ke bawah di bawah lembar form).
+    document.documentElement.style.background = `linear-gradient(${warna} 50%, #FFFFFF 50%)`;
+    document.body.style.background = 'transparent';
+    return () => {
+      if (meta && lama.meta) meta.setAttribute('content', lama.meta);
+      document.documentElement.style.background = lama.html;
+      document.body.style.background = lama.body;
+    };
+  }, [warna]);
+}
+
 function Masuk({ error, onMasuk }) {
+  useWarnaBarStatus('#1D4ED8');
   const [perluSetup, setPerluSetup] = useState(null);
   const [isi, setIsi] = useState({ username: '', password: '', nama: '', kunciSetup: '' });
   const [lihat, setLihat] = useState(false);
