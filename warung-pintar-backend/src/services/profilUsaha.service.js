@@ -87,3 +87,30 @@ export function profilUntukKonteks(profil) {
   teks += ` Margin wajar buat jenis usaha ini ${j.margin[0]}%-${j.margin[1]}% (pakai ${j.pakai}% kalau user nggak nyebut).`;
   return teks;
 }
+
+// Jenis usaha singkat buat prompt AI SELAIN chat (saran harga pas nambah barang, scan foto barang, tulis-ulang suara).
+// Dulu semua prompt itu nulis "warung kelontong" mentah - toko bangunan dikasih saran harga & margin ala warung rokok.
+// Gagal baca profil = anggap kelontong (bawaan lama), fitur AI-nya jangan ikut gagal.
+export async function infoUsaha(warungId) {
+  let p = null;
+  try {
+    p = warungId ? await ambilProfilUsaha(warungId) : null;
+  } catch {
+    p = null;
+  }
+  const jenis = p && !p.dilewati && JENIS_USAHA[p.jenis] ? p.jenis : 'kelontong';
+  const j = JENIS_USAHA[jenis];
+  return { jenis, label: jenis === 'lainnya' && p.jenisLain ? p.jenisLain : j.label, margin: j.margin, contoh: j.contoh };
+}
+
+// Panduan selisih modal -> harga pasaran buat saran harga barang baru, sesuai jenis usahanya.
+export function panduanMarginReferensi(u) {
+  if (u.jenis === 'kelontong') {
+    return 'selisihnya wajar buat barang kelontong: rokok & sembako pokok marginnya TIPIS (sekitar 5%-12% dari harga jual); snack, minuman, sabun, kosmetik LEBIH TEBAL (20%-35%). Jangan pukul rata.';
+  }
+  return (
+    `selisihnya wajar buat ${u.label} - biasanya ${u.margin[0]}%-${u.margin[1]}% dari harga jual, tergantung jenis barangnya ` +
+    `(barang pokok/cepat laku lebih tipis, aksesoris/pelengkap lebih tebal). Jangan pukul rata.` +
+    (u.contoh ? ` Barang khas usaha ini: ${u.contoh}.` : '')
+  );
+}

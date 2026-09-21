@@ -19,6 +19,7 @@
 import { cekJatahAi, catatPemakaianAi } from './aiQuota.service.js';
 import { ATURAN_MEMORI } from './memori.service.js';
 import { ATURAN_KULAKAN } from './kulakan.service.js';
+import { infoUsaha, panduanMarginReferensi } from './profilUsaha.service.js';
 
 const MODEL = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini';
 const TIMEOUT_MS = 12000;
@@ -177,7 +178,7 @@ MENENTUKAN BARANG MANA yang dimaksud (produkId) kamu WAJIB yakin dulu, jangan as
 - "data" WAJIB SELALU DIISI (walau tipenya "hapus" - boleh cuma {} kosong) - setiap detail
   (harga/modal/stok/nama/dst) yang DISEBUT ANGKANYA sama user WAJIB masuk ke "data".
 - tipe "tambah": "produkId" null. "data.nama" WAJIB diisi jelas, field lain isi yang masuk akal dari
-  obrolan (kalau nggak disebut boleh dikosongin - defaultnya kategori "sembako", satuan "pcs",
+  obrolan (kalau nggak disebut boleh dikosongin - defaultnya kategori yang cocok sama jenis usaha di "Profil usaha" (kelontong/belum diisi: "sembako"), satuan "pcs",
   isiKemasan 1, harga/modal/stok 0).
 - tipe "ubah" ATAU "hapus": "produkId" WAJIB diisi, disalin PERSIS APA ADANYA (karakter demi
   karakter, JANGAN diketik ulang manual) dari salah satu "id" di "Daftar barang" di bawah - cocokkan
@@ -298,7 +299,8 @@ Balas SATU objek JSON PERSIS: {"kode": "..."} - JANGAN ada teks lain di luar JSO
 // warung ini (nama doang di daftar, bukan foto - hemat token, sama pola kayak versi Gemini-nya).
 export async function cariBarangOpenRouter({ fotoBase64, produkList, warungId }) {
   const daftarTeks = produkList.map((p) => `- id: ${p.id} | nama: ${p.nama}`).join('\n');
-  const prompt = `Ini foto barang yang difoto pakai kamera di sebuah warung kelontong. Berikut daftar produk yang SUDAH TERDAFTAR di warung ini:
+  const { label } = await infoUsaha(warungId);
+  const prompt = `Ini foto barang yang difoto pakai kamera di sebuah ${label}. Berikut daftar produk yang SUDAH TERDAFTAR di warung ini:
 ${daftarTeks}
 
 Kalau barang di foto ini KELIHATAN JELAS sama persis dengan salah satu produk di daftar (merek &
@@ -317,7 +319,8 @@ Balas SATU objek JSON PERSIS: {"id": "..."} - JANGAN ada teks lain di luar JSON.
 // tegasnya kayak versi Gemini soal "mending kelewat daripada salah tagih".
 export async function cariBanyakBarangOpenRouter({ fotoBase64, produkList, warungId }) {
   const daftarTeks = produkList.map((p) => `- id: ${p.id} | nama: ${p.nama}`).join('\n');
-  const prompt = `Ini foto BEBERAPA barang sekaligus yang mau di-checkout di sebuah warung kelontong
+  const { label } = await infoUsaha(warungId);
+  const prompt = `Ini foto BEBERAPA barang sekaligus yang mau di-checkout di sebuah ${label}
 (customer taruh beberapa barang buat dibayar bareng). Berikut daftar produk yang SUDAH TERDAFTAR di
 warung ini:
 ${daftarTeks}
@@ -366,21 +369,21 @@ satupun yang yakin dikenali) - JANGAN ada teks lain di luar JSON.`;
 // Cadangan buat cariReferensiProdukGemini - TEKS doang, saran nama/satuan/isi kemasan/kisaran harga
 // dari pengetahuan umum model (BUKAN data live) buat ngisi form tambah barang baru.
 export async function cariReferensiProdukOpenRouter(query, warungId) {
-  const prompt = `User pemilik warung kelontong di Indonesia lagi mau nambahin barang baru ke
+  const u = await infoUsaha(warungId);
+  const prompt = `User pemilik ${u.label} di Indonesia lagi mau nambahin barang baru ke
 katalog, ketik nama umum: "${query}"
 
 Dari pengetahuan umummu soal produk retail Indonesia, kasih daftar varian produk yang PALING
 MUNGKIN dimaksud (maks 5). Buat tiap varian, isi:
 - nama: nama produk spesifik & jelas (contoh: "Gudang Garam Filter International 12" bukan cuma "Gudang Garam")
-- satuan: satuan jual satuan KECIL/eceran yang paling umum dipakai orang beli di warung (contoh: "bungkus" buat rokok yang dijual utuh, "botol" buat minuman, "pcs" buat snack)
+- satuan: satuan jual satuan KECIL/eceran yang paling umum dipakai orang beli di ${u.label} (contoh: "bungkus" buat rokok yang dijual utuh, "botol" buat minuman, "pcs" buat snack, "sak" buat semen, "meter" buat kabel)
 - isiKemasan: kalau satuan kecilnya sendiri berisi beberapa unit lebih kecil lagi yang biasa dijual ketengan (contoh: 1 bungkus rokok isi 12/16/20 batang), isi jumlahnya di sini. Kalau nggak ada pemecahan lebih lanjut yang lazim, isi 1.
 - namaKemasan: nama satuan yang lebih kecil itu (contoh: "batang" buat rokok). Isi null kalau isiKemasan cuma 1.
 - hargaModal: perkiraan harga KULAKAN/grosir per satuan jual di atas, dalam Rupiah (angka bulat).
   Ini yang dibayar pemilik warung ke agen, BUKAN harga jual ke pembeli.
-- hargaPasaran: perkiraan harga JUAL ECERAN yang UMUM dipasang warung kelontong lain, dalam Rupiah.
+- hargaPasaran: perkiraan harga JUAL ECERAN yang UMUM dipasang ${u.label} lain, dalam Rupiah.
 
-hargaPasaran HARUS lebih besar dari hargaModal, selisihnya wajar buat kelontong: rokok & sembako
-pokok TIPIS (5%-12% dari harga jual), snack/minuman/sabun LEBIH TEBAL (20%-35%). Jangan pukul rata.
+hargaPasaran HARUS lebih besar dari hargaModal, dan ${panduanMarginReferensi(u)}
 
 Kalau nama yang diketik nggak cukup jelas/nggak kamu kenal produknya sama sekali, balikin array
 kosong - JANGAN ngarang varian yang kamu nggak yakin beneran ada.

@@ -2,6 +2,7 @@ import { Jimp, JimpMime } from 'jimp';
 import { cekJatahAi, catatPemakaianAi } from './aiQuota.service.js';
 import { ATURAN_MEMORI } from './memori.service.js';
 import { ATURAN_KULAKAN } from './kulakan.service.js';
+import { infoUsaha, panduanMarginReferensi } from './profilUsaha.service.js';
 
 // Panggilan ke Gemini API (Google) buat jawaban "Mang Warung" yang lebih natural/luwes dari
 // rule-based. Sengaja pakai fetch polos (bukan SDK) - sama gayanya kayak midtrans.service.js -
@@ -148,7 +149,7 @@ tebak (lihat aturan tiap tipe di bawah).
   di pesan ini WAJIB masuk ke "data", jangan sampai kelewat cuma karena ngerasa "user pasti udah
   liat sendiri di chat".
 - tipe "tambah": produkId dikosongin (null/""). "data.nama" WAJIB diisi jelas, field lain isi yang
-  masuk akal dari obrolan/foto (kalau nggak disebut boleh dikosongin - defaultnya kategori "sembako",
+  masuk akal dari obrolan/foto (kalau nggak disebut boleh dikosongin - defaultnya kategori yang cocok sama jenis usaha di "Profil usaha" (kelontong/belum diisi: "sembako"),
   satuan "pcs", isiKemasan 1, harga/modal/stok 0).
 - tipe "ubah": WAJIB isi produkId, HARUS disalin PERSIS APA ADANYA (karakter demi karakter, JANGAN
   diketik ulang manual/diringkas/ditambah embel-embel apapun) dari salah satu "id" di "Daftar barang"
@@ -438,7 +439,8 @@ export async function cariBarangGemini({ fotoBase64, produkList, warungId }) {
   const { mimeType, data } = await siapkanGambar(fotoBase64);
 
   const daftarTeks = produkList.map((p) => `- id: ${p.id} | nama: ${p.nama}`).join('\n');
-  const prompt = `Ini foto barang yang difoto pakai kamera di sebuah warung kelontong. Berikut daftar produk yang SUDAH TERDAFTAR di warung ini:
+  const { label } = await infoUsaha(warungId);
+  const prompt = `Ini foto barang yang difoto pakai kamera di sebuah ${label}. Berikut daftar produk yang SUDAH TERDAFTAR di warung ini:
 ${daftarTeks}
 
 Kalau barang di foto ini KELIHATAN JELAS sama persis dengan salah satu produk di daftar (merek &
@@ -479,7 +481,8 @@ export async function cariBanyakBarangGemini({ fotoBase64, produkList, warungId 
   const { mimeType, data } = await siapkanGambar(fotoBase64);
 
   const daftarTeks = produkList.map((p) => `- id: ${p.id} | nama: ${p.nama}`).join('\n');
-  const prompt = `Ini foto BEBERAPA barang sekaligus yang mau di-checkout di sebuah warung kelontong
+  const { label } = await infoUsaha(warungId);
+  const prompt = `Ini foto BEBERAPA barang sekaligus yang mau di-checkout di sebuah ${label}
 (customer taruh beberapa barang buat dibayar bareng). Berikut daftar produk yang SUDAH TERDAFTAR di
 warung ini:
 ${daftarTeks}
@@ -583,24 +586,23 @@ satupun yang yakin dikenali.`;
 // nyimpen langsung tanpa lewat form yang bisa diedit). Prompt-nya SENGAJA nyuruh Gemini jujur
 // balikin array kosong kalau nggak yakin/nggak kenal, daripada ngarang varian yang nggak ada.
 export async function cariReferensiProdukGemini(query, warungId) {
-  const prompt = `User pemilik warung kelontong di Indonesia lagi mau nambahin barang baru ke
+  const u = await infoUsaha(warungId);
+  const prompt = `User pemilik ${u.label} di Indonesia lagi mau nambahin barang baru ke
 katalog, ketik nama umum: "${query}"
 
 Dari pengetahuan umummu soal produk retail Indonesia, kasih daftar varian produk yang PALING
 MUNGKIN dimaksud (maks 5). Buat tiap varian, isi:
 - nama: nama produk spesifik & jelas (contoh: "Gudang Garam Filter International 12" bukan cuma "Gudang Garam")
-- satuan: satuan jual satuan KECIL/eceran yang paling umum dipakai orang beli di warung (contoh: "bungkus" buat rokok yang dijual utuh, "botol" buat minuman, "pcs" buat snack)
+- satuan: satuan jual satuan KECIL/eceran yang paling umum dipakai orang beli di ${u.label} (contoh: "bungkus" buat rokok yang dijual utuh, "botol" buat minuman, "pcs" buat snack, "sak" buat semen, "meter" buat kabel)
 - isiKemasan: kalau satuan kecilnya sendiri berisi beberapa unit lebih kecil lagi yang biasa dijual ketengan (contoh: 1 bungkus rokok isi 12/16/20 batang), isi jumlahnya di sini. Kalau nggak ada pemecahan lebih lanjut yang lazim, isi 1.
 - namaKemasan: nama satuan yang lebih kecil itu (contoh: "batang" buat rokok). Isi null kalau isiKemasan cuma 1.
 - hargaModal: perkiraan harga KULAKAN/grosir per satuan jual di atas, dalam Rupiah (angka bulat).
   Ini yang dibayar pemilik warung ke agen/grosir, BUKAN harga jual ke pembeli.
-- hargaPasaran: perkiraan harga JUAL ECERAN yang UMUM dipasang warung kelontong lain buat barang
+- hargaPasaran: perkiraan harga JUAL ECERAN yang UMUM dipasang ${u.label} lain buat barang
   ini, dalam Rupiah (angka bulat). Ini patokan pasar - harga yang bikin pembeli nggak kaget.
 
-PENTING soal dua angka itu: hargaPasaran HARUS lebih besar dari hargaModal (warung nggak jualan
-rugi), dan selisihnya wajar buat barang kelontong - biasanya 10%-30% dari harga jual, tergantung
-jenis barang. Rokok & sembako pokok marginnya TIPIS (sekitar 5%-12%); snack, minuman, sabun,
-kosmetik marginnya LEBIH TEBAL (20%-35%). Jangan pukul rata.
+PENTING soal dua angka itu: hargaPasaran HARUS lebih besar dari hargaModal (toko nggak jualan
+rugi), dan ${panduanMarginReferensi(u)}
 
 Dua-duanya PERKIRAAN pasaran umum, bukan harga pasti - user bakal ngedit sendiri sesuai agen dia.
 
@@ -680,7 +682,8 @@ export async function transkripSuaraGemini(audioBase64, warungId) {
   const [, mimeType, data] = match;
   if (data.length > MAKS_AUDIO_B64) throw Object.assign(new Error('Rekamannya kepanjangan'), { status: 413 });
 
-  const prompt = `Kamu alat tulis-ulang suara buat aplikasi warung kelontong Indonesia.
+  const { label } = await infoUsaha(warungId);
+  const prompt = `Kamu alat tulis-ulang suara buat aplikasi kasir ${label} di Indonesia.
 
 Tulis ULANG PERSIS apa yang diucapkan di rekaman ini. Aturannya:
 - Bahasa Indonesia sehari-hari, termasuk logat/campuran bahasa daerah kalau ada.
