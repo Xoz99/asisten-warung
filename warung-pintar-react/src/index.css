@@ -1088,3 +1088,9 @@ body{background:#E9E9E6}
   background:rgba(10,10,10,.55);color:#fff;display:grid;place-items:center;cursor:pointer;backdrop-filter:blur(4px)}
 .kamera-ganti:active{transform:scale(.92)}
 .kamera-ganti svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* Kenal wajah > "Ini siapa?": pilih pelanggan manual, wajahnya disimpen jadi sampel orang itu. */
+.pilih-wajah{display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;margin-top:8px;text-align:left}
+.pilih-wajah-baris{display:flex;align-items:center;gap:12px;padding:8px 10px;border:1px solid var(--garis);border-radius:14px;background:var(--surface);color:var(--ink);font:inherit;font-weight:700;cursor:pointer;text-align:left}
+.pilih-wajah-baris:active{transform:scale(.98)}
+.pilih-wajah-baris .ava{width:40px;height:40px;border-radius:12px;flex:none;font-size:14px}

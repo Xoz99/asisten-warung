@@ -1276,7 +1276,7 @@ const KUNCI_KAMERA_WAJAH = 'warungpintar_kamera_wajah';
 
 function SheetWajah({ onClose, onTambahBaru }) {
   const { S, setPelangganTerpilih, toast, dispatch, openLunas, refreshData } = useApp();
-  const [state, setState] = useState('memuat'); // memuat | menyiapkan | mencari | hasil | tidak-ketemu | error
+  const [state, setState] = useState('memuat'); // memuat | menyiapkan | mencari | hasil | tidak-ketemu | pilih | error
   const [match, setMatch] = useState(null); // { pelanggan, totalUtang, jarak, templateBelanjaan, descriptor }
   const [wajahKedeteksi, setWajahKedeteksi] = useState(null); // null = belum dicoba, true/false = frame terakhir
   // Kamera depan (pembeli ngadep HP) atau belakang (HP diarahin ke pembeli, kamera belakang biasanya lebih tajam).
@@ -1310,6 +1310,11 @@ function SheetWajah({ onClose, onTambahBaru }) {
   const [bayarSebagian, setBayarSebagian] = useState(false);
   const [jumlahCustom, setJumlahCustom] = useState('');
   const [percobaanWajah, setPercobaanWajah] = useState(0); // ditampilkan biar kelihatan masih jalan, bukan nyangkut
+  // Wajah terakhir yang kebaca (rata-rata beberapa frame) - dipakai buat "Ini pelanggan lama": pemilik milih namanya,
+  // wajah ini disimpen jadi sampel orang itu. Dulu wajah cuma dipelajari kalau UDAH kekenal, jadi pelanggan yang dari
+  // awal nggak kekenal (foto daftar beda kamera/cahaya) nggak pernah dapet kesempatan belajar sama sekali.
+  const wajahTerakhirRef = useRef(null);
+  const [cariNama, setCariNama] = useState('');
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
@@ -1332,6 +1337,19 @@ function SheetWajah({ onClose, onTambahBaru }) {
     if (match?.descriptor) api.wajah.daftarkan(match.pelanggan.id, match.descriptor).catch(() => {});
   };
 
+  // Pemilik nunjuk sendiri ini siapa (wajahnya nggak kekenal / Mang AI salah orang) -> wajah yang barusan kebaca
+  // disimpen jadi sampel orang itu, terus dia langsung dipilih jadi pembeli.
+  const pilihPelangganManual = (p) => {
+    const d = wajahTerakhirRef.current;
+    if (d) api.wajah.daftarkan(p.id, d).then(() => refreshData()).catch(() => {});
+    setPelangganTerpilih({ id: p.id, nama: p.nama, wa: p.wa, foto: p.foto || null });
+    toast(d ? `Wajah ${escapeHtml(p.nama)} dipelajari - besok lebih gampang kenal` : `Pembeli: ${escapeHtml(p.nama)}`);
+    onClose();
+  };
+  const hasilCari = S.pelanggan
+    .filter((p) => !cariNama.trim() || p.nama.toLowerCase().includes(cariNama.trim().toLowerCase()))
+    .slice(0, 8);
+
   useEffect(() => {
     let batal = false;
     let percobaan = 0;
@@ -1353,6 +1371,7 @@ function SheetWajah({ onClose, onTambahBaru }) {
         setWajahKedeteksi(Boolean(descriptor));
         if (descriptor) {
           const { rata, jumlah } = pengumpul.tambah(descriptor);
+          wajahTerakhirRef.current = rata;
           const hasil = await api.wajah.identifikasi(rata);
           if (batal) return;
           if (layakDitampilkan(hasil, jumlah)) {
@@ -1447,7 +1466,10 @@ function SheetWajah({ onClose, onTambahBaru }) {
   return (
     <div className="sheet tengah show">
       <div className="panel mid">
-        <div className={'viewfinder' + (state === 'hasil' || state === 'tidak-ketemu' || state === 'error' ? ' diam' : '')}>
+        <div
+          className={'viewfinder' + (state === 'hasil' || state === 'tidak-ketemu' || state === 'error' || state === 'pilih' ? ' diam' : '')}
+          style={state === 'pilih' ? { display: 'none' } : undefined}
+        >
           <div className="frame" />
           {state !== 'error' && (
             // Kamera depan ditampilin kayak cermin (biar nggak bingung pas geser), deteksinya tetap pakai gambar asli.
@@ -1503,10 +1525,37 @@ function SheetWajah({ onClose, onTambahBaru }) {
         {state === 'tidak-ketemu' && (
           <>
             <h3>Wajah belum dikenali</h3>
-            <p>Belum ketemu yang cocok - bisa jadi belum terdaftar, atau fotonya belum kedaftar wajahnya.</p>
+            <p>
+              {wajahTerakhirRef.current
+                ? 'Wajahnya kebaca tapi belum ketemu yang cocok. Kalau dia pelanggan lama, pilih namanya - Mang AI jadi kenal wajahnya.'
+                : 'Wajahnya belum kebaca jelas - hadap ke kamera, agak dekat & terang, lalu coba lagi.'}
+            </p>
+            {wajahTerakhirRef.current && S.pelanggan.length > 0 && (
+              <button className="btn utama" style={{ width: '100%', marginTop: 10 }} onClick={() => setState('pilih')}>
+                Ini pelanggan lama - pilih namanya
+              </button>
+            )}
             <button className="btn" style={{ width: '100%', marginTop: 10 }} onClick={onTambahBaru}>
               + Tambahkan pelanggan baru
             </button>
+          </>
+        )}
+        {state === 'pilih' && (
+          <>
+            <h3>Ini siapa?</h3>
+            <p>Wajah yang barusan kebaca disimpen ke pelanggan yang kamu pilih.</p>
+            <div className="field" style={{ textAlign: 'left' }}>
+              <input value={cariNama} onChange={(e) => setCariNama(e.target.value)} placeholder="Cari nama pelanggan" autoFocus />
+            </div>
+            <div className="pilih-wajah">
+              {hasilCari.map((p) => (
+                <button key={p.id} className="pilih-wajah-baris" onClick={() => pilihPelangganManual(p)}>
+                  <span className="ava">{p.foto ? <img src={p.foto} alt="" /> : inisial(p.nama)}</span>
+                  <span>{p.nama}</span>
+                </button>
+              ))}
+              {!hasilCari.length && <p style={{ margin: '8px 0' }}>Nggak ada nama yang cocok.</p>}
+            </div>
           </>
         )}
         {state === 'hasil' && match && (
@@ -1582,12 +1631,12 @@ function SheetWajah({ onClose, onTambahBaru }) {
             <button className="btn" style={{ width: '100%', marginTop: 10 }} onClick={onTambahBaru}>
               + Tambahkan pelanggan baru
             </button>
-            <button className="btn" style={{ width: '100%', marginTop: 10 }} onClick={onClose}>
-              Bukan dia
+            <button className="btn" style={{ width: '100%', marginTop: 10 }} onClick={() => setState('pilih')}>
+              Bukan dia - pilih yang bener
             </button>
           </>
         )}
-        {(state === 'memuat' || state === 'menyiapkan' || state === 'mencari' || state === 'error' || state === 'tidak-ketemu') && (
+        {(state === 'memuat' || state === 'menyiapkan' || state === 'mencari' || state === 'error' || state === 'tidak-ketemu' || state === 'pilih') && (
           <button className="btn" style={{ width: '100%', marginTop: 12 }} onClick={onClose}>
             Tutup
           </button>
