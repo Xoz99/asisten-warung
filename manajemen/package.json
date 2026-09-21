@@ -1,0 +1,28 @@
+{
+  "name": "konsulin-manajemen",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Manajemen internal produk-produk Konsulin (Warung Pintar, dst): sales, rekap langganan. Terpisah dari aplikasi produknya.",
+  "scripts": {
+    "dev": "vite",
+    "dev:server": "node --watch server/index.js",
+    "build": "vite build",
+    "start": "node server/index.js",
+    "lint": "oxlint"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0",
+    "pg": "^8.12.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.0",
+    "oxlint": "^1.79.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "vite": "^8.2.2"
+  }
+}

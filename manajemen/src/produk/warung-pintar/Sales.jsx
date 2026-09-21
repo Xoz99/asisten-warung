@@ -1,56 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
-import { rupiah } from '../lib/format.js';
+import { rupiah, tgl } from '../../lib/format.js';
 
-// Halaman admin (/admin) buat pemilik aplikasi - BUKAN pemilik warung. Isinya: sales mana bawa warung mana, siapa
-// yang udah bayar langganan, dan berapa duitnya. Dikunci pakai ADMIN_KEY di .env server (lihat admin.routes.js);
-// kuncinya disimpen di sessionStorage doang, jadi ketutup tab = harus masukin lagi.
-const BASE_URL = import.meta.env.VITE_API_URL || '';
-const KUNCI_SESI = 'warungpintar_admin';
-
-const bacaKunci = () => {
-  try {
-    return sessionStorage.getItem(KUNCI_SESI) || '';
-  } catch {
-    return '';
-  }
-};
-const simpanKunci = (k) => {
-  try {
-    if (k) sessionStorage.setItem(KUNCI_SESI, k);
-    else sessionStorage.removeItem(KUNCI_SESI);
-  } catch {
-    /* sessionStorage diblok - kuncinya cuma hidup di memori */
-  }
-};
-
-async function panggil(kunci, method, path, body) {
-  let res;
-  try {
-    res = await fetch(BASE_URL + '/api/admin' + path, {
-      method,
-      headers: { 'X-Admin-Key': kunci, ...(body ? { 'Content-Type': 'application/json' } : {}) },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-  } catch {
-    throw new Error('Tidak bisa menghubungi server');
-  }
-  const data = await res.json().catch(() => null);
-  if (!res.ok) throw Object.assign(new Error(data?.error || `Gagal (${res.status})`), { status: res.status });
-  return data;
-}
-
+// Warung Pintar > Sales: warung bawaan tiap sales, siapa yang udah bayar langganan, dan berapa duitnya.
+// `api(method, path, body)` udah nempel ke /api/warung-pintar + kunci admin (lihat App.jsx).
 const NAMA_PLAN = { trial: 'Trial', bulanan: 'Bulanan', triwulan: '3 Bulan', tahunan: 'Tahunan', permanen: 'Permanen' };
-const tgl = (t) => (t ? new Date(t).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-');
-const linkSales = (kode) => `${window.location.origin}/?ref=${kode}`;
+const linkSales = (urlProduk, kode) => `${urlProduk}/?ref=${kode}`;
 
-export default function Admin() {
-  const [kunci, setKunci] = useState(bacaKunci);
+export default function Sales({ api, produk }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [memuat, setMemuat] = useState(false);
   const [pilihan, setPilihan] = useState(null); // { id, judul } - sales yang dibuka daftar warungnya
-
-  const api = useCallback((method, path, body) => panggil(kunci, method, path, body), [kunci]);
 
   const muat = useCallback(async () => {
     setMemuat(true);
@@ -58,10 +18,6 @@ export default function Admin() {
     try {
       setData(await api('GET', '/ringkasan'));
     } catch (e) {
-      if (e.status === 401 || e.status === 503) {
-        simpanKunci('');
-        setKunci('');
-      }
       setError(e.message);
     } finally {
       setMemuat(false);
@@ -69,161 +25,102 @@ export default function Admin() {
   }, [api]);
 
   useEffect(() => {
-    if (!kunci) return;
     let batal = false;
-    panggil(kunci, 'GET', '/ringkasan')
+    api('GET', '/ringkasan')
       .then((d) => !batal && setData(d))
-      .catch((e) => {
-        if (batal) return;
-        if (e.status === 401 || e.status === 503) {
-          simpanKunci('');
-          setKunci('');
-        }
-        setError(e.message);
-      });
+      .catch((e) => !batal && setError(e.message));
     return () => {
       batal = true;
     };
-  }, [kunci]);
-
-  if (!kunci) {
-    return (
-      <MasukAdmin
-        error={error}
-        onMasuk={(k) => {
-          simpanKunci(k);
-          setError('');
-          setKunci(k);
-        }}
-      />
-    );
-  }
+  }, [api]);
 
   const semua = data ? [...data.sales, data.tanpaSales] : [];
   const total = (f) => semua.reduce((n, s) => n + (s?.[f] || 0), 0);
 
   return (
-    <div className="adm t-mono">
-      <div className="adm-isi">
-        <header className="adm-kepala">
-          <div>
-            <p className="p-h1">Rekap sales</p>
-            <p className="p-sub">Warung bawaan tiap sales & siapa yang udah langganan.</p>
+    <>
+      <header className="adm-kepala">
+        <div>
+          <h1>Sales</h1>
+          <p className="adm-sub">Warung bawaan tiap sales & siapa yang udah langganan {produk.nama}.</p>
+        </div>
+        <button className="btn kecil" onClick={muat} disabled={memuat}>
+          {memuat ? 'Memuat…' : 'Muat ulang'}
+        </button>
+      </header>
+
+      {error && <p className="adm-error">{error}</p>}
+
+      {!data ? (
+        !error && <p className="adm-sub">Memuat…</p>
+      ) : (
+        <>
+          <div className="adm-angka">
+            <Angka label="Warung daftar" nilai={total('daftar')} />
+            <Angka label="Pernah bayar" nilai={total('bayar')} />
+            <Angka label="Omzet bulan ini" nilai={rupiah(total('omzet_bulan_ini'))} />
+            <Angka label="Omzet total" nilai={rupiah(total('omzet'))} />
           </div>
-          <div className="adm-aksi">
-            <button className="btn kecil" onClick={muat} disabled={memuat}>
-              {memuat ? 'Memuat…' : 'Muat ulang'}
-            </button>
-            <button
-              className="btn kecil"
-              onClick={() => {
-                simpanKunci('');
-                setKunci('');
-                setData(null);
-              }}
-            >
-              Keluar
-            </button>
-          </div>
-        </header>
 
-        {error && <p className="adm-error">{error}</p>}
-
-        {!data ? (
-          <p className="p-sub">Memuat…</p>
-        ) : (
-          <>
-            <div className="adm-angka">
-              <Angka label="Warung daftar" nilai={total('daftar')} />
-              <Angka label="Pernah bayar" nilai={total('bayar')} />
-              <Angka label="Omzet bulan ini" nilai={rupiah(total('omzet_bulan_ini'))} />
-              <Angka label="Omzet total" nilai={rupiah(total('omzet'))} />
-            </div>
-
-            <div className="adm-kolom">
-              <section className="adm-kartu">
-                <h2>Sales</h2>
-                <TabelSales
-                  sales={data.sales}
-                  tanpa={data.tanpaSales}
-                  onBuka={setPilihan}
-                  onUbah={async (id, perubahan) => {
-                    try {
-                      await api('PATCH', '/sales/' + id, perubahan);
-                      muat();
-                    } catch (e) {
-                      setError(e.message);
-                    }
-                  }}
-                />
-                <TambahSales
-                  onTambah={async (isi) => {
-                    await api('POST', '/sales', isi);
+          <div className="adm-kolom">
+            <section className="adm-kartu">
+              <h2>Daftar sales</h2>
+              <TabelSales
+                urlProduk={produk.url}
+                sales={data.sales}
+                tanpa={data.tanpaSales}
+                onBuka={setPilihan}
+                onUbah={async (id, perubahan) => {
+                  try {
+                    await api('PATCH', '/sales/' + id, perubahan);
                     muat();
-                  }}
-                />
-              </section>
+                  } catch (e) {
+                    setError(e.message);
+                  }
+                }}
+              />
+              <TambahSales
+                urlProduk={produk.url}
+                onTambah={async (isi) => {
+                  await api('POST', '/sales', isi);
+                  muat();
+                }}
+              />
+            </section>
 
-              <section className="adm-kartu">
-                <h2>Pembayaran terbaru</h2>
-                {data.pembayaran.length === 0 ? (
-                  <p className="p-sub">Belum ada pembayaran lunas.</p>
-                ) : (
-                  <ul className="adm-daftar">
-                    {data.pembayaran.map((p) => (
-                      <li key={p.order_id}>
-                        <div>
-                          <b>{p.warung}</b> <span className="adm-redup">@{p.username}</span>
-                          <div className="adm-redup">
-                            {NAMA_PLAN[p.plan] || p.plan} · {tgl(p.lunas_pada)}
-                          </div>
+            <section className="adm-kartu">
+              <h2>Pembayaran terbaru</h2>
+              {data.pembayaran.length === 0 ? (
+                <p className="adm-sub">Belum ada pembayaran lunas.</p>
+              ) : (
+                <ul className="adm-daftar">
+                  {data.pembayaran.map((p) => (
+                    <li key={p.order_id}>
+                      <div>
+                        <b>{p.warung}</b> <span className="adm-redup">@{p.username}</span>
+                        <div className="adm-redup">
+                          {NAMA_PLAN[p.plan] || p.plan} · {tgl(p.lunas_pada)}
                         </div>
-                        <div className="adm-kanan">
-                          <b>{rupiah(p.jumlah)}</b>
-                          <span className={'adm-lencana' + (p.sales_nama ? '' : ' kosong')}>
-                            {p.sales_nama ? `${p.sales_nama} (${p.sales_kode})` : 'Tanpa sales'}
-                          </span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-            </div>
+                      </div>
+                      <div className="adm-kanan">
+                        <b>{rupiah(p.jumlah)}</b>
+                        <span className={'adm-lencana' + (p.sales_nama ? '' : ' kosong')}>
+                          {p.sales_nama ? `${p.sales_nama} (${p.sales_kode})` : 'Tanpa sales'}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
 
-            <CariWarung api={api} sales={data.sales} onBerubah={muat} />
-          </>
-        )}
-      </div>
+          <CariWarung api={api} sales={data.sales} onBerubah={muat} />
+        </>
+      )}
 
       {pilihan && <DaftarWarung api={api} pilihan={pilihan} sales={data?.sales || []} onTutup={() => setPilihan(null)} onBerubah={muat} />}
-    </div>
-  );
-}
-
-function MasukAdmin({ error, onMasuk }) {
-  const [isi, setIsi] = useState('');
-  return (
-    <div className="adm t-mono adm-tengah">
-      <form
-        className="adm-kartu adm-masuk"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (isi.trim()) onMasuk(isi.trim());
-        }}
-      >
-        <p className="p-h1">Admin</p>
-        <p className="p-sub">Masukin kunci admin (ADMIN_KEY di .env server).</p>
-        <div className="field">
-          <label>Kunci admin</label>
-          <input type="password" value={isi} onChange={(e) => setIsi(e.target.value)} autoFocus autoComplete="current-password" />
-        </div>
-        {error && <p className="adm-error">{error}</p>}
-        <button className="btn utama" style={{ width: '100%', marginTop: 16 }} type="submit" disabled={!isi.trim()}>
-          Masuk
-        </button>
-      </form>
-    </div>
+    </>
   );
 }
 
@@ -236,15 +133,15 @@ function Angka({ label, nilai }) {
   );
 }
 
-function TabelSales({ sales, tanpa, onBuka, onUbah }) {
+function TabelSales({ urlProduk, sales, tanpa, onBuka, onUbah }) {
   const [tersalin, setTersalin] = useState('');
   const salin = async (kode) => {
     try {
-      await navigator.clipboard.writeText(linkSales(kode));
+      await navigator.clipboard.writeText(linkSales(urlProduk, kode));
       setTersalin(kode);
       setTimeout(() => setTersalin((k) => (k === kode ? '' : k)), 1500);
     } catch {
-      window.prompt('Salin link ini:', linkSales(kode));
+      window.prompt('Salin link ini:', linkSales(urlProduk, kode));
     }
   };
   return (
@@ -314,7 +211,7 @@ function TabelSales({ sales, tanpa, onBuka, onUbah }) {
   );
 }
 
-function TambahSales({ onTambah }) {
+function TambahSales({ urlProduk, onTambah }) {
   const [kode, setKode] = useState('');
   const [nama, setNama] = useState('');
   const [noHp, setNoHp] = useState('');
@@ -358,7 +255,7 @@ function TambahSales({ onTambah }) {
       <button className="btn utama" style={{ marginTop: 12 }} type="submit" disabled={simpan || kode.length < 3 || !nama.trim()}>
         {simpan ? 'Menyimpan…' : 'Tambah sales'}
       </button>
-      {kode.length >= 3 && <p className="adm-redup" style={{ marginTop: 8 }}>Link-nya nanti: {linkSales(kode)}</p>}
+      {kode.length >= 3 && <p className="adm-redup" style={{ marginTop: 8 }}>Link-nya nanti: {linkSales(urlProduk, kode)}</p>}
     </form>
   );
 }
@@ -430,9 +327,9 @@ function DaftarWarung({ api, pilihan, sales, onTutup, onBerubah }) {
         </div>
         {error && <p className="adm-error">{error}</p>}
         {!warung ? (
-          !error && <p className="p-sub">Memuat…</p>
+          !error && <p className="adm-sub">Memuat…</p>
         ) : warung.length === 0 ? (
-          <p className="p-sub">Belum ada warung.</p>
+          <p className="adm-sub">Belum ada warung.</p>
         ) : (
           <ul className="adm-daftar">
             {warung.map((w) => (
@@ -471,7 +368,7 @@ function CariWarung({ api, sales, onBerubah }) {
       {error && <p className="adm-error">{error}</p>}
       {hasil &&
         (hasil.length === 0 ? (
-          <p className="p-sub">Nggak ketemu.</p>
+          <p className="adm-sub">Nggak ketemu.</p>
         ) : (
           <ul className="adm-daftar">
             {hasil.map((w) => (

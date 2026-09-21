@@ -1,34 +1,12 @@
 import { Router } from 'express';
-import crypto from 'crypto';
-import rateLimit from 'express-rate-limit';
-import { query } from '../db.js';
-import { normalisasiNoHp } from '../utils/noHp.js';
-import { POLA_KODE_SALES, pastikanTabelSales, rapikanKodeSales } from '../services/sales.service.js';
+import { normalisasiNoHp } from '../../utils/noHp.js';
+import { POLA_KODE_SALES, pastikanTabelSales, query, rapikanKodeSales } from './db.js';
 
-// Halaman admin (/admin di aplikasi) buat pemilik aplikasi: kelola daftar sales + rekap sales mana bawa warung
-// mana & siapa yang udah bayar. BUKAN buat pemilik warung - kuncinya ADMIN_KEY di .env server, dikirim lewat
-// header X-Admin-Key. ADMIN_KEY kosong / kependekan = halaman admin mati total.
+// Warung Pintar: kelola sales + rekap sales mana bawa warung mana & siapa yang udah bayar langganan.
+// Dipasang di /api/warung-pintar (lihat produk/index.js), udah dikunci ADMIN_KEY dari server/index.js.
 const router = Router();
 
-// Salah kunci dibatasi (yang bener nggak dihitung) - biar kuncinya nggak bisa ditebak pakai script.
-const adminLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 10,
-  skipSuccessfulRequests: true,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Terlalu banyak percobaan kunci admin. Coba lagi 15 menit lagi.' },
-});
-
-const hash = (s) => crypto.createHash('sha256').update(String(s)).digest();
-
-router.use(adminLimiter, async (req, res, next) => {
-  const kunci = process.env.ADMIN_KEY || '';
-  if (kunci.length < 16) return res.status(503).json({ error: 'Halaman admin belum diaktifkan (isi ADMIN_KEY minimal 16 karakter di .env server).' });
-  // Dibandingin lewat hash + timingSafeEqual: panjangnya selalu sama & waktunya nggak bocorin isi kunci.
-  if (!crypto.timingSafeEqual(hash(req.get('x-admin-key') || ''), hash(kunci))) {
-    return res.status(401).json({ error: 'Kunci admin salah' });
-  }
+router.use(async (req, res, next) => {
   try {
     await pastikanTabelSales();
     next();

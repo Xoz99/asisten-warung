@@ -3,6 +3,8 @@ import { query } from '../db.js';
 // Sales lapangan yang nawarin aplikasi ke warung. Tiap sales punya KODE (mis. BUDI) yang ikut di link
 // daftar (/?ref=BUDI) atau diketik manual di form daftar - warung yang daftar pakai kode itu nempel ke
 // sales-nya (warung.sales_id), jadi begitu warung itu bayar langganan, ketauan sales siapa yang bawa.
+// Daftar sales & rekapnya dikelola dari aplikasi MANAJEMEN Konsulin (folder manajemen/, server & domain terpisah) -
+// aplikasi warung ini sengaja nggak punya halaman/API admin sama sekali.
 // Tabelnya dibikin otomatis (deploy nggak jalanin migrate), sama kayak tabel-tabel baru lainnya.
 let tabelSalesSiap = null;
 export function pastikanTabelSales() {
