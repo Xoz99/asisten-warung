@@ -71,7 +71,14 @@ const antara = (a, b) => a + Math.floor(acak() * (b - a + 1));
 async function seed() {
   console.log(`Menyiapkan akun demo "${USERNAME}"...`);
 
-  // Hapus akun demo lama - ON DELETE CASCADE ngurus produk/transaksi/pelanggan/kasbon-nya.
+  // Hapus akun demo lama - ON DELETE CASCADE ngurus produk/transaksi/pelanggan/kasbon-nya. Item transaksi dihapus
+  // duluan: transaksi_item.produk_id nunjuk ke produk TANPA cascade, jadi kalau produk kehapus lebih dulu lewat cascade
+  // warung, Postgres nolak ("violates foreign key constraint transaksi_item_produk_id_fkey").
+  await query(
+    `DELETE FROM transaksi_item WHERE transaksi_id IN
+       (SELECT t.id FROM transaksi t JOIN warung w ON w.id = t.warung_id WHERE w.username=$1)`,
+    [USERNAME]
+  );
   const { rowCount } = await query('DELETE FROM warung WHERE username=$1', [USERNAME]);
   if (rowCount) console.log('  akun demo lama dihapus (biar datanya nggak numpuk)');
 
