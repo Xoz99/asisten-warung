@@ -22,6 +22,15 @@ export const NAMA_AKSI = {
   'ops.lead.massal': 'ubah lead CRM sekaligus',
   'ops.lead.impor': 'impor lead CRM dari CSV',
   'ops.keuangan.catat': 'catat transaksi',
+  'rekrutmen.lamaran.tambah': 'nambah kandidat',
+  'rekrutmen.lamaran.maju': 'majuin tahap kandidat',
+  'rekrutmen.attempt': 'catat hasil tes kandidat',
+  'rekrutmen.keputusan_hiring': 'keputusan hiring',
+  'rekrutmen.lamaran.keluar': 'keluarin kandidat',
+  'rekrutmen.lamaran.ulang': 'lamaran ulang kandidat',
+  'rekrutmen.kampanye.tambah': 'bikin kampanye rekrutmen',
+  'rekrutmen.titik.tambah': 'nambah titik sebar',
+  'rekrutmen.titik.status': 'ubah status posting',
   'ops.keuangan.hapus': 'hapus transaksi',
 };
 export const ringkasDetail = (d) =>

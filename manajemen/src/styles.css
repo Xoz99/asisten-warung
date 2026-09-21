@@ -280,3 +280,14 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
   .adm-crm-kartu.total,.adm-crm-kartu.tahap-stuck{grid-column:span 2}
 }
 .adm-tahap button.stuck.on{background:var(--merah);color:var(--putih)}
+
+/* ---------- Rekrutmen: daftar tahapan di panel kandidat ---------- */
+.adm-tahapan{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.adm-tahapan li{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;border:var(--garis-tipis);padding:8px 10px;background:var(--putih)}
+.adm-tahapan li span{width:24px;height:24px;display:grid;place-items:center;border:2px solid var(--hitam);font-weight:700;font-size:12px}
+.adm-tahapan li em{font-style:normal;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--redup)}
+.adm-tahapan li.lewat{background:#DCFCE7}
+.adm-tahapan li.lewat span{background:var(--hijau)}
+.adm-tahapan li.sekarang{background:var(--kuning);box-shadow:3px 3px 0 var(--hitam)}
+.adm-tahapan li.sekarang span{background:var(--hitam);color:var(--kuning)}
+.adm-tahapan li.sekarang em{color:var(--tinta)}

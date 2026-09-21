@@ -1,0 +1,609 @@
+import crypto from 'crypto';
+import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
+import { catatLog, query, pool } from './db.js';
+import { normalisasiNoHp } from './utils/noHp.js';
+
+// Rekrutmen Sales Partner (PRD v0.2 §7-10): orang (identitas seumur hidup, D-59), lamaran (satu siklus, D-30),
+// tahap + attempt (riwayat percobaan nggak pernah hilang), kampanye & titik sebar (sumber per titik, D-73), dan
+// form daftar publik (?s=KODE). Belum dibangun (NOT VERIFIED / menyusul): cohort (§9), bonus rekrutmen (§10),
+// pembayaran referral (§7.7), bank soal Product Test berversi, retensi data (§25), pembagian peran Owner/Recruiter (§22).
+
+// Urutan tahap (D-77, tidak berubah). HIRING_DECISION = peristiwa, bukan status (§8.2): lamaran yang lulus Closing
+// Test tetap di 'closing_test' sampai keputusan manusia dicatat.
+export const TAHAP = ['new', 'screening', 'screening_passed', 'product_test', 'interview', 'field_test_24h', 'closing_test', 'hired'];
+export const KELUAR = ['rejected', 'withdrawn', 'no_response', 'on_hold', 'talent_pool'];
+// Tahap yang majunya lewat attempt yang lulus (bukan tombol "maju" biasa).
+const TAHAP_DENGAN_TES = ['product_test', 'interview', 'field_test_24h', 'closing_test'];
+const HARI_NO_RESPONSE = 3; // D-32
+const HARI_CLOSING_TEST = 6; // D-33
+const KANAL = { FB: 'Grup Facebook', WA: 'Komunitas WhatsApp', PST: 'Poster QR', IG: 'Instagram', WEB: 'Halaman sendiri', REF: 'Referral', LAIN: 'Lainnya' };
+// Pilihan "Tahu Konsulin dari mana?" - sumber keyakinan RENDAH (D-72), dilaporkan terpisah.
+export const DROPDOWN_SUMBER = ['Facebook', 'WhatsApp', 'Instagram', 'TikTok', 'Poster', 'Teman / keluarga', 'Lainnya'];
+
+// Hash satu arah nomor HP, disimpan PERMANEN (D-35) - buat nolak orang ganda & nanti bonus sekali seumur hidup,
+// tetap jalan walau data pribadinya dihapus retensi (D-60). Garamnya konstanta: jangan diganti, hash lama jadi nggak cocok.
+const hashHp = (hp) => crypto.createHash('sha256').update('konsulin-hp-v1:' + hp).digest('hex');
+const POLA_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const teks = (v, n) => (typeof v === 'string' ? v.trim().slice(0, n) : '');
+const salah = (pesan, status = 400) => Object.assign(new Error(pesan), { status });
+
+let siap = null;
+export function pastikanTabelRekrutmen() {
+  if (!siap) {
+    siap = (async () => {
+      await query(`CREATE TABLE IF NOT EXISTS mj_rek_kampanye (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        nama TEXT NOT NULL, area TEXT, mulai DATE, selesai DATE,
+        biaya NUMERIC NOT NULL DEFAULT 0, catatan TEXT, arsip BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT now()
+      )`);
+      // Titik sebar = satu tempat posting (satu grup FB, satu poster). Kodenya unik & jadi ?s= di link daftar (§7.2).
+      await query(`CREATE TABLE IF NOT EXISTS mj_rek_titik (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        kampanye_id UUID NOT NULL REFERENCES mj_rek_kampanye(id) ON DELETE CASCADE,
+        kode TEXT UNIQUE NOT NULL, kanal TEXT NOT NULL, deskripsi TEXT,
+        biaya NUMERIC NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'queued', -- queued | ready | posted | failed | skipped | expired (§7.5)
+        bukti_url TEXT, diposting_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT now()
+      )`);
+      await query(`CREATE TABLE IF NOT EXISTS mj_orang (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        hp_hash TEXT UNIQUE NOT NULL,
+        nama TEXT, no_hp TEXT, email TEXT, domisili TEXT,
+        kode_ref TEXT UNIQUE NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT now()
+      )`);
+      await query(`CREATE TABLE IF NOT EXISTS mj_lamaran (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        nomor BIGSERIAL,
+        orang_id UUID NOT NULL REFERENCES mj_orang(id),
+        status TEXT NOT NULL DEFAULT 'new',
+        status_sejak TIMESTAMPTZ NOT NULL DEFAULT now(),
+        -- Sumber nempel di LAMARAN, bukan di orang (§7.3) - retry nggak nimpa riwayat.
+        sumber_kode TEXT, sumber_titik_id UUID REFERENCES mj_rek_titik(id) ON DELETE SET NULL,
+        sumber_dropdown TEXT, keyakinan TEXT NOT NULL DEFAULT 'unknown', -- tinggi | rendah | unknown
+        referrer_orang_id UUID REFERENCES mj_orang(id),
+        alasan_keluar TEXT,
+        terakhir_followup TIMESTAMPTZ, terakhir_respon TIMESTAMPTZ,
+        closing_mulai TIMESTAMPTZ,
+        dibuat_oleh TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT now()
+      )`);
+      await query('CREATE INDEX IF NOT EXISTS idx_mj_lamaran_orang ON mj_lamaran (orang_id, created_at DESC)');
+      // Satu orang cuma boleh punya satu lamaran yang lagi jalan.
+      await query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_mj_lamaran_aktif ON mj_lamaran (orang_id)
+        WHERE status NOT IN ('hired','rejected','withdrawn','no_response','on_hold','talent_pool')`);
+      await query(`CREATE TABLE IF NOT EXISTS mj_rek_attempt (
+        id BIGSERIAL PRIMARY KEY,
+        lamaran_id UUID NOT NULL REFERENCES mj_lamaran(id) ON DELETE CASCADE,
+        tahap TEXT NOT NULL,
+        hasil TEXT NOT NULL, -- lulus | gagal | dijadwalkan | berjalan
+        data JSONB, catatan TEXT, pewawancara TEXT, jadwal TIMESTAMPTZ,
+        aktor TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT now()
+      )`);
+      // Semua peristiwa (ganti status, follow-up, catatan, keputusan) - aktor, waktu, nilai lama/baru, alasan (§23).
+      await query(`CREATE TABLE IF NOT EXISTS mj_lamaran_event (
+        id BIGSERIAL PRIMARY KEY,
+        lamaran_id UUID NOT NULL REFERENCES mj_lamaran(id) ON DELETE CASCADE,
+        jenis TEXT NOT NULL, dari TEXT, ke TEXT, isi TEXT,
+        aktor TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT now()
+      )`);
+    })().catch((e) => {
+      siap = null;
+      throw e;
+    });
+  }
+  return siap;
+}
+
+const kodeRefBaru = () => 'REF-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+
+async function catatEvent(c, lamaranId, jenis, { dari = null, ke = null, isi = null }, aktor) {
+  await c.query('INSERT INTO mj_lamaran_event (lamaran_id, jenis, dari, ke, isi, aktor) VALUES ($1,$2,$3,$4,$5,$6)', [lamaranId, jenis, dari, ke, isi, aktor]);
+}
+
+async function transaksi(fn) {
+  const c = await pool.connect();
+  try {
+    await c.query('BEGIN');
+    const r = await fn(c);
+    await c.query('COMMIT');
+    return r;
+  } catch (e) {
+    await c.query('ROLLBACK');
+    throw e;
+  } finally {
+    c.release();
+  }
+}
+
+// Bikin lamaran baru (dari form publik atau input recruiter). Orang dikenali dari hash nomor HP (D-35/D-59).
+async function buatLamaran({ nama, noHp, email, domisili, s, dropdown, referral }, aktor) {
+  const hp = normalisasiNoHp(noHp || '');
+  if (!teks(nama, 80)) throw salah('Nama wajib diisi');
+  if (!hp) throw salah('Nomor HP nggak valid. Contoh: 0812-3456-7890');
+  // Rantai sumber (§7.3): ?s= (tinggi) -> kode referral (tinggi) -> dropdown (rendah) -> unknown.
+  let titik = null;
+  const kode = teks(s, 30).toUpperCase();
+  if (kode) {
+    const { rows } = await query('SELECT id, kode FROM mj_rek_titik WHERE kode=$1', [kode]);
+    titik = rows[0] || null;
+  }
+  let referrer = null;
+  const ref = teks(referral, 20).toUpperCase();
+  if (ref) {
+    const { rows } = await query('SELECT id, hp_hash FROM mj_orang WHERE kode_ref=$1', [ref]);
+    if (!rows.length) throw salah('Kode referral nggak dikenal');
+    if (rows[0].hp_hash === hashHp(hp)) throw salah('Nggak bisa mereferensikan diri sendiri');
+    referrer = rows[0];
+  }
+  const pilihan = DROPDOWN_SUMBER.includes(dropdown) ? dropdown : null;
+  const keyakinan = titik || referrer ? 'tinggi' : pilihan ? 'rendah' : 'unknown';
+
+  return transaksi(async (c) => {
+    const h = hashHp(hp);
+    let { rows: o } = await c.query('SELECT * FROM mj_orang WHERE hp_hash=$1 FOR UPDATE', [h]);
+    if (!o.length) {
+      ({ rows: o } = await c.query(
+        'INSERT INTO mj_orang (hp_hash, nama, no_hp, email, domisili, kode_ref) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *',
+        [h, teks(nama, 80), hp, teks(email, 120) || null, teks(domisili, 80) || null, kodeRefBaru()]
+      ));
+    } else {
+      await c.query('UPDATE mj_orang SET nama=$2, no_hp=$3, email=COALESCE($4,email), domisili=COALESCE($5,domisili) WHERE id=$1', [
+        o[0].id,
+        teks(nama, 80),
+        hp,
+        teks(email, 120) || null,
+        teks(domisili, 80) || null,
+      ]);
+    }
+    const orang = o[0];
+    const { rows: aktif } = await c.query(
+      `SELECT id, status FROM mj_lamaran WHERE orang_id=$1 AND status NOT IN ('rejected','withdrawn','no_response','on_hold','talent_pool')`,
+      [orang.id]
+    );
+    if (aktif.some((a) => a.status === 'hired')) throw salah('Orang ini udah jadi Sales Partner. Sales yang masih aktif nggak bisa daftar lagi (D-34).', 409);
+    if (aktif.length) throw salah('Orang ini masih punya lamaran yang lagi jalan.', 409);
+    if (referrer && referrer.id === orang.id) throw salah('Nggak bisa mereferensikan diri sendiri');
+    const { rows: l } = await c.query(
+      `INSERT INTO mj_lamaran (orang_id, sumber_kode, sumber_titik_id, sumber_dropdown, keyakinan, referrer_orang_id, dibuat_oleh)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [orang.id, titik?.kode || (kode || null), titik?.id || null, pilihan, keyakinan, referrer?.id || null, aktor]
+    );
+    await catatEvent(c, l[0].id, 'status', { ke: 'new', isi: `Lamaran masuk (sumber: ${titik?.kode || (referrer ? 'referral ' + ref : pilihan || 'tidak diketahui')})` }, aktor);
+    return { lamaran: l[0], orang };
+  });
+}
+
+// ---------------- Form daftar publik (tanpa login) ----------------
+export const publikRouter = Router();
+const daftarLimiter = rateLimit({ windowMs: 60 * 60 * 1000, limit: 20, standardHeaders: true, legacyHeaders: false, message: { error: 'Terlalu banyak percobaan. Coba lagi nanti.' } });
+
+publikRouter.get('/daftar/info', async (req, res, next) => {
+  try {
+    await pastikanTabelRekrutmen();
+    const kode = teks(req.query.s, 30).toUpperCase();
+    let kampanye = null;
+    if (kode) {
+      const { rows } = await query('SELECT k.nama, k.area FROM mj_rek_titik t JOIN mj_rek_kampanye k ON k.id=t.kampanye_id WHERE t.kode=$1', [kode]);
+      kampanye = rows[0] || null;
+    }
+    res.json({ kampanye, pilihanSumber: DROPDOWN_SUMBER });
+  } catch (e) {
+    next(e);
+  }
+});
+
+publikRouter.post('/daftar', daftarLimiter, async (req, res, next) => {
+  try {
+    await pastikanTabelRekrutmen();
+    const b = req.body || {};
+    // "Tahu dari mana" wajib kalau nggak datang lewat link berkode / referral (§7.3).
+    if (!teks(b.s, 30) && !teks(b.referral, 20) && !DROPDOWN_SUMBER.includes(b.dropdown)) {
+      return res.status(400).json({ error: 'Pilih dulu tahu Konsulin dari mana' });
+    }
+    await buatLamaran(b, 'form daftar');
+    res.status(201).json({ ok: true });
+  } catch (e) {
+    if (e.status === 409) return res.status(409).json({ error: 'Nomor ini udah terdaftar dan lagi diproses. Tim kami bakal ngehubungin kamu.' });
+    next(e);
+  }
+});
+
+// ---------------- Admin ----------------
+const router = Router();
+router.use(async (req, res, next) => {
+  try {
+    await pastikanTabelRekrutmen();
+    next();
+  } catch (e) {
+    next(e);
+  }
+});
+
+// D-32: 3 hari setelah di-follow-up nggak ada respons -> NO_RESPONSE, dijalanin sistem tiap kali data dibaca.
+async function tandaiNoResponse() {
+  const { rows } = await query(
+    `UPDATE mj_lamaran SET status='no_response', status_sejak=now(), alasan_keluar='Nggak membalas ${HARI_NO_RESPONSE} hari setelah di-follow-up (D-32)'
+     WHERE status NOT IN ('hired','rejected','withdrawn','no_response','on_hold','talent_pool')
+       AND terakhir_followup IS NOT NULL AND terakhir_followup < now() - interval '${HARI_NO_RESPONSE} days'
+       AND (terakhir_respon IS NULL OR terakhir_respon < terakhir_followup)
+     RETURNING id`
+  );
+  for (const r of rows) await query("INSERT INTO mj_lamaran_event (lamaran_id, jenis, ke, isi, aktor) VALUES ($1,'status','no_response',$2,'sistem')", [r.id, `Otomatis: nggak membalas ${HARI_NO_RESPONSE} hari (D-32)`]);
+}
+
+const KOLOM_LAMARAN = `l.*, 'KD-' || lpad(l.nomor::text, 4, '0') AS kode, o.nama, o.no_hp, o.email, o.domisili, o.kode_ref,
+  t.kanal AS sumber_kanal, k.nama AS kampanye_nama, ro.nama AS referrer_nama,
+  (SELECT count(*)::int FROM mj_lamaran l2 WHERE l2.orang_id = l.orang_id) AS jumlah_lamaran,
+  (SELECT row_to_json(a) FROM (SELECT hasil, jadwal, pewawancara, created_at FROM mj_rek_attempt a WHERE a.lamaran_id=l.id AND a.tahap=l.status ORDER BY a.id DESC LIMIT 1) a) AS attempt_terakhir`;
+const JOIN_LAMARAN = `FROM mj_lamaran l JOIN mj_orang o ON o.id = l.orang_id
+  LEFT JOIN mj_rek_titik t ON t.id = l.sumber_titik_id LEFT JOIN mj_rek_kampanye k ON k.id = t.kampanye_id
+  LEFT JOIN mj_orang ro ON ro.id = l.referrer_orang_id`;
+
+router.get('/rekrutmen/ringkasan', async (req, res, next) => {
+  try {
+    await tandaiNoResponse();
+    const [{ rows: status }, { rows: minggu }, { rows: jadwal }, { rows: waktu }, { rows: perluFu }] = await Promise.all([
+      query('SELECT status, count(*)::int AS n FROM mj_lamaran GROUP BY status'),
+      query(`SELECT count(*)::int AS n FROM mj_lamaran WHERE created_at >= now() - interval '7 days'`),
+      query(
+        `SELECT a.jadwal, a.pewawancara, o.nama, l.id AS lamaran_id FROM mj_rek_attempt a JOIN mj_lamaran l ON l.id=a.lamaran_id JOIN mj_orang o ON o.id=l.orang_id
+         WHERE a.hasil='dijadwalkan' AND l.status='interview' AND a.jadwal >= now() - interval '2 hours'
+           AND NOT EXISTS (SELECT 1 FROM mj_rek_attempt b WHERE b.lamaran_id=a.lamaran_id AND b.tahap='interview' AND b.id > a.id)
+         ORDER BY a.jadwal LIMIT 1`
+      ),
+      query(`SELECT round(avg(EXTRACT(EPOCH FROM (status_sejak - created_at)) / 86400))::int AS hari, count(*)::int AS n FROM mj_lamaran WHERE status='hired'`),
+      query(
+        `SELECT count(*)::int AS n FROM mj_lamaran WHERE status NOT IN ('hired','rejected','withdrawn','no_response','on_hold','talent_pool')
+         AND COALESCE(terakhir_followup, created_at) < now() - interval '2 days'`
+      ),
+    ]);
+    const per = Object.fromEntries(status.map((r) => [r.status, r.n]));
+    res.json({
+      perStatus: per,
+      aktif: TAHAP.filter((t) => t !== 'hired').reduce((a, t) => a + (per[t] || 0), 0),
+      mingguIni: minggu[0].n,
+      jadwalTerdekat: jadwal[0] || null,
+      rataHariHired: waktu[0].n ? waktu[0].hari : null,
+      jumlahHired: per.hired || 0,
+      perluFollowup: perluFu[0].n,
+      pilihanSumber: DROPDOWN_SUMBER,
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.get('/rekrutmen/lamaran', async (req, res, next) => {
+  try {
+    await tandaiNoResponse();
+    const mode = req.query.mode === 'arsip' ? 'arsip' : 'aktif';
+    const q = teks(req.query.q, 60);
+    const pola = q ? '%' + q.replace(/[\\%_]/g, (c) => '\\' + c) + '%' : null;
+    const { rows } = await query(
+      `SELECT ${KOLOM_LAMARAN} ${JOIN_LAMARAN}
+       WHERE ${mode === 'arsip' ? `l.status IN ('rejected','withdrawn','no_response','on_hold','talent_pool','hired')` : `l.status NOT IN ('rejected','withdrawn','no_response','on_hold','talent_pool','hired')`}
+         AND ($1::text IS NULL OR o.nama ILIKE $1 OR o.no_hp ILIKE $1 OR l.sumber_kode ILIKE $1)
+       ORDER BY l.status_sejak DESC LIMIT 500`,
+      [pola]
+    );
+    res.json(rows);
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post('/rekrutmen/lamaran', async (req, res, next) => {
+  try {
+    const r = await buatLamaran(req.body || {}, req.admin.nama);
+    await catatLog(req, 'rekrutmen.lamaran.tambah', { nama: r.orang.nama, sumber: r.lamaran.sumber_kode || r.lamaran.sumber_dropdown || '-' });
+    res.status(201).json(r.lamaran);
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.get('/rekrutmen/lamaran/:id', async (req, res, next) => {
+  try {
+    if (!POLA_UUID.test(req.params.id)) return res.status(404).json({ error: 'Lamaran tidak ditemukan' });
+    const { rows } = await query(`SELECT ${KOLOM_LAMARAN} ${JOIN_LAMARAN} WHERE l.id=$1`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: 'Lamaran tidak ditemukan' });
+    const l = rows[0];
+    const [{ rows: attempt }, { rows: event }, { rows: riwayat }] = await Promise.all([
+      query('SELECT * FROM mj_rek_attempt WHERE lamaran_id=$1 ORDER BY id DESC', [l.id]),
+      query('SELECT * FROM mj_lamaran_event WHERE lamaran_id=$1 ORDER BY id DESC', [l.id]),
+      query(`SELECT id, 'KD-' || lpad(nomor::text, 4, '0') AS kode, status, created_at, status_sejak, sumber_kode, alasan_keluar FROM mj_lamaran WHERE orang_id=$1 AND id<>$2 ORDER BY created_at DESC`, [
+        l.orang_id,
+        l.id,
+      ]),
+    ]);
+    res.json({ lamaran: l, attempt, event, riwayat, hariNoResponse: HARI_NO_RESPONSE, hariClosing: HARI_CLOSING_TEST });
+  } catch (e) {
+    next(e);
+  }
+});
+
+async function ambilLamaran(c, id) {
+  if (!POLA_UUID.test(id)) throw salah('Lamaran tidak ditemukan', 404);
+  const { rows } = await c.query('SELECT l.*, o.nama FROM mj_lamaran l JOIN mj_orang o ON o.id=l.orang_id WHERE l.id=$1 FOR UPDATE OF l', [id]);
+  if (!rows.length) throw salah('Lamaran tidak ditemukan', 404);
+  return rows[0];
+}
+
+async function ganti(c, l, ke, isi, aktor, ekstra = '') {
+  await c.query(`UPDATE mj_lamaran SET status=$2, status_sejak=now()${ekstra} WHERE id=$1`, [l.id, ke]);
+  await catatEvent(c, l.id, 'status', { dari: l.status, ke, isi }, aktor);
+}
+
+// Maju satu tahap (tahap tanpa tes): new -> screening -> screening_passed -> product_test. Nggak boleh lompat (§8.2).
+router.post('/rekrutmen/lamaran/:id/maju', async (req, res, next) => {
+  try {
+    const hasil = await transaksi(async (c) => {
+      const l = await ambilLamaran(c, req.params.id);
+      const i = TAHAP.indexOf(l.status);
+      if (i < 0 || TAHAP_DENGAN_TES.includes(l.status) || l.status === 'hired') throw salah('Tahap ini majunya lewat hasil tes, bukan tombol maju');
+      const ke = TAHAP[i + 1];
+      await ganti(c, l, ke, teks(req.body.catatan, 300) || null, req.admin.nama);
+      return { nama: l.nama, dari: l.status, ke };
+    });
+    await catatLog(req, 'rekrutmen.lamaran.maju', hasil);
+    res.json({ ok: true, ke: hasil.ke });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Catat attempt di tahap bertes. Aturan lulus (D-33):
+//  product_test  : 5 soal benar semua + setuju bagi hasil
+//  interview     : keputusan manusia (lulus/gagal) + pewawancara + alasan; bisa dijadwalkan dulu
+//  field_test_24h: 3 warung dikunjungi + laporan terkirim
+//  closing_test  : 3 warung jadi customer, maksimal 6 hari sejak closing test dimulai
+router.post('/rekrutmen/lamaran/:id/attempt', async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const hasil = await transaksi(async (c) => {
+      const l = await ambilLamaran(c, req.params.id);
+      if (!TAHAP_DENGAN_TES.includes(l.status)) throw salah('Tahap ini nggak punya tes');
+      let lulus;
+      let data = null;
+      let catatan = teks(b.catatan, 1000) || null;
+      let pewawancara = null;
+      let jadwal = null;
+      if (l.status === 'product_test') {
+        const benar = Math.max(0, Math.min(5, Math.floor(Number(b.benar))));
+        if (!Number.isFinite(benar)) throw salah('Isi jumlah jawaban benar (0-5)');
+        data = { benar, dari: 5, setujuBagiHasil: !!b.setujuBagiHasil };
+        lulus = benar === 5 && !!b.setujuBagiHasil;
+      } else if (l.status === 'interview') {
+        pewawancara = teks(b.pewawancara, 80);
+        if (!pewawancara) throw salah('Isi nama pewawancara');
+        if (b.jadwalkan) {
+          jadwal = new Date(b.jadwal);
+          if (Number.isNaN(jadwal.getTime())) throw salah('Isi jadwal interview');
+          await c.query('INSERT INTO mj_rek_attempt (lamaran_id, tahap, hasil, pewawancara, jadwal, catatan, aktor) VALUES ($1,$2,$3,$4,$5,$6,$7)', [
+            l.id, 'interview', 'dijadwalkan', pewawancara, jadwal, catatan, req.admin.nama,
+          ]);
+          await catatEvent(c, l.id, 'jadwal', { isi: `Interview dijadwalkan ${jadwal.toISOString()} dengan ${pewawancara}` }, req.admin.nama);
+          return { nama: l.nama, tahap: l.status, hasil: 'dijadwalkan' };
+        }
+        if (!['lulus', 'gagal'].includes(b.hasil)) throw salah('Pilih hasil interview: lulus atau gagal');
+        if (!teks(b.alasan, 500)) throw salah('Alasan keputusan interview wajib diisi');
+        lulus = b.hasil === 'lulus';
+        data = { alasan: teks(b.alasan, 500) };
+      } else if (l.status === 'field_test_24h') {
+        const warung = Math.max(0, Math.floor(Number(b.warung) || 0));
+        data = { warung, laporan: !!b.laporan };
+        lulus = warung >= 3 && !!b.laporan;
+      } else if (l.status === 'closing_test') {
+        const customer = Math.max(0, Math.floor(Number(b.customer) || 0));
+        const mulai = l.closing_mulai || l.status_sejak;
+        const hari = (Date.now() - new Date(mulai).getTime()) / 86400000;
+        data = { customer, hariBerjalan: Math.round(hari * 10) / 10 };
+        if (customer >= 3) lulus = hari <= HARI_CLOSING_TEST;
+        else if (hari > HARI_CLOSING_TEST) lulus = false;
+        else throw salah(`Baru ${customer} customer. Closing test masih jalan (${Math.floor(hari)} dari ${HARI_CLOSING_TEST} hari) - catat lagi pas udah 3 atau pas tenggat lewat.`);
+      }
+      await c.query('INSERT INTO mj_rek_attempt (lamaran_id, tahap, hasil, data, catatan, pewawancara, aktor) VALUES ($1,$2,$3,$4,$5,$6,$7)', [
+        l.id, l.status, lulus ? 'lulus' : 'gagal', JSON.stringify(data), catatan, pewawancara, req.admin.nama,
+      ]);
+      await catatEvent(c, l.id, 'attempt', { dari: l.status, ke: lulus ? 'lulus' : 'gagal', isi: JSON.stringify(data) }, req.admin.nama);
+      // Lulus -> maju ke tahap berikutnya. Closing test yang lulus nunggu keputusan hiring (peristiwa, bukan status).
+      if (lulus && l.status !== 'closing_test') {
+        const ke = TAHAP[TAHAP.indexOf(l.status) + 1];
+        await ganti(c, l, ke, 'Lulus ' + l.status, req.admin.nama, ke === 'closing_test' ? ', closing_mulai=now()' : '');
+      }
+      return { nama: l.nama, tahap: l.status, hasil: lulus ? 'lulus' : 'gagal' };
+    });
+    await catatLog(req, 'rekrutmen.attempt', hasil);
+    res.json({ ok: true, ...hasil });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Keputusan hiring (§8.2): peristiwa manusia dengan pembuat, tanggal, keputusan, alasan. Cuma setelah Closing Test lulus.
+router.post('/rekrutmen/lamaran/:id/keputusan', async (req, res, next) => {
+  try {
+    const keputusan = req.body.keputusan;
+    const alasan = teks(req.body.alasan, 500);
+    if (!['terima', 'tolak'].includes(keputusan)) throw salah('Pilih terima atau tolak');
+    if (!alasan) throw salah('Alasan keputusan wajib diisi');
+    const hasil = await transaksi(async (c) => {
+      const l = await ambilLamaran(c, req.params.id);
+      if (l.status !== 'closing_test') throw salah('Keputusan hiring cuma bisa setelah Closing Test');
+      const { rows } = await c.query("SELECT 1 FROM mj_rek_attempt WHERE lamaran_id=$1 AND tahap='closing_test' AND hasil='lulus' LIMIT 1", [l.id]);
+      if (!rows.length) throw salah('Closing Test belum lulus');
+      await catatEvent(c, l.id, 'keputusan', { ke: keputusan, isi: alasan }, req.admin.nama);
+      if (keputusan === 'terima') await ganti(c, l, 'hired', 'Diterima: ' + alasan, req.admin.nama);
+      else {
+        await c.query('UPDATE mj_lamaran SET alasan_keluar=$2 WHERE id=$1', [l.id, alasan]);
+        await ganti(c, l, 'rejected', 'Ditolak setelah Closing Test: ' + alasan, req.admin.nama);
+      }
+      return { nama: l.nama, keputusan, alasan };
+    });
+    await catatLog(req, 'rekrutmen.keputusan_hiring', hasil);
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post('/rekrutmen/lamaran/:id/keluar', async (req, res, next) => {
+  try {
+    const ke = req.body.status;
+    const alasan = teks(req.body.alasan, 500);
+    if (!KELUAR.includes(ke)) throw salah('Status keluar nggak dikenal');
+    if (!alasan) throw salah('Alasan wajib diisi');
+    const hasil = await transaksi(async (c) => {
+      const l = await ambilLamaran(c, req.params.id);
+      if (KELUAR.includes(l.status) || l.status === 'hired') throw salah('Lamaran ini udah selesai');
+      await c.query('UPDATE mj_lamaran SET alasan_keluar=$2 WHERE id=$1', [l.id, alasan]);
+      await ganti(c, l, ke, alasan, req.admin.nama);
+      return { nama: l.nama, dari: l.status, ke, alasan };
+    });
+    await catatLog(req, 'rekrutmen.lamaran.keluar', hasil);
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// D-31: balik dari no_response / on_hold (atau retry setelah ditolak, D-30) = LAMARAN BARU dari NEW; hasil lama nggak berlaku.
+router.post('/rekrutmen/lamaran/:id/lamar-ulang', async (req, res, next) => {
+  try {
+    if (!POLA_UUID.test(req.params.id)) throw salah('Lamaran tidak ditemukan', 404);
+    const { rows } = await query('SELECT l.*, o.nama, o.no_hp FROM mj_lamaran l JOIN mj_orang o ON o.id=l.orang_id WHERE l.id=$1', [req.params.id]);
+    if (!rows.length) throw salah('Lamaran tidak ditemukan', 404);
+    if (!KELUAR.includes(rows[0].status)) throw salah('Cuma lamaran yang udah keluar yang bisa dilamar ulang');
+    const r = await buatLamaran({ nama: rows[0].nama, noHp: rows[0].no_hp, s: req.body.s, dropdown: req.body.dropdown }, req.admin.nama);
+    await catatLog(req, 'rekrutmen.lamaran.ulang', { nama: rows[0].nama });
+    res.status(201).json(r.lamaran);
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Follow-up manual di luar sistem (D-74/D-79) - satu tombol dengan timestamp otomatis (§21). "Membalas" ngereset hitungan D-32.
+router.post('/rekrutmen/lamaran/:id/followup', async (req, res, next) => {
+  try {
+    const jenis = req.body.jenis === 'respon' ? 'respon' : 'followup';
+    await transaksi(async (c) => {
+      const l = await ambilLamaran(c, req.params.id);
+      if (KELUAR.includes(l.status) || l.status === 'hired') throw salah('Lamaran ini udah selesai');
+      await c.query(`UPDATE mj_lamaran SET ${jenis === 'respon' ? 'terakhir_respon' : 'terakhir_followup'}=now() WHERE id=$1`, [l.id]);
+      await catatEvent(c, l.id, jenis, { isi: teks(req.body.catatan, 300) || (jenis === 'respon' ? 'Kandidat membalas' : 'Sudah di-follow-up') }, req.admin.nama);
+    });
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post('/rekrutmen/lamaran/:id/catatan', async (req, res, next) => {
+  try {
+    const isi = teks(req.body.isi, 1000);
+    if (!isi) throw salah('Catatannya diisi dulu');
+    await transaksi(async (c) => {
+      const l = await ambilLamaran(c, req.params.id);
+      await catatEvent(c, l.id, 'catatan', { isi }, req.admin.nama);
+    });
+    res.status(201).json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ---------------- Kampanye & titik sebar ----------------
+router.get('/rekrutmen/kampanye', async (req, res, next) => {
+  try {
+    const { rows: kampanye } = await query('SELECT *, biaya::float AS biaya FROM mj_rek_kampanye WHERE NOT arsip ORDER BY created_at DESC');
+    // Funnel per titik. "Menemukan" = titik di lamaran PERTAMA orang itu; "Mengonversi" = titik di lamaran yang HIRED (D-71).
+    const { rows: titik } = await query(
+      `SELECT t.*, t.biaya::float AS biaya,
+              count(l.id)::int AS pelamar,
+              count(l.id) FILTER (WHERE l.status NOT IN ('new'))::int AS lewat_new,
+              count(l.id) FILTER (WHERE l.status IN ('interview','field_test_24h','closing_test','hired'))::int AS sampai_interview,
+              count(l.id) FILTER (WHERE l.status IN ('closing_test','hired'))::int AS sampai_closing,
+              count(l.id) FILTER (WHERE l.status = 'hired')::int AS diterima,
+              count(l.id) FILTER (WHERE l.id = (SELECT l2.id FROM mj_lamaran l2 WHERE l2.orang_id = l.orang_id ORDER BY l2.created_at LIMIT 1))::int AS menemukan
+       FROM mj_rek_titik t LEFT JOIN mj_lamaran l ON l.sumber_titik_id = t.id
+       GROUP BY t.id ORDER BY t.created_at`
+    );
+    const { rows: rendah } = await query(
+      `SELECT COALESCE(sumber_dropdown, 'Tidak diketahui') AS sumber, keyakinan, count(*)::int AS pelamar, count(*) FILTER (WHERE status='hired')::int AS diterima
+       FROM mj_lamaran WHERE keyakinan <> 'tinggi' GROUP BY 1, 2 ORDER BY pelamar DESC`
+    );
+    const { rows: referral } = await query(
+      `SELECT count(*)::int AS pelamar, count(*) FILTER (WHERE status='hired')::int AS diterima FROM mj_lamaran WHERE referrer_orang_id IS NOT NULL`
+    );
+    res.json({ kampanye, titik, rendah, referral: referral[0], kanal: KANAL });
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post('/rekrutmen/kampanye', async (req, res, next) => {
+  try {
+    const nama = teks(req.body.nama, 100);
+    if (!nama) throw salah('Nama kampanye wajib diisi');
+    const biaya = Math.max(0, Math.round(Number(req.body.biaya) || 0));
+    const tgl = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(v || '') ? v : null);
+    const { rows } = await query('INSERT INTO mj_rek_kampanye (nama, area, mulai, selesai, biaya, catatan) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *', [
+      nama, teks(req.body.area, 60) || null, tgl(req.body.mulai), tgl(req.body.selesai), biaya, teks(req.body.catatan, 300) || null,
+    ]);
+    await catatLog(req, 'rekrutmen.kampanye.tambah', { nama, biaya });
+    res.status(201).json(rows[0]);
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Titik sebar baru: kode dibikin otomatis KANAL-AREA-NNN (mis. FB-KRW-001), atau diisi sendiri.
+router.post('/rekrutmen/kampanye/:id/titik', async (req, res, next) => {
+  try {
+    if (!POLA_UUID.test(req.params.id)) throw salah('Kampanye tidak ditemukan', 404);
+    const kanal = KANAL[req.body.kanal] ? req.body.kanal : 'LAIN';
+    const area = teks(req.body.area, 6).toUpperCase().replace(/[^A-Z]/g, '') || 'UMUM';
+    let kode = teks(req.body.kode, 30).toUpperCase().replace(/[^A-Z0-9-]/g, '');
+    if (!kode) {
+      const { rows } = await query("SELECT count(*)::int AS n FROM mj_rek_titik WHERE kode LIKE $1", [`${kanal}-${area}-%`]);
+      kode = `${kanal}-${area}-${String(rows[0].n + 1).padStart(3, '0')}`;
+    }
+    const { rows } = await query(
+      'INSERT INTO mj_rek_titik (kampanye_id, kode, kanal, deskripsi, biaya) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (kode) DO NOTHING RETURNING *',
+      [req.params.id, kode, kanal, teks(req.body.deskripsi, 200) || null, Math.max(0, Math.round(Number(req.body.biaya) || 0))]
+    );
+    if (!rows.length) throw salah(`Kode ${kode} udah dipakai`, 409);
+    await catatLog(req, 'rekrutmen.titik.tambah', { kode });
+    res.status(201).json(rows[0]);
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Status posting (§7.5). POSTED wajib ada bukti URL - kalau nggak, metrik distribusinya nggak bisa dipercaya.
+router.patch('/rekrutmen/titik/:id', async (req, res, next) => {
+  try {
+    if (!POLA_UUID.test(req.params.id)) throw salah('Titik tidak ditemukan', 404);
+    const status = ['queued', 'ready', 'posted', 'failed', 'skipped', 'expired'].includes(req.body.status) ? req.body.status : null;
+    if (!status) throw salah('Status nggak dikenal');
+    const bukti = teks(req.body.bukti_url, 500);
+    if (status === 'posted' && !/^https?:\/\/\S+$/.test(bukti)) throw salah('Status POSTED wajib ada bukti URL postingan');
+    const { rows } = await query(
+      `UPDATE mj_rek_titik SET status=$2, bukti_url=COALESCE($3, bukti_url), diposting_at = CASE WHEN $2='posted' THEN now() ELSE diposting_at END WHERE id=$1 RETURNING kode`,
+      [req.params.id, status, bukti || null]
+    );
+    if (!rows.length) throw salah('Titik tidak ditemukan', 404);
+    await catatLog(req, 'rekrutmen.titik.status', { kode: rows[0].kode, status });
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+export default router;

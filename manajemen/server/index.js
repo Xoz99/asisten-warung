@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import { authRouter, requireAdmin } from './auth.js';
 import adminRoutes from './admin.routes.js';
 import opsRoutes from './ops.routes.js';
+import rekrutmenRoutes, { publikRouter } from './rekrutmen.routes.js';
 import { PRODUK } from './produk/index.js';
 
 // Server aplikasi manajemen Konsulin: API /api/* (wajib login admin, lihat auth.js) + nyajiin hasil build tampilannya (dist/).
@@ -24,9 +25,12 @@ app.use(express.json({ limit: '100kb' }));
 app.get('/health', (req, res) => res.json({ ok: true }));
 
 app.use('/api/auth', authRouter);
+// Form daftar calon Sales Partner - publik (tanpa login), dibatasi rate limit (lihat rekrutmen.routes.js).
+app.use('/api/publik', publikRouter);
 app.use('/api', requireAdmin);
 app.use('/api', adminRoutes);
 app.use('/api', opsRoutes);
+app.use('/api', rekrutmenRoutes);
 app.get('/api/produk', (req, res) => {
   res.json(PRODUK.filter((p) => p.aktif).map(({ id, nama, url }) => ({ id, nama, url })));
 });
