@@ -265,7 +265,12 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
 .adm-inspector-laci{position:fixed;top:0;right:0;bottom:0;width:min(420px,100%);z-index:20;box-shadow:-6px 0 0 var(--hitam)}
 .adm-inspector-laci .adm-inspector{position:static;max-height:100vh;height:100%;box-shadow:none}
 .adm-unggah{display:flex;flex-direction:column;align-items:center;gap:4px;border:3px dashed var(--hitam);padding:22px;margin-top:12px;cursor:pointer;text-align:center}
-.adm-unggah input{font-size:13px;margin-bottom:6px}
+/* Input file asli disembunyiin (tetap bisa di-Tab & diklik lewat label-nya) - tombol bawaan browser nggak nyambung sama gaya. */
+.adm-unggah{position:relative}
+.adm-unggah input{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
+.adm-unggah:focus-within{outline:3px solid var(--biru);outline-offset:2px}
+.adm-unggah b{display:inline-block;border:var(--garis-tipis);background:var(--kuning);padding:8px 14px;text-transform:uppercase;letter-spacing:.05em;font-size:12px;box-shadow:3px 3px 0 var(--hitam)}
+.adm-unggah span{display:block;margin-top:6px}
 @media (max-width:1280px){
   .adm-crm-tahap{grid-template-columns:repeat(3,minmax(0,1fr))}
   .adm-crm-kartu{border-bottom:var(--garis)}
@@ -291,3 +296,22 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
 .adm-tahapan li.sekarang{background:var(--kuning);box-shadow:3px 3px 0 var(--hitam)}
 .adm-tahapan li.sekarang span{background:var(--hitam);color:var(--kuning)}
 .adm-tahapan li.sekarang em{color:var(--tinta)}
+
+/* ---------- Form lamaran publik & data lamaran ---------- */
+.adm-langkah{list-style:none;margin:16px 0 4px;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:var(--garis)}
+.adm-langkah li{display:flex;align-items:center;gap:8px;padding:10px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:var(--putih)}
+.adm-langkah li+li{border-left:var(--garis-tipis)}
+.adm-langkah li span{width:24px;height:24px;flex:none;display:grid;place-items:center;border:2px solid var(--hitam);font-size:12px}
+.adm-langkah li.on{background:var(--kuning)}
+.adm-langkah li.on span{background:var(--hitam);color:var(--kuning)}
+.adm-langkah li.lewat span{background:var(--hijau)}
+.adm-setuju{display:flex;gap:10px;align-items:flex-start;margin-top:14px;font-size:14px;cursor:pointer}
+.adm-setuju .adm-centang{margin-top:2px;flex:none}
+.adm-jawaban{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px;margin:0}
+.adm-jawaban dt{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--redup)}
+.adm-jawaban dd{margin:2px 0 0;font-weight:500;overflow-wrap:anywhere}
+@media (max-width:560px){
+  .adm-langkah{grid-template-columns:minmax(0,1fr)}
+  .adm-langkah li+li{border-left:0;border-top:var(--garis-tipis)}
+  .adm-jawaban{grid-template-columns:minmax(0,1fr)}
+}

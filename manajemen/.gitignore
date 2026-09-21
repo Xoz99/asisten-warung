@@ -2,3 +2,5 @@ node_modules/
 dist/
 .env*
 !.env.example
+# CV & foto pelamar (lihat DOKUMEN_DIR) - data pribadi, jangan masuk git
+data/

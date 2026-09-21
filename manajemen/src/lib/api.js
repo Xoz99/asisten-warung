@@ -39,3 +39,19 @@ export async function panggil(token, method, path, body) {
   if (!res.ok) throw Object.assign(new Error(data?.error || `Gagal (${res.status})`), { status: res.status });
   return data;
 }
+
+// Buka file yang butuh login (CV/foto pelamar) di tab baru. Nggak bisa pakai <a href> biasa karena token-nya di header.
+export async function bukaFile(path) {
+  const token = bacaSesi()?.token;
+  const tab = window.open('', '_blank');
+  const res = await fetch('/api' + path, { headers: token ? { Authorization: 'Bearer ' + token } : {} });
+  if (!res.ok) {
+    tab?.close();
+    const d = await res.json().catch(() => null);
+    throw new Error(d?.error || `Gagal membuka file (${res.status})`);
+  }
+  const url = URL.createObjectURL(await res.blob());
+  if (tab) tab.location.href = url;
+  else window.location.href = url;
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}

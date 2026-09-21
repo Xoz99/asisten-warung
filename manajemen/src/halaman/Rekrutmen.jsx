@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { rupiah, tampilHp, tgl, waktu, waktuRelatif } from '../lib/format.js';
 import { Gagal, Kosong, Memuat, Modal, Tabs, useData } from '../komponen/Ui.jsx';
+import { bukaFile } from '../lib/api.js';
 
 // Rekrutmen Sales Partner (PRD v0.2 §7-10). Tahap nggak boleh dilompati; tahap bertes majunya lewat hasil tes.
 export const TAHAP = [
@@ -297,6 +298,8 @@ function Detail({ api, id, onTutup, onBerubah, onBuka }) {
               </p>
             </div>
 
+            <DataLamaran jawaban={l.jawaban} label={d.label} dokumen={d.dokumen} onError={setError} />
+
             <h4 className="adm-label" style={{ fontSize: 11, margin: '16px 0 6px' }}>
               Tahapan rekrutmen
             </h4>
@@ -407,6 +410,58 @@ function Detail({ api, id, onTutup, onBerubah, onBuka }) {
           </>
         )}
       </aside>
+    </>
+  );
+}
+
+// Jawaban form lamaran + CV/foto. Urutan tampil = urutan di form.
+const URUT_JAWABAN = ['tanggalLahir', 'jenisKelamin', 'kota', 'kecamatan', 'pendidikan', 'pekerjaan', 'pengalamanSales', 'bidangPengalaman', 'waktuKerja', 'ketersediaan', 'kendaraan', 'hpAndroid', 'area', 'kenalWarung', 'sosmed'];
+function DataLamaran({ jawaban, label, dokumen, onError }) {
+  if (!jawaban && !dokumen?.length) return null;
+  const j = jawaban || {};
+  const nilai = (k) => {
+    if (k === 'tanggalLahir') return `${tgl(j[k])} (${Math.floor((Date.now() - new Date(j[k]).getTime()) / (365.25 * 86400000))} tahun)`;
+    if (k === 'hpAndroid') return j[k] ? 'Punya HP Android + kuota' : 'Belum punya HP Android';
+    if (k === 'sosmed' && /^https?:\/\//.test(j[k])) return <a href={j[k]} target="_blank" rel="noopener noreferrer">{j[k]}</a>;
+    return j[k];
+  };
+  return (
+    <>
+      <h4 className="adm-label" style={{ fontSize: 11, margin: '16px 0 6px' }}>
+        Data lamaran
+      </h4>
+      <div className="adm-kartu" style={{ boxShadow: 'none', padding: 12 }}>
+        {dokumen?.length > 0 && (
+          <div className="adm-tombol" style={{ marginTop: 0, marginBottom: 10 }}>
+            {dokumen.map((x) => (
+              <button key={x.id} className="btn kecil" onClick={() => bukaFile(`/rekrutmen/dokumen/${x.id}`).catch((e) => onError(e.message))}>
+                Lihat {x.jenis === 'cv' ? 'CV' : 'foto'} ({x.ukuran < 1024 ? `${x.ukuran} B` : `${Math.round(x.ukuran / 1024)} KB`})
+              </button>
+            ))}
+          </div>
+        )}
+        <dl className="adm-jawaban">
+          {URUT_JAWABAN.filter((k) => j[k] !== undefined && j[k] !== '').map((k) => (
+            <div key={k}>
+              <dt>{k === 'tanggalLahir' ? 'Tanggal lahir' : k === 'hpAndroid' ? 'HP Android' : label?.[k] || k}</dt>
+              <dd>{nilai(k)}</dd>
+            </div>
+          ))}
+        </dl>
+        {j.alasan && (
+          <>
+            <p className="adm-label" style={{ fontSize: 10, margin: '10px 0 4px' }}>
+              Alasan tertarik
+            </p>
+            <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{j.alasan}</p>
+          </>
+        )}
+        {jawaban && (
+          <p className="adm-redup" style={{ margin: '10px 0 0' }}>
+            {j.setujuData ? 'Setuju data dipakai buat seleksi' : 'Belum setuju pemakaian data'} · {j.setujuWa ? 'boleh dihubungi WA' : 'nggak mau dihubungi WA'}
+          </p>
+        )}
+      </div>
     </>
   );
 }

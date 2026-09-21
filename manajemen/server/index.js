@@ -20,6 +20,8 @@ app.use((req, res, next) => {
   res.setHeader('X-Robots-Tag', 'noindex, nofollow');
   next();
 });
+// Form daftar publik boleh bawa CV + foto (maks 3 MB masing-masing, dikirim base64) - batas lebih longgar khusus rute ini.
+app.use('/api/publik/daftar', express.json({ limit: '9mb' }));
 app.use(express.json({ limit: '100kb' }));
 
 app.get('/health', (req, res) => res.json({ ok: true }));

@@ -1,16 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { panggil } from '../lib/api.js';
 
-// Form daftar calon Sales Partner - publik, tanpa login (makalin.konsulin.com/daftar?s=KODE).
-// ?s= = kode titik sebar (sumber keyakinan tinggi). Tanpa kode, "tahu dari mana" wajib dipilih (§7.3).
+// Form lamaran calon Sales Partner - publik, tanpa login (makalin.konsulin.com/daftar?s=KODE).
+// 3 langkah biar nggak kerasa panjang: data diri -> pengalaman & kesiapan -> dokumen & persetujuan.
+// ?s= = kode titik sebar (sumber keyakinan tinggi). Tanpa kode & tanpa referral, "tahu dari mana" wajib (§7.3).
+const LANGKAH = ['Data diri', 'Pengalaman & kesiapan', 'Dokumen & persetujuan'];
+const MAKS_FILE = 3 * 1024 * 1024;
+const AWAL = {
+  nama: '', noHp: '', email: '', tanggalLahir: '', jenisKelamin: '', kota: '', kecamatan: '', pendidikan: '',
+  pekerjaan: '', pengalamanSales: '', bidangPengalaman: '', waktuKerja: '', ketersediaan: '', kendaraan: '', hpAndroid: null,
+  area: '', kenalWarung: '', alasan: '', sosmed: '', referral: '', dropdown: '', setujuData: false, setujuWa: true,
+};
+
 export default function DaftarPublik() {
   const params = new URLSearchParams(window.location.search);
   const s = (params.get('s') || '').trim().toUpperCase();
   const [info, setInfo] = useState(null);
-  const [isi, setIsi] = useState({ nama: '', noHp: '', domisili: '', dropdown: '', referral: params.get('ref') || '' });
+  const [isi, setIsi] = useState(() => ({ ...AWAL, referral: params.get('ref') || '' }));
+  const [cv, setCv] = useState(null);
+  const [foto, setFoto] = useState(null);
+  const [langkah, setLangkah] = useState(0);
   const [error, setError] = useState('');
   const [sibuk, setSibuk] = useState(false);
   const [selesai, setSelesai] = useState(false);
+  const atasRef = useRef(null);
 
   useEffect(() => {
     panggil(null, 'GET', `/publik/daftar/info?s=${encodeURIComponent(s)}`)
@@ -18,75 +31,251 @@ export default function DaftarPublik() {
       .catch((e) => setError(e.message));
   }, [s]);
 
-  const ubah = (k) => (e) => setIsi((x) => ({ ...x, [k]: e.target.value }));
-  const perluDropdown = !s && !isi.referral.trim();
+  const P = info?.pilihan || {};
+  const ubah = (k) => (e) => setIsi((x) => ({ ...x, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
+  // Kode ?s= yang nggak dikenal (link salah ketik / titiknya dihapus) dianggap nggak ada kode.
+  const kodeDikenal = !!(s && info?.kampanye);
+  const perluDropdown = !kodeDikenal && !isi.referral.trim();
+
+  // Validasi per langkah biar salahnya ketauan sebelum pindah, bukan pas kirim di akhir.
+  const cekLangkah = (i) => {
+    const kosong = (k, label) => (!String(isi[k] ?? '').trim() ? `${label} wajib diisi` : null);
+    const cek = {
+      0: [
+        kosong('nama', 'Nama lengkap'),
+        isi.noHp.replace(/\D/g, '').length < 10 ? 'Nomor WhatsApp belum benar' : null,
+        kosong('tanggalLahir', 'Tanggal lahir'),
+        kosong('jenisKelamin', 'Jenis kelamin'),
+        kosong('kota', 'Kota / kabupaten'),
+        kosong('kecamatan', 'Kecamatan'),
+        kosong('pendidikan', 'Pendidikan terakhir'),
+      ],
+      1: [
+        kosong('pekerjaan', 'Pekerjaan sekarang'),
+        kosong('pengalamanSales', 'Pengalaman jualan'),
+        kosong('waktuKerja', 'Waktu kerja'),
+        kosong('ketersediaan', 'Hari & jam tersedia'),
+        kosong('kendaraan', 'Kendaraan'),
+        isi.hpAndroid === null ? 'Jawab soal HP Android' : null,
+        kosong('area', 'Area yang mau digarap'),
+        kosong('kenalWarung', 'Jumlah warung yang dikenal'),
+        isi.alasan.trim().length < 20 ? 'Ceritain alasanmu minimal 20 huruf' : null,
+      ],
+      2: [perluDropdown && !isi.dropdown ? 'Pilih tahu Konsulin dari mana' : null, !isi.setujuData ? 'Centang persetujuan pemakaian data' : null],
+    }[i];
+    return cek.find(Boolean) || '';
+  };
+
+  const lanjut = () => {
+    const e = cekLangkah(langkah);
+    setError(e);
+    if (!e) {
+      setLangkah((x) => x + 1);
+      atasRef.current?.scrollIntoView({ block: 'start' });
+    }
+  };
+
+  const pilihFile = (set, jenis) => (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    setError('');
+    if (!f) return;
+    if (f.size > MAKS_FILE) return setError(`${jenis === 'cv' ? 'CV' : 'Foto'} maksimal 3 MB`);
+    const boleh = jenis === 'cv' ? ['application/pdf', 'image/jpeg', 'image/png'] : ['image/jpeg', 'image/png'];
+    if (!boleh.includes(f.type)) return setError(jenis === 'cv' ? 'CV harus PDF, JPG, atau PNG' : 'Foto harus JPG atau PNG');
+    const r = new FileReader();
+    r.onload = () => set({ nama: f.name, ukuran: f.size, data: r.result });
+    r.readAsDataURL(f);
+  };
+
+  const kirim = async (e) => {
+    e.preventDefault();
+    const salah = cekLangkah(0) || cekLangkah(1) || cekLangkah(2);
+    if (salah) return setError(salah);
+    setError('');
+    setSibuk(true);
+    try {
+      await panggil(null, 'POST', '/publik/daftar', { ...isi, s, cv, foto });
+      setSelesai(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSibuk(false);
+    }
+  };
+
+  const f = (k, label, props = {}, bantu) => (
+    <div className="field">
+      <label htmlFor={`d-${k}`}>{label}</label>
+      <input id={`d-${k}`} value={isi[k]} onChange={ubah(k)} {...props} />
+      {bantu && <span className="adm-redup">{bantu}</span>}
+    </div>
+  );
+  const pilih = (k, label, opsi) => (
+    <div className="field">
+      <label htmlFor={`d-${k}`}>{label}</label>
+      <select id={`d-${k}`} value={isi[k]} onChange={ubah(k)} style={{ maxWidth: 'none', width: '100%', minHeight: 44 }}>
+        <option value="">Pilih</option>
+        {(opsi || []).map((o) => (
+          <option key={o}>{o}</option>
+        ))}
+      </select>
+    </div>
+  );
+  const berkas = (label, nilai, set, jenis, accept) => (
+    <div className="field">
+      <span className="adm-label" style={{ fontSize: 11, display: 'block', marginBottom: 6 }}>
+        {label}
+      </span>
+      {nilai ? (
+        <div className="adm-kartu" style={{ boxShadow: 'none', padding: 10, display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+          <span style={{ overflowWrap: 'anywhere' }}>
+            {nilai.nama} <span className="adm-redup">({nilai.ukuran < 1024 ? `${nilai.ukuran} B` : `${Math.round(nilai.ukuran / 1024)} KB`})</span>
+          </span>
+          <button type="button" className="btn kecil" onClick={() => set(null)}>
+            Hapus
+          </button>
+        </div>
+      ) : (
+        <label className="adm-unggah" style={{ marginTop: 0 }}>
+          <input type="file" accept={accept} onChange={pilihFile(set, jenis)} />
+          <b>Pilih file</b>
+          <span className="adm-redup">{jenis === 'cv' ? 'PDF, JPG, atau PNG, maksimal 3 MB' : 'JPG atau PNG, maksimal 3 MB'}</span>
+        </label>
+      )}
+    </div>
+  );
 
   return (
-    <div className="adm-tengah">
-      <div className="adm-kartu adm-masuk" style={{ boxShadow: '8px 8px 0 #000', maxWidth: 480 }}>
+    <div className="adm-tengah" style={{ alignItems: 'flex-start', padding: '32px 16px' }}>
+      <div className="adm-kartu" style={{ boxShadow: '8px 8px 0 #000', width: '100%', maxWidth: 620 }} ref={atasRef}>
         <div className="adm-kartu-kepala hitam">
-          <h1 style={{ fontSize: 18, margin: 0 }}>Daftar Sales Partner Konsulin</h1>
+          <h1 style={{ fontSize: 18, margin: 0 }}>Lamaran Sales Partner Konsulin</h1>
         </div>
+
         {selesai ? (
           <>
-            <h2 style={{ marginTop: 0 }}>Pendaftaran masuk</h2>
-            <p>Makasih, {isi.nama.split(' ')[0]}. Tim Konsulin bakal ngehubungin kamu lewat WhatsApp {isi.noHp} buat tahap berikutnya.</p>
+            <h2 style={{ marginTop: 0 }}>Lamaran kamu udah masuk</h2>
+            <p>
+              Makasih, {isi.nama.split(' ')[0]}. Tim Konsulin bakal ngecek lamaranmu dan ngehubungin lewat WhatsApp <b>{isi.noHp}</b> buat tahap berikutnya (tes produk
+              singkat, lalu interview).
+            </p>
           </>
         ) : (
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              setError('');
-              setSibuk(true);
-              try {
-                await panggil(null, 'POST', '/publik/daftar', { ...isi, s });
-                setSelesai(true);
-              } catch (err) {
-                setError(err.message);
-              } finally {
-                setSibuk(false);
-              }
-            }}
-          >
+          <form onSubmit={kirim} noValidate>
             <p className="adm-sub" style={{ marginTop: 0 }}>
-              Jual aplikasi Asisten Warung ke pemilik warung di sekitarmu dan dapat komisi dari tiap langganan.
-              {info?.kampanye ? ` (${info.kampanye.nama}${info.kampanye.area ? `, ${info.kampanye.area}` : ''})` : ''}
+              Sales Partner nawarin aplikasi Asisten Warung ke pemilik warung di area kamu dan dapat komisi dari tiap langganan. Isi lamaran ini sekitar 5 menit.
+              {info?.kampanye ? ` Program: ${info.kampanye.nama}${info.kampanye.area ? `, ${info.kampanye.area}` : ''}.` : ''}
             </p>
-            <div className="field">
-              <label htmlFor="d-nama">Nama lengkap</label>
-              <input id="d-nama" value={isi.nama} onChange={ubah('nama')} autoComplete="name" required />
-            </div>
-            <div className="field">
-              <label htmlFor="d-hp">Nomor WhatsApp</label>
-              <input id="d-hp" value={isi.noHp} onChange={ubah('noHp')} inputMode="tel" autoComplete="tel" placeholder="0812-3456-7890" required />
-            </div>
-            <div className="field">
-              <label htmlFor="d-dom">Domisili (kota / kecamatan)</label>
-              <input id="d-dom" value={isi.domisili} onChange={ubah('domisili')} />
-            </div>
-            <div className="field">
-              <label htmlFor="d-ref">Kode referral (kalau diajak teman)</label>
-              <input id="d-ref" value={isi.referral} onChange={ubah('referral')} placeholder="REF-A1B2C3" />
-            </div>
-            {perluDropdown && (
-              <div className="field">
-                <label htmlFor="d-dari">Tahu Konsulin dari mana?</label>
-                <select id="d-dari" value={isi.dropdown} onChange={ubah('dropdown')} required style={{ maxWidth: 'none', width: '100%', minHeight: 44 }}>
-                  <option value="">Pilih salah satu</option>
-                  {(info?.pilihanSumber || []).map((p) => (
-                    <option key={p}>{p}</option>
-                  ))}
-                </select>
-              </div>
+
+            <ol className="adm-langkah" aria-label="Langkah pengisian">
+              {LANGKAH.map((l, i) => (
+                <li key={l} className={i === langkah ? 'on' : i < langkah ? 'lewat' : ''} aria-current={i === langkah ? 'step' : undefined}>
+                  <span>{i < langkah ? '✓' : i + 1}</span>
+                  {l}
+                </li>
+              ))}
+            </ol>
+
+            {langkah === 0 && (
+              <>
+                {f('nama', 'Nama lengkap (sesuai KTP)', { autoComplete: 'name' })}
+                <div className="adm-baris" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+                  {f('noHp', 'Nomor WhatsApp', { inputMode: 'tel', autoComplete: 'tel', placeholder: '0812-3456-7890' })}
+                  {f('email', 'Email (opsional)', { type: 'email', autoComplete: 'email', placeholder: 'nama@email.com' })}
+                  {f('tanggalLahir', 'Tanggal lahir', { type: 'date' })}
+                  {pilih('jenisKelamin', 'Jenis kelamin', P.jenisKelamin)}
+                  {f('kota', 'Kota / kabupaten domisili', { placeholder: 'Karawang' })}
+                  {f('kecamatan', 'Kecamatan', { placeholder: 'Telukjambe' })}
+                </div>
+                {pilih('pendidikan', 'Pendidikan terakhir', P.pendidikan)}
+              </>
             )}
+
+            {langkah === 1 && (
+              <>
+                <div className="adm-baris" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+                  {pilih('pekerjaan', 'Pekerjaan sekarang', P.pekerjaan)}
+                  {pilih('pengalamanSales', 'Pengalaman jualan / sales', P.pengalamanSales)}
+                </div>
+                {f('bidangPengalaman', 'Pernah jualan apa? (opsional)', { placeholder: 'Misal: sales FMCG, jualan pulsa, reseller online' })}
+                <div className="adm-baris" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+                  {pilih('waktuKerja', 'Bisa kerja', P.waktuKerja)}
+                  {f('ketersediaan', 'Hari & jam tersedia', { placeholder: 'Senin-Sabtu, 09.00-16.00' })}
+                  {pilih('kendaraan', 'Kendaraan buat keliling', P.kendaraan)}
+                  <fieldset className="field" style={{ border: 0, padding: 0, margin: '12px 0 0' }}>
+                    <legend className="adm-label" style={{ fontSize: 11, marginBottom: 6 }}>
+                      Punya HP Android + kuota internet?
+                    </legend>
+                    <div className="adm-toggle" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                      <button type="button" className={isi.hpAndroid === true ? 'on' : ''} onClick={() => setIsi((x) => ({ ...x, hpAndroid: true }))} aria-pressed={isi.hpAndroid === true}>
+                        Punya
+                      </button>
+                      <button type="button" className={isi.hpAndroid === false ? 'on keluar' : ''} onClick={() => setIsi((x) => ({ ...x, hpAndroid: false }))} aria-pressed={isi.hpAndroid === false}>
+                        Belum
+                      </button>
+                    </div>
+                  </fieldset>
+                </div>
+                {f('area', 'Area yang mau kamu garap', { placeholder: 'Kecamatan / kelurahan sekitar rumah' })}
+                {pilih('kenalWarung', 'Kira-kira kenal berapa pemilik warung di sekitarmu?', P.kenalWarung)}
+                <div className="field">
+                  <label htmlFor="d-alasan">Kenapa tertarik jadi Sales Partner?</label>
+                  <textarea id="d-alasan" value={isi.alasan} onChange={ubah('alasan')} placeholder="Ceritain singkat: pengalamanmu, target penghasilan, atau kenapa cocok" />
+                  <span className="adm-redup">{isi.alasan.trim().length}/20 huruf minimal</span>
+                </div>
+              </>
+            )}
+
+            {langkah === 2 && (
+              <>
+                {berkas('CV / riwayat hidup (opsional)', cv, setCv, 'cv', 'application/pdf,image/jpeg,image/png')}
+                {berkas('Foto diri (opsional)', foto, setFoto, 'foto', 'image/jpeg,image/png')}
+                {f('sosmed', 'Link Instagram / Facebook / LinkedIn (opsional)', { placeholder: 'https://' })}
+                {f('referral', 'Kode referral (kalau diajak teman)', { placeholder: 'REF-A1B2C3', autoCapitalize: 'characters' })}
+                {perluDropdown && pilih('dropdown', 'Tahu Konsulin dari mana?', info?.pilihanSumber)}
+                <label className="adm-setuju">
+                  <input type="checkbox" className="adm-centang" checked={isi.setujuData} onChange={ubah('setujuData')} />
+                  <span>Saya setuju data di lamaran ini dipakai Konsulin buat proses seleksi Sales Partner. Data pelamar yang nggak lolos dihapus setelah 2 tahun.</span>
+                </label>
+                <label className="adm-setuju">
+                  <input type="checkbox" className="adm-centang" checked={isi.setujuWa} onChange={ubah('setujuWa')} />
+                  <span>Boleh dihubungi lewat WhatsApp soal lamaran ini.</span>
+                </label>
+              </>
+            )}
+
             {error && (
               <p className="adm-error" role="alert">
                 {error}
               </p>
             )}
-            <button className="btn utama" style={{ width: '100%', marginTop: 18 }} type="submit" disabled={sibuk}>
-              {sibuk ? 'Mengirim…' : 'Kirim pendaftaran'}
-            </button>
+
+            <div className="adm-tombol" style={{ justifyContent: 'space-between', marginTop: 20 }}>
+              {langkah > 0 ? (
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => {
+                    setError('');
+                    setLangkah((x) => x - 1);
+                  }}
+                >
+                  Kembali
+                </button>
+              ) : (
+                <span />
+              )}
+              {langkah < LANGKAH.length - 1 ? (
+                <button type="button" className="btn utama" onClick={lanjut}>
+                  Lanjut
+                </button>
+              ) : (
+                <button type="submit" className="btn utama" disabled={sibuk}>
+                  {sibuk ? 'Mengirim…' : 'Kirim lamaran'}
+                </button>
+              )}
+            </div>
           </form>
         )}
       </div>

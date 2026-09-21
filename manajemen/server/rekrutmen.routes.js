@@ -1,4 +1,7 @@
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { catatLog, query, pool } from './db.js';
@@ -84,6 +87,16 @@ export function pastikanTabelRekrutmen() {
         aktor TEXT NOT NULL,
         created_at TIMESTAMPTZ DEFAULT now()
       )`);
+      // Jawaban form lamaran (data diri, pengalaman, kesiapan) - per LAMARAN, karena bisa beda tiap kali melamar.
+      await query('ALTER TABLE mj_lamaran ADD COLUMN IF NOT EXISTS jawaban JSONB');
+      // CV & foto diri yang diunggah pelamar. Filenya di disk server (DOKUMEN_DIR), bukan di database.
+      await query(`CREATE TABLE IF NOT EXISTS mj_lamaran_dokumen (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        lamaran_id UUID NOT NULL REFERENCES mj_lamaran(id) ON DELETE CASCADE,
+        jenis TEXT NOT NULL, -- cv | foto
+        nama_file TEXT, mime TEXT NOT NULL, ukuran INT NOT NULL, lokasi TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT now()
+      )`);
       // Semua peristiwa (ganti status, follow-up, catatan, keputusan) - aktor, waktu, nilai lama/baru, alasan (§23).
       await query(`CREATE TABLE IF NOT EXISTS mj_lamaran_event (
         id BIGSERIAL PRIMARY KEY,
@@ -121,8 +134,86 @@ async function transaksi(fn) {
   }
 }
 
+// ---------------- Formulir lamaran ----------------
+// Pilihan tetap (biar bisa disaring & dihitung), bukan teks bebas.
+export const PILIHAN = {
+  jenisKelamin: ['Laki-laki', 'Perempuan'],
+  pendidikan: ['SD', 'SMP', 'SMA / SMK', 'D3', 'S1', 'S2 ke atas'],
+  pekerjaan: ['Belum bekerja', 'Karyawan', 'Wiraswasta / punya usaha', 'Pelajar / mahasiswa', 'Freelance', 'Ibu rumah tangga', 'Lainnya'],
+  pengalamanSales: ['Belum pernah', 'Kurang dari 1 tahun', '1-3 tahun', 'Lebih dari 3 tahun'],
+  waktuKerja: ['Full time', 'Part time'],
+  kendaraan: ['Motor sendiri', 'Mobil sendiri', 'Nggak punya kendaraan'],
+  kenalWarung: ['Belum kenal', '1-5 warung', '6-20 warung', 'Lebih dari 20 warung'],
+};
+
+// Bersihin jawaban form publik. `wajib` = true buat form daftar publik (semua isian penting wajib); input manual
+// recruiter boleh sebagian.
+function bersihkanJawaban(b, wajib) {
+  const j = {};
+  const pilih = (k) => {
+    if (PILIHAN[k].includes(b[k])) j[k] = b[k];
+    else if (wajib) throw salah(`Pilih ${LABEL[k].toLowerCase()}`);
+  };
+  const isian = (k, n, min = 1) => {
+    const v = teks(b[k], n);
+    if (v.length >= min) j[k] = v;
+    else if (wajib && min > 0) throw salah(min > 1 ? `${LABEL[k]} minimal ${min} huruf` : `${LABEL[k]} wajib diisi`);
+  };
+  if (/^\d{4}-\d{2}-\d{2}$/.test(b.tanggalLahir || '')) {
+    const umur = (Date.now() - new Date(b.tanggalLahir).getTime()) / (365.25 * 86400000);
+    if (umur < 17 || umur > 70) throw salah('Umur pelamar minimal 17 tahun');
+    j.tanggalLahir = b.tanggalLahir;
+  } else if (wajib) throw salah('Tanggal lahir wajib diisi');
+  pilih('jenisKelamin');
+  isian('kota', 60);
+  isian('kecamatan', 60);
+  pilih('pendidikan');
+  pilih('pekerjaan');
+  pilih('pengalamanSales');
+  isian('bidangPengalaman', 200, 0);
+  pilih('waktuKerja');
+  isian('ketersediaan', 120);
+  pilih('kendaraan');
+  if (typeof b.hpAndroid === 'boolean') j.hpAndroid = b.hpAndroid;
+  else if (wajib) throw salah('Jawab dulu soal HP Android');
+  isian('area', 200);
+  pilih('kenalWarung');
+  isian('alasan', 1000, 20);
+  isian('sosmed', 200, 0);
+  if (wajib && b.setujuData !== true) throw salah('Centang persetujuan pemakaian data dulu');
+  j.setujuData = b.setujuData === true;
+  j.setujuWa = b.setujuWa === true;
+  return j;
+}
+const LABEL = {
+  jenisKelamin: 'Jenis kelamin', pendidikan: 'Pendidikan terakhir', pekerjaan: 'Pekerjaan sekarang', pengalamanSales: 'Pengalaman jualan',
+  waktuKerja: 'Waktu kerja', kendaraan: 'Kendaraan', kenalWarung: 'Jumlah warung yang dikenal', kota: 'Kota / kabupaten', kecamatan: 'Kecamatan',
+  ketersediaan: 'Hari & jam tersedia', area: 'Area yang mau digarap', alasan: 'Alasan tertarik', bidangPengalaman: 'Bidang pengalaman', sosmed: 'Link sosmed',
+};
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DOKUMEN_DIR = process.env.DOKUMEN_DIR || path.resolve(__dirname, '../data/dokumen');
+const MAKS_DOKUMEN = 3 * 1024 * 1024;
+// Jenis file dicek dari ISI filenya (tanda tangan byte), bukan dari nama/klaim browser.
+function kenaliFile(buf) {
+  if (buf.subarray(0, 4).toString() === '%PDF') return { mime: 'application/pdf', ext: 'pdf' };
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return { mime: 'image/jpeg', ext: 'jpg' };
+  if (buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return { mime: 'image/png', ext: 'png' };
+  return null;
+}
+function bacaDokumen(d, jenis) {
+  if (!d) return null;
+  const m = /^data:[\w/+.-]+;base64,(.+)$/.exec(d.data || '');
+  if (!m) throw salah(`File ${jenis === 'cv' ? 'CV' : 'foto'} nggak kebaca`);
+  const buf = Buffer.from(m[1], 'base64');
+  if (buf.length > MAKS_DOKUMEN) throw salah(`File ${jenis === 'cv' ? 'CV' : 'foto'} maksimal 3 MB`);
+  const k = kenaliFile(buf);
+  if (!k || (jenis === 'foto' && k.ext === 'pdf')) throw salah(jenis === 'cv' ? 'CV harus PDF, JPG, atau PNG' : 'Foto harus JPG atau PNG');
+  return { buf, ...k, nama: teks(d.nama, 120) || `${jenis}.${k.ext}` };
+}
+
 // Bikin lamaran baru (dari form publik atau input recruiter). Orang dikenali dari hash nomor HP (D-35/D-59).
-async function buatLamaran({ nama, noHp, email, domisili, s, dropdown, referral }, aktor) {
+async function buatLamaran({ nama, noHp, email, domisili, s, dropdown, referral, jawaban = null, dokumen = [] }, aktor) {
   const hp = normalisasiNoHp(noHp || '');
   if (!teks(nama, 80)) throw salah('Nama wajib diisi');
   if (!hp) throw salah('Nomor HP nggak valid. Contoh: 0812-3456-7890');
@@ -170,10 +261,26 @@ async function buatLamaran({ nama, noHp, email, domisili, s, dropdown, referral 
     if (aktif.length) throw salah('Orang ini masih punya lamaran yang lagi jalan.', 409);
     if (referrer && referrer.id === orang.id) throw salah('Nggak bisa mereferensikan diri sendiri');
     const { rows: l } = await c.query(
-      `INSERT INTO mj_lamaran (orang_id, sumber_kode, sumber_titik_id, sumber_dropdown, keyakinan, referrer_orang_id, dibuat_oleh)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [orang.id, titik?.kode || (kode || null), titik?.id || null, pilihan, keyakinan, referrer?.id || null, aktor]
+      `INSERT INTO mj_lamaran (orang_id, sumber_kode, sumber_titik_id, sumber_dropdown, keyakinan, referrer_orang_id, dibuat_oleh, jawaban)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [orang.id, titik?.kode || (kode || null), titik?.id || null, pilihan, keyakinan, referrer?.id || null, aktor, jawaban ? JSON.stringify(jawaban) : null]
     );
+    // File ditulis di dalam transaksi: kalau nyimpen barisnya gagal, file yang udah ketulis dihapus lagi.
+    const ditulis = [];
+    try {
+      for (const d of dokumen) {
+        fs.mkdirSync(DOKUMEN_DIR, { recursive: true });
+        const lokasi = `${l[0].id}-${d.jenis}-${crypto.randomBytes(4).toString('hex')}.${d.ext}`;
+        fs.writeFileSync(path.join(DOKUMEN_DIR, lokasi), d.buf);
+        ditulis.push(lokasi);
+        await c.query('INSERT INTO mj_lamaran_dokumen (lamaran_id, jenis, nama_file, mime, ukuran, lokasi) VALUES ($1,$2,$3,$4,$5,$6)', [
+          l[0].id, d.jenis, d.nama, d.mime, d.buf.length, lokasi,
+        ]);
+      }
+    } catch (e) {
+      for (const f of ditulis) fs.rmSync(path.join(DOKUMEN_DIR, f), { force: true });
+      throw e;
+    }
     await catatEvent(c, l[0].id, 'status', { ke: 'new', isi: `Lamaran masuk (sumber: ${titik?.kode || (referrer ? 'referral ' + ref : pilihan || 'tidak diketahui')})` }, aktor);
     return { lamaran: l[0], orang };
   });
@@ -192,7 +299,7 @@ publikRouter.get('/daftar/info', async (req, res, next) => {
       const { rows } = await query('SELECT k.nama, k.area FROM mj_rek_titik t JOIN mj_rek_kampanye k ON k.id=t.kampanye_id WHERE t.kode=$1', [kode]);
       kampanye = rows[0] || null;
     }
-    res.json({ kampanye, pilihanSumber: DROPDOWN_SUMBER });
+    res.json({ kampanye, pilihanSumber: DROPDOWN_SUMBER, pilihan: PILIHAN });
   } catch (e) {
     next(e);
   }
@@ -202,11 +309,18 @@ publikRouter.post('/daftar', daftarLimiter, async (req, res, next) => {
   try {
     await pastikanTabelRekrutmen();
     const b = req.body || {};
-    // "Tahu dari mana" wajib kalau nggak datang lewat link berkode / referral (§7.3).
-    if (!teks(b.s, 30) && !teks(b.referral, 20) && !DROPDOWN_SUMBER.includes(b.dropdown)) {
+    // "Tahu dari mana" wajib kalau nggak datang lewat link berkode yang dikenal / referral (§7.3).
+    const kodeS = teks(b.s, 30).toUpperCase();
+    const adaTitik = kodeS ? (await query('SELECT 1 FROM mj_rek_titik WHERE kode=$1', [kodeS])).rows.length > 0 : false;
+    if (!adaTitik && !teks(b.referral, 20) && !DROPDOWN_SUMBER.includes(b.dropdown)) {
       return res.status(400).json({ error: 'Pilih dulu tahu Konsulin dari mana' });
     }
-    await buatLamaran(b, 'form daftar');
+    const jawaban = bersihkanJawaban(b, true);
+    const dokumen = [
+      b.cv ? { jenis: 'cv', ...bacaDokumen(b.cv, 'cv') } : null,
+      b.foto ? { jenis: 'foto', ...bacaDokumen(b.foto, 'foto') } : null,
+    ].filter(Boolean);
+    await buatLamaran({ ...b, domisili: [teks(b.kecamatan, 60), teks(b.kota, 60)].filter(Boolean).join(', '), jawaban, dokumen }, 'form daftar');
     res.status(201).json({ ok: true });
   } catch (e) {
     if (e.status === 409) return res.status(409).json({ error: 'Nomor ini udah terdaftar dan lagi diproses. Tim kami bakal ngehubungin kamu.' });
@@ -314,15 +428,16 @@ router.get('/rekrutmen/lamaran/:id', async (req, res, next) => {
     const { rows } = await query(`SELECT ${KOLOM_LAMARAN} ${JOIN_LAMARAN} WHERE l.id=$1`, [req.params.id]);
     if (!rows.length) return res.status(404).json({ error: 'Lamaran tidak ditemukan' });
     const l = rows[0];
-    const [{ rows: attempt }, { rows: event }, { rows: riwayat }] = await Promise.all([
+    const [{ rows: attempt }, { rows: event }, { rows: riwayat }, { rows: dokumen }] = await Promise.all([
       query('SELECT * FROM mj_rek_attempt WHERE lamaran_id=$1 ORDER BY id DESC', [l.id]),
       query('SELECT * FROM mj_lamaran_event WHERE lamaran_id=$1 ORDER BY id DESC', [l.id]),
       query(`SELECT id, 'KD-' || lpad(nomor::text, 4, '0') AS kode, status, created_at, status_sejak, sumber_kode, alasan_keluar FROM mj_lamaran WHERE orang_id=$1 AND id<>$2 ORDER BY created_at DESC`, [
         l.orang_id,
         l.id,
       ]),
+      query('SELECT id, jenis, nama_file, mime, ukuran, created_at FROM mj_lamaran_dokumen WHERE lamaran_id=$1 ORDER BY created_at', [l.id]),
     ]);
-    res.json({ lamaran: l, attempt, event, riwayat, hariNoResponse: HARI_NO_RESPONSE, hariClosing: HARI_CLOSING_TEST });
+    res.json({ lamaran: l, attempt, event, riwayat, dokumen, label: LABEL, hariNoResponse: HARI_NO_RESPONSE, hariClosing: HARI_CLOSING_TEST });
   } catch (e) {
     next(e);
   }
@@ -513,6 +628,24 @@ router.post('/rekrutmen/lamaran/:id/catatan', async (req, res, next) => {
       await catatEvent(c, l.id, 'catatan', { isi }, req.admin.nama);
     });
     res.status(201).json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Buka CV / foto pelamar (cuma admin yang login). Nama lokasi dari database, bukan dari request - nggak bisa dipakai
+// buat baca file lain di server.
+router.get('/rekrutmen/dokumen/:id', async (req, res, next) => {
+  try {
+    if (!POLA_UUID.test(req.params.id)) throw salah('Dokumen tidak ditemukan', 404);
+    const { rows } = await query('SELECT * FROM mj_lamaran_dokumen WHERE id=$1', [req.params.id]);
+    if (!rows.length) throw salah('Dokumen tidak ditemukan', 404);
+    const file = path.join(DOKUMEN_DIR, path.basename(rows[0].lokasi));
+    if (!fs.existsSync(file)) throw salah('File-nya udah nggak ada di server', 404);
+    res.setHeader('Content-Type', rows[0].mime);
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(rows[0].nama_file || 'dokumen')}"`);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    fs.createReadStream(file).pipe(res);
   } catch (e) {
     next(e);
   }
