@@ -141,7 +141,8 @@ img.picon.produk-ikon{display:block;object-fit:cover}
 .btn:active{transform:scale(.97)}
 .btn[disabled]{opacity:.32;pointer-events:none}
 .btn.kecil{padding:14px 18px;font-size:var(--small);min-height:48px;border-radius:999px}
-.actions{display:flex;gap:12px;margin-top:22px;margin-bottom:calc(84px + env(safe-area-inset-bottom))}
+/* Jarak buat menu bawah HP udah diurus padding-bottom .screen - dulu ditambah 84px lagi di sini: dobel di HP & kebawa percuma di desktop. */
+.actions{display:flex;gap:12px;margin-top:22px}
 .actions .btn{flex:1}.actions .btn.utama{flex:1.7}
 .linkkecil{display:block;width:100%;margin:26px 0 0;background:none;border:0;color:var(--abu);font:inherit;
   font-size:14px;font-weight:600;text-decoration:underline;cursor:pointer;padding:12px}
