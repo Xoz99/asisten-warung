@@ -419,6 +419,9 @@ router.get('/lapangan/wp-sales', async (req, res, next) => {
 });
 
 // Status pelanggan diturunin dari plan & masa aktif (sama kayak halaman Leads, PRD §13).
+// Link referral sales = alamat app Warung Pintar + ?ref=KODE (dibaca warung-pintar-react/src/lib/kodeSales.js).
+const URL_WARUNG = () => (process.env.WARUNG_PINTAR_URL || 'https://asistenwarung.konsulin.com').replace(/\/+$/, '');
+
 const SQL_TAHAP = `CASE
   WHEN w.plan = 'permanen' THEN 'permanen'
   WHEN w.plan = 'trial' AND w.lisensi_berlaku_sampai > now() THEN 'trial'
@@ -479,6 +482,7 @@ router.get('/lapangan/toko', async (req, res, next) => {
       terhubung: true,
       akun: { id: akun.id, nama: akun.nama },
       sales: sales[0] || null,
+      link: sales[0] ? `${URL_WARUNG()}/?ref=${encodeURIComponent(sales[0].kode)}` : null,
       ringkas,
       toko,
       pembayaran: bayar,
