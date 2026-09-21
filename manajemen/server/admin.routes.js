@@ -14,7 +14,7 @@ const PERAN = ['admin', 'sales'];
 
 router.get('/admin', async (req, res, next) => {
   try {
-    const { rows } = await query('SELECT id, username, nama, peran, aktif, terakhir_masuk, created_at FROM mj_admin ORDER BY created_at');
+    const { rows } = await query('SELECT id, username, nama, peran, wp_sales_id, aktif, terakhir_masuk, created_at FROM mj_admin ORDER BY created_at');
     res.json(rows);
   } catch (e) {
     next(e);
@@ -46,6 +46,15 @@ router.patch('/admin/:id', async (req, res, next) => {
   try {
     if (!POLA_UUID.test(req.params.id)) return res.status(404).json({ error: 'Admin tidak ditemukan' });
     const { aktif, password, peran } = req.body;
+    // Hubungin akun sales ke data sales Warung Pintar (buat tab "Toko saya" di Sales Lapangan). null = lepas.
+    if (req.body.wp_sales_id !== undefined) {
+      const wp = req.body.wp_sales_id;
+      if (wp !== null && !POLA_UUID.test(wp)) return res.status(400).json({ error: 'Sales Warung Pintar nggak ditemukan' });
+      const { rows } = await query('UPDATE mj_admin SET wp_sales_id=$2 WHERE id=$1 RETURNING username', [req.params.id, wp]);
+      if (!rows.length) return res.status(404).json({ error: 'Akun tidak ditemukan' });
+      await catatLog(req, 'admin.hubung_sales', { username: rows[0].username, terhubung: Boolean(wp) });
+      return res.json({ ok: true });
+    }
     if (aktif === false && req.params.id === req.admin.id) return res.status(400).json({ error: 'Nggak bisa nonaktifin akun sendiri' });
     if (peran !== undefined && !PERAN.includes(peran)) return res.status(400).json({ error: 'Peran nggak dikenal' });
     if (peran !== undefined && req.params.id === req.admin.id) return res.status(400).json({ error: 'Nggak bisa ganti peran akun sendiri' });

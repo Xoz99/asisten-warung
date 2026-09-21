@@ -32,6 +32,7 @@ export const NAMA_AKSI = {
   'rekrutmen.titik.tambah': 'nambah titik sebar',
   'rekrutmen.titik.status': 'ubah status posting',
   'admin.ubah_peran': 'ganti peran akun',
+  'admin.hubung_sales': 'nyambungin akun ke kode sales',
   'lapangan.keberatan.tambah': 'nambah keberatan di bank',
   'lapangan.keberatan.ubah': 'ubah keberatan di bank',
   'lapangan.log.tambah': 'nyatet kunjungan lapangan',
@@ -70,6 +71,11 @@ export const ringkasDetail = (d) =>
 
 export default function Admin({ api, admin }) {
   const [daftar, setDaftar] = useState(null);
+  // Daftar kode sales Warung Pintar, buat nyambungin akun sales Makalin (tab "Toko saya" di Sales Lapangan).
+  const [wpSales, setWpSales] = useState(null);
+  useEffect(() => {
+    api('GET', '/lapangan/wp-sales').then(setWpSales, () => setWpSales([]));
+  }, [api]);
   const [log, setLog] = useState(null);
   const [error, setError] = useState('');
   const [pesan, setPesan] = useState('');
@@ -137,6 +143,8 @@ export default function Admin({ api, admin }) {
                   onAktif={(aktif) => aksi(() => api('PATCH', '/admin/' + a.id, { aktif }), `${a.nama} ${aktif ? 'diaktifin' : 'dinonaktifin'}`)}
                   onReset={(password) => aksi(() => api('PATCH', '/admin/' + a.id, { password }), `Password ${a.nama} direset ✓`)}
                   onPeran={(peran) => aksi(() => api('PATCH', '/admin/' + a.id, { peran }), `${a.nama} sekarang ${peran}. Dia perlu masuk ulang.`)}
+                  wpSales={wpSales}
+                  onHubung={(wp_sales_id) => aksi(() => api('PATCH', '/admin/' + a.id, { wp_sales_id }), wp_sales_id ? `${a.nama} dihubungin ke kode sales.` : `${a.nama} dilepas dari kode sales.`)}
                 />
               ))}
             </ul>
@@ -171,7 +179,7 @@ export default function Admin({ api, admin }) {
   );
 }
 
-function BarisAdmin({ a, diriSendiri, onAktif, onReset, onPeran }) {
+function BarisAdmin({ a, diriSendiri, onAktif, onReset, onPeran, wpSales, onHubung }) {
   const [reset, setReset] = useState(false);
   const [pw, setPw] = useState('');
   return (
@@ -201,6 +209,22 @@ function BarisAdmin({ a, diriSendiri, onAktif, onReset, onPeran }) {
           </div>
         )}
       </div>
+      {a.peran === 'sales' && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
+          <label className="adm-redup" htmlFor={`wp-${a.id}`}>
+            Kode sales Warung Pintar
+          </label>
+          <select id={`wp-${a.id}`} value={a.wp_sales_id || ''} onChange={(e) => onHubung(e.target.value || null)}>
+            <option value="">Belum dihubungin</option>
+            {(wpSales || []).map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.kode} · {s.nama}
+                {s.aktif ? '' : ' (nonaktif)'}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       {reset && (
         <form
           className="adm-cari"

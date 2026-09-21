@@ -4,6 +4,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { catatLog, query, pool } from './db.js';
+import { query as queryWp, pastikanTabelSales } from './produk/warung-pintar/db.js';
 
 // Sales Lapangan: bank keberatan pelanggan (kategori, ucapan, fakta produk buat ngejawab) + log kunjungan sales
 // (respon sales, respon pelanggan, hasil, insight, foto bukti WEBP, titik GPS otomatis dari HP).
@@ -404,6 +405,94 @@ router.get('/lapangan/foto/:id', async (req, res, next) => {
   }
 });
 
+// ---------------- Toko saya (data Warung Pintar) ----------------
+// Daftar sales di Warung Pintar, buat admin nyambungin akun sales Makalin ke kode sales-nya.
+router.get('/lapangan/wp-sales', async (req, res, next) => {
+  try {
+    adminSaja(req);
+    await pastikanTabelSales();
+    const { rows } = await queryWp('SELECT id, kode, nama, aktif FROM sales ORDER BY aktif DESC, nama');
+    res.json(rows);
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Status pelanggan diturunin dari plan & masa aktif (sama kayak halaman Leads, PRD §13).
+const SQL_TAHAP = `CASE
+  WHEN w.plan = 'permanen' THEN 'permanen'
+  WHEN w.plan = 'trial' AND w.lisensi_berlaku_sampai > now() THEN 'trial'
+  WHEN w.plan = 'trial' THEN 'trial_habis'
+  WHEN w.lisensi_berlaku_sampai > now() THEN 'langganan'
+  ELSE 'berhenti' END`;
+
+// Toko yang dipegang sales sekarang + pembayaran yang masuk waktu toko itu miliknya (pemilik PADA SAAT bayar, §15.1).
+// Akun sales cuma bisa lihat punyanya; admin boleh milih akun sales lewat ?akun=.
+// NOT VERIFIED (NV-03): waktu bayar = waktu pembayaran dicatat lunas (updated_at), belum dari field Midtrans.
+router.get('/lapangan/toko', async (req, res, next) => {
+  try {
+    let akun = req.admin;
+    if (req.admin.peran !== 'sales') {
+      if (!POLA_UUID.test(req.query.akun || '')) return res.json({ terhubung: false, pilihAkun: true });
+      const { rows } = await query("SELECT id, nama, wp_sales_id FROM mj_admin WHERE id=$1 AND peran='sales'", [req.query.akun]);
+      if (!rows.length) throw salah('Akun sales nggak ditemukan', 404);
+      akun = rows[0];
+    }
+    if (!akun.wp_sales_id) return res.json({ terhubung: false });
+    await pastikanTabelSales();
+    const S = akun.wp_sales_id;
+    const [{ rows: sales }, { rows: toko }, { rows: bayar }] = await Promise.all([
+      queryWp('SELECT id, kode, nama, aktif FROM sales WHERE id=$1', [S]),
+      queryWp(
+        `SELECT w.id, w.nama, w.no_hp, w.created_at, w.plan, w.lisensi_berlaku_sampai, ${SQL_TAHAP} AS tahap,
+                k.valid_from AS pegang_sejak, w.profil_usaha->>'jenis' AS jenis_usaha,
+                (SELECT MAX(t.waktu) FROM transaksi t WHERE t.warung_id = w.id) AS terakhir_aktif,
+                (SELECT count(*)::int FROM pembayaran p WHERE p.warung_id = w.id AND p.status = 'settlement') AS jumlah_bayar,
+                (SELECT COALESCE(SUM(p.jumlah), 0)::float FROM pembayaran p WHERE p.warung_id = w.id AND p.status = 'settlement') AS total_bayar,
+                (SELECT MAX(p.updated_at) FROM pembayaran p WHERE p.warung_id = w.id AND p.status = 'settlement') AS terakhir_bayar
+         FROM kepemilikan_warung k JOIN warung w ON w.id = k.warung_id
+         WHERE k.sales_id = $1 AND k.valid_to IS NULL AND NOT COALESCE(w.demo, false)
+         ORDER BY (${SQL_TAHAP} IN ('langganan', 'permanen')) DESC, w.lisensi_berlaku_sampai ASC NULLS LAST`,
+        [S]
+      ),
+      queryWp(
+        `WITH p AS (
+           SELECT p.*, row_number() OVER (PARTITION BY p.warung_id ORDER BY p.updated_at, p.created_at) AS urutan
+           FROM pembayaran p WHERE p.status = 'settlement'
+         )
+         SELECT p.order_id, p.plan, p.jumlah::float AS jumlah, p.updated_at AS lunas_pada, p.urutan::int AS urutan, w.nama AS warung_nama
+         FROM p JOIN warung w ON w.id = p.warung_id
+         JOIN LATERAL (
+           SELECT k.sales_id FROM kepemilikan_warung k WHERE k.warung_id = p.warung_id
+           ORDER BY (k.valid_from <= p.updated_at) DESC, CASE WHEN k.valid_from <= p.updated_at THEN k.valid_from END DESC, k.valid_from ASC
+           LIMIT 1
+         ) k ON k.sales_id = $1
+         WHERE NOT COALESCE(w.demo, false)
+         ORDER BY p.updated_at DESC LIMIT 200`,
+        [S]
+      ),
+    ]);
+    const awalBulan = new Date(new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 7) + '-01T00:00:00+07:00');
+    const ringkas = {};
+    for (const t of toko) ringkas[t.tahap] = (ringkas[t.tahap] || 0) + 1;
+    res.json({
+      terhubung: true,
+      akun: { id: akun.id, nama: akun.nama },
+      sales: sales[0] || null,
+      ringkas,
+      toko,
+      pembayaran: bayar,
+      total: {
+        semua: bayar.reduce((a, p) => a + p.jumlah, 0),
+        bulanIni: bayar.filter((p) => new Date(p.lunas_pada) >= awalBulan).reduce((a, p) => a + p.jumlah, 0),
+        tokoBaruBulanIni: bayar.filter((p) => p.urutan === 1 && new Date(p.lunas_pada) >= awalBulan).length,
+      },
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+
 // ---------------- Insight ----------------
 router.get('/lapangan/insight', async (req, res, next) => {
   try {
@@ -428,7 +517,7 @@ router.get('/lapangan/insight', async (req, res, next) => {
       ),
       req.admin.peran === 'sales'
         ? Promise.resolve({ rows: [] })
-        : query(`SELECT id, nama, aktif FROM mj_admin WHERE peran='sales' ORDER BY aktif DESC, nama`),
+        : query(`SELECT id, nama, aktif, wp_sales_id FROM mj_admin WHERE peran='sales' ORDER BY aktif DESC, nama`),
     ]);
     res.json({ total: total[0], perKategori, perSales, catatan, sales });
   } catch (e) {

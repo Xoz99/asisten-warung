@@ -5,11 +5,20 @@ import { bacaSesi } from '../lib/api.js';
 import { keWebp } from '../lib/gambar.js';
 
 // Sales Lapangan: bank keberatan pelanggan + log kunjungan sales + insight. Akun peran sales cuma lihat punyanya sendiri.
-const TABS = [
+const tabsUntuk = (sales) => [
   { id: 'log', nama: 'Log kunjungan' },
+  { id: 'toko', nama: sales ? 'Toko saya' : 'Toko per sales' },
   { id: 'bank', nama: 'Bank keberatan' },
   { id: 'insight', nama: 'Insight' },
 ];
+const STATUS_TOKO = {
+  langganan: { nama: 'Langganan aktif', warna: 'hijau' },
+  permanen: { nama: 'Permanen', warna: 'ungu' },
+  trial: { nama: 'Trial', warna: 'biru' },
+  trial_habis: { nama: 'Trial habis', warna: '' },
+  berhenti: { nama: 'Berhenti', warna: 'merah' },
+};
+const koordinat = (lat, lng) => `${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`;
 export const HASIL = {
   berhasil: { nama: 'Berhasil (daftar / trial)', pendek: 'Berhasil', warna: 'hijau', isi: 'var(--hijau)' },
   tertarik: { nama: 'Tertarik, follow up', pendek: 'Tertarik', warna: 'biru', isi: 'var(--biru)' },
@@ -21,8 +30,9 @@ const hariIniWib = () => new Date(Date.now() + 7 * 3600000).toISOString().slice(
 const JAM_UBAH_SALES = 24;
 
 export default function Lapangan({ api, admin, tab }) {
-  const aktif = TABS.some((t) => t.id === tab) ? tab : 'log';
   const sales = admin.peran === 'sales';
+  const TABS = tabsUntuk(sales);
+  const aktif = TABS.some((t) => t.id === tab) ? tab : 'log';
   const [form, setForm] = useState(null); // { awal } | null
   const [dipilih, setDipilih] = useState(null);
   const [versi, setVersi] = useState(0);
@@ -52,6 +62,7 @@ export default function Lapangan({ api, admin, tab }) {
       )}
 
       {aktif === 'log' && <Log api={api} sales={sales} versi={versi} onBuka={setDipilih} onCatat={() => setForm({ awal: {} })} />}
+      {aktif === 'toko' && <Toko api={api} sales={sales} />}
       {aktif === 'bank' && <Bank api={api} sales={sales} setPesan={setPesan} onPakai={(k) => setForm({ awal: { keberatan_id: k.id } })} />}
       {aktif === 'insight' && <Insight api={api} sales={sales} versi={versi} />}
 
@@ -98,12 +109,12 @@ function Log({ api, sales, versi, onBuka, onCatat }) {
   const kategori = useMemo(() => [...new Set([...(bank || []).map((k) => k.kategori), ...(data || []).map((l) => l.kategori)])].sort(), [bank, data]);
 
   const ekspor = () => {
-    const kepala = ['No', 'Tanggal', 'Sales', 'Kategori', 'Ucapan pelanggan', 'Fakta produk', 'Respon sales', 'Respon customer', 'Hasil', 'Catatan / insight', 'No kunjungan / ID cust', 'Link lokasi', 'Akurasi GPS (m)', 'Jumlah foto'];
+    const kepala = ['No', 'Tanggal', 'Sales', 'Kategori', 'Ucapan pelanggan', 'Fakta produk', 'Respon sales', 'Respon customer', 'Hasil', 'Catatan / insight', 'No kunjungan / ID cust', 'Latitude', 'Longitude', 'Akurasi GPS (m)', 'Waktu GPS', 'Jumlah foto'];
     const sel = (v) => {
       const s = v == null ? '' : String(v);
       return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const baris = data.map((l) => [l.nomor, l.tanggal, l.sales_nama, l.kategori, l.ucapan, l.fakta, l.respon_sales, l.respon_customer, HASIL[l.hasil]?.pendek, l.catatan, l.id_kunjungan, l.lokasi_url, l.akurasi_m, l.foto.length]);
+    const baris = data.map((l) => [l.nomor, l.tanggal, l.sales_nama, l.kategori, l.ucapan, l.fakta, l.respon_sales, l.respon_customer, HASIL[l.hasil]?.pendek, l.catatan, l.id_kunjungan, l.lat ?? '', l.lng ?? '', l.akurasi_m ?? '', l.lokasi_at || '', l.foto.length]);
     const url = URL.createObjectURL(new Blob(['﻿' + [kepala, ...baris].map((r) => r.map(sel).join(',')).join('\n')], { type: 'text/csv;charset=utf-8' }));
     Object.assign(document.createElement('a'), { href: url, download: `sales-lapangan-${hariIniWib()}.csv` }).click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -210,7 +221,8 @@ function Log({ api, sales, versi, onBuka, onCatat }) {
                   <th>Hasil</th>
                   <th>Catatan / insight</th>
                   <th>Kunjungan</th>
-                  <th>Bukti</th>
+                  <th>Lokasi (lat, long)</th>
+                  <th>Foto</th>
                 </tr>
               </thead>
               <tbody>
@@ -230,12 +242,17 @@ function Log({ api, sales, versi, onBuka, onCatat }) {
                     </td>
                     <td className="adm-lap-sel">{l.catatan || <span className="adm-redup">-</span>}</td>
                     <td>{l.id_kunjungan || <span className="adm-redup">-</span>}</td>
-                    <td style={{ whiteSpace: 'nowrap' }}>
-                      {l.foto.length ? `${l.foto.length} foto` : ''}
-                      {l.foto.length && l.lokasi_url ? ' · ' : ''}
-                      {l.lokasi_url ? 'lokasi' : ''}
-                      {!l.foto.length && !l.lokasi_url && <span className="adm-redup">-</span>}
+                    <td className="adm-mono" style={{ whiteSpace: 'nowrap', fontSize: 13 }}>
+                      {l.lat != null ? (
+                        <>
+                          {koordinat(l.lat, l.lng)}
+                          {l.akurasi_m != null && <div className="adm-redup" style={l.akurasi_m > 100 ? { color: 'var(--merah)' } : undefined}>±{l.akurasi_m} m</div>}
+                        </>
+                      ) : (
+                        <span className="adm-redup">-</span>
+                      )}
                     </td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{l.foto.length ? `${l.foto.length} foto` : <span className="adm-redup">-</span>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -365,14 +382,16 @@ function Detail({ api, l, admin, onTutup, onUbah, onHapus }) {
           )}
           {l.lat != null ? (
             <p style={{ margin: '8px 0 0' }}>
-              <a href={l.lokasi_url} target="_blank" rel="noopener noreferrer" className="adm-link">
-                Lihat lokasi kunjungan di peta
-              </a>
-              <span className="adm-redup">
-                {' '}
-                · GPS{l.akurasi_m != null ? ` ±${l.akurasi_m} m` : ''}
-                {l.lokasi_at ? ` · ${waktu(l.lokasi_at)}` : ''}
+              <span className="adm-mono">
+                <b>{koordinat(l.lat, l.lng)}</b>
               </span>
+              <span className="adm-redup">
+                {l.akurasi_m != null ? ` · akurasi ±${l.akurasi_m} m` : ''}
+                {l.lokasi_at ? ` · diambil ${waktu(l.lokasi_at)}` : ''}
+              </span>{' '}
+              <a href={l.lokasi_url} target="_blank" rel="noopener noreferrer" className="adm-link" style={{ whiteSpace: 'nowrap' }}>
+                buka peta
+              </a>
             </p>
           ) : l.lokasi_url ? (
             <p style={{ margin: '8px 0 0' }}>
@@ -465,12 +484,9 @@ function LokasiGps({ gps, status, error, lama, onAmbil }) {
       </div>
       {titik ? (
         <p style={{ margin: '6px 0 0' }}>
-          <b>{gps ? 'Lokasi terkunci' : 'Lokasi tersimpan'}</b>
+          <b>{gps ? 'Lokasi terkunci' : 'Lokasi tersimpan'}: </b>
+          <span className="adm-mono">{koordinat(titik.lat, titik.lng)}</span>
           {titik.akurasi != null && <span className={titik.akurasi > 100 ? '' : 'adm-redup'} style={titik.akurasi > 100 ? { color: 'var(--merah)' } : undefined}> · akurasi ±{Math.round(titik.akurasi)} m</span>}
-          {' · '}
-          <a href={`https://www.google.com/maps?q=${titik.lat},${titik.lng}`} target="_blank" rel="noopener noreferrer" className="adm-link">
-            lihat di peta
-          </a>
         </p>
       ) : status === 'jalan' ? (
         <p className="adm-redup" style={{ margin: '6px 0 0' }}>Nyari sinyal GPS, biasanya beberapa detik…</p>
@@ -702,6 +718,217 @@ function FormLog({ api, awal, wajibGps, onTutup, onSelesai }) {
         </div>
       </form>
     </Modal>
+  );
+}
+
+// ---------------- Toko saya ----------------
+const rupiah = (n) => 'Rp ' + Math.round(n || 0).toLocaleString('id-ID');
+function sisaHari(t) {
+  if (!t) return '';
+  const h = Math.ceil((new Date(t) - Date.now()) / 86400000);
+  return h >= 0 ? `sisa ${h} hari` : `lewat ${-h} hari`;
+}
+
+function Toko({ api, sales }) {
+  const [akun, setAkun] = useState('');
+  const { data: daftar } = useData(api, sales ? null : '/admin');
+  const akunSales = (daftar || []).filter((a) => a.peran === 'sales');
+  const { data, error, muat } = useData(api, sales ? '/lapangan/toko' : akun ? `/lapangan/toko?akun=${akun}` : null);
+  const [filter, setFilter] = useState('');
+
+  return (
+    <>
+      {!sales && (
+        <section className="adm-kartu" style={{ marginBottom: 12, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <label htmlFor="toko-akun" className="adm-label" style={{ fontSize: 11 }}>
+            Akun sales
+          </label>
+          <select id="toko-akun" value={akun} onChange={(e) => setAkun(e.target.value)}>
+            <option value="">{daftar ? 'Pilih akun sales' : 'Memuat…'}</option>
+            {akunSales.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.nama}
+                {a.wp_sales_id ? '' : ' (belum dihubungin)'}
+              </option>
+            ))}
+          </select>
+          <span className="adm-redup">Hubungin akun sales ke kode sales Warung Pintar di Pengaturan, Pengguna &amp; tim.</span>
+        </section>
+      )}
+      {!sales && !akun ? (
+        <Kosong judul="Pilih akun sales dulu">Tab ini nampilin toko yang dipegang sales itu dan pembayaran dari tokonya.</Kosong>
+      ) : error ? (
+        <Gagal apa="toko" pesan={error} onUlang={muat} />
+      ) : !data ? (
+        <Memuat apa="toko" />
+      ) : !data.terhubung ? (
+        <Kosong judul="Akun ini belum dihubungin ke kode sales">
+          {sales ? 'Minta admin nyambungin akunmu ke kode sales Warung Pintar-mu. Setelah itu toko yang kamu pegang muncul di sini.' : 'Buka Pengaturan, Pengguna & tim, lalu pilih kode sales Warung Pintar buat akun ini.'}
+        </Kosong>
+      ) : (
+        <>
+          <section className="adm-lap-toko-atas">
+            <div className="adm-kartu">
+              <span className="adm-label">Kode sales</span>
+              <b className="adm-mono" style={{ fontSize: 22 }}>{data.sales?.kode || '-'}</b>
+              <span className="adm-redup">{data.sales?.nama}</span>
+            </div>
+            <div className="adm-kartu">
+              <span className="adm-label">Toko dipegang</span>
+              <b className="p-num" style={{ fontSize: 22 }}>{data.toko.length}</b>
+              <span className="adm-redup">
+                {(data.ringkas.langganan || 0) + (data.ringkas.permanen || 0)} masih berlangganan · {data.ringkas.trial || 0} trial
+              </span>
+            </div>
+            <div className="adm-kartu">
+              <span className="adm-label">Pembayaran bulan ini</span>
+              <b className="p-num" style={{ fontSize: 22 }}>{rupiah(data.total.bulanIni)}</b>
+              <span className="adm-redup">{data.total.tokoBaruBulanIni} toko bayar pertama kali bulan ini</span>
+            </div>
+            <div className="adm-kartu">
+              <span className="adm-label">Total pembayaran</span>
+              <b className="p-num" style={{ fontSize: 22 }}>{rupiah(data.total.semua)}</b>
+              <span className="adm-redup">{sales ? 'dari toko waktu kamu pegang' : 'dari toko selama dipegang sales ini'}</span>
+            </div>
+          </section>
+          <p className="adm-redup" style={{ margin: '0 0 14px' }}>
+            Angka di atas itu uang yang dibayar toko, bukan komisi. Komisi belum dihitung di sini.
+          </p>
+
+          <div className="adm-chip-filter">
+            <button className={'adm-chip' + (filter === '' ? ' biru' : '')} onClick={() => setFilter('')}>
+              Semua {data.toko.length}
+            </button>
+            {Object.entries(STATUS_TOKO).map(([id, st]) =>
+              data.ringkas[id] ? (
+                <button key={id} className={'adm-chip' + (filter === id ? ' biru' : '')} onClick={() => setFilter(id)} aria-pressed={filter === id}>
+                  {st.nama} {data.ringkas[id]}
+                </button>
+              ) : null
+            )}
+          </div>
+
+          {data.toko.length === 0 ? (
+            <Kosong judul={sales ? 'Belum ada toko yang kamu pegang' : 'Sales ini belum pegang toko'}>Toko muncul di sini begitu ada warung yang daftar pakai kode atau link sales ini.</Kosong>
+          ) : (
+            <>
+            <ul className="adm-lap-kartu" style={{ marginBottom: 20 }}>
+              {data.toko
+                .filter((t) => !filter || t.tahap === filter)
+                .map((t) => (
+                  <li key={t.id} className="adm-kartu" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
+                      <b style={{ overflowWrap: 'anywhere' }}>{t.nama}</b>
+                      <span className={`adm-chip ${STATUS_TOKO[t.tahap]?.warna}`}>{STATUS_TOKO[t.tahap]?.nama}</span>
+                    </div>
+                    <span className="adm-redup">
+                      {t.plan} · {t.tahap === 'permanen' ? 'seumur hidup' : `${tgl(t.lisensi_berlaku_sampai)} (${sisaHari(t.lisensi_berlaku_sampai)})`}
+                    </span>
+                    <span className="adm-redup">
+                      Dibayar {rupiah(t.total_bayar)} ({t.jumlah_bayar}×) · pakai app {t.terakhir_aktif ? waktu(t.terakhir_aktif) : 'belum pernah'}
+                    </span>
+                    {t.no_hp && (
+                      <a className="adm-link" href={`https://wa.me/${t.no_hp.replace(/\D/g, '').replace(/^0/, '62')}`} target="_blank" rel="noopener noreferrer">
+                        WhatsApp pemilik
+                      </a>
+                    )}
+                  </li>
+                ))}
+            </ul>
+            <div className="adm-gulir adm-lap-tabel" style={{ marginBottom: 20 }}>
+              <table className="adm-tabel">
+                <thead>
+                  <tr>
+                    <th>Toko</th>
+                    <th>Status</th>
+                    <th>Paket</th>
+                    <th>Berlaku sampai</th>
+                    <th className="kanan">Total dibayar</th>
+                    <th>Terakhir pakai app</th>
+                    <th>Kontak</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.toko
+                    .filter((t) => !filter || t.tahap === filter)
+                    .map((t) => (
+                      <tr key={t.id}>
+                        <td>
+                          <b>{t.nama}</b>
+                          <div className="adm-redup">
+                            {t.jenis_usaha ? `${t.jenis_usaha} · ` : ''}dipegang sejak {tgl(t.pegang_sejak)}
+                          </div>
+                        </td>
+                        <td>
+                          <span className={`adm-chip ${STATUS_TOKO[t.tahap]?.warna}`}>{STATUS_TOKO[t.tahap]?.nama}</span>
+                        </td>
+                        <td>{t.plan}</td>
+                        <td style={{ whiteSpace: 'nowrap' }}>
+                          {t.tahap === 'permanen' ? (
+                            'Seumur hidup'
+                          ) : (
+                            <>
+                              {tgl(t.lisensi_berlaku_sampai)}
+                              <div className="adm-redup" style={['berhenti', 'trial_habis'].includes(t.tahap) ? { color: 'var(--merah)' } : undefined}>
+                                {sisaHari(t.lisensi_berlaku_sampai)}
+                              </div>
+                            </>
+                          )}
+                        </td>
+                        <td className="kanan p-num">
+                          {rupiah(t.total_bayar)}
+                          <div className="adm-redup">{t.jumlah_bayar}× bayar</div>
+                        </td>
+                        <td style={{ whiteSpace: 'nowrap' }}>{t.terakhir_aktif ? waktu(t.terakhir_aktif) : <span className="adm-redup">Belum pernah</span>}</td>
+                        <td>
+                          {t.no_hp ? (
+                            <a className="adm-link" href={`https://wa.me/${t.no_hp.replace(/\D/g, '').replace(/^0/, '62')}`} target="_blank" rel="noopener noreferrer">
+                              WhatsApp
+                            </a>
+                          ) : (
+                            <span className="adm-redup">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+            </>
+          )}
+
+          <h2 style={{ fontSize: 20 }}>{sales ? 'Pembayaran dari toko kamu' : 'Pembayaran dari toko sales ini'}</h2>
+          {data.pembayaran.length === 0 ? (
+            <Kosong judul="Belum ada pembayaran">Pembayaran lunas dari toko yang kamu pegang muncul di sini.</Kosong>
+          ) : (
+            <div className="adm-gulir">
+              <table className="adm-tabel">
+                <thead>
+                  <tr>
+                    <th>Lunas</th>
+                    <th>Toko</th>
+                    <th>Paket</th>
+                    <th>Order</th>
+                    <th className="kanan">Jumlah</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.pembayaran.map((p) => (
+                    <tr key={p.order_id}>
+                      <td style={{ whiteSpace: 'nowrap' }}>{waktu(p.lunas_pada)}</td>
+                      <td>{p.warung_nama}</td>
+                      <td>{p.plan}</td>
+                      <td>{p.urutan === 1 ? <span className="adm-chip hijau">Pertama</span> : <span className="adm-chip">Perpanjangan ke-{p.urutan - 1}</span>}</td>
+                      <td className="kanan p-num">{rupiah(p.jumlah)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </>
   );
 }
 
