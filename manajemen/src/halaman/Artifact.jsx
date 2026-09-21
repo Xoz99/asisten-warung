@@ -76,65 +76,24 @@ export default function Artifact({ api, tab }) {
 
   return (
     <div onDragEnter={onDragEnter} onDragLeave={onDragLeave} onDragOver={(e) => adaFile(e) && e.preventDefault()} onDrop={onDrop}>
-      <header className="adm-kepala">
+      <header className="adm-art-kepala">
         <div>
-          <h1>Artifact</h1>
+          <h1 style={{ margin: 0 }}>Artifact</h1>
           <p className="adm-sub">Tempat nyimpen SOP, dokumen, aset, video, dan catatan tim. Tiap perubahan kesimpen sebagai versi.</p>
-        </div>
-        <div className="adm-tombol" style={{ marginTop: 0 }}>
-          <button className="btn" onClick={() => setModal({ jenis: 'folder', induk: folderAktif })}>
-            Buat folder
-          </button>
-          <button className="btn" onClick={() => setModal({ jenis: 'catatan', awal: { folder_id: folderAktif } })}>
-            Catatan baru
-          </button>
-          <button className="btn utama" onClick={() => setModal({ jenis: 'unggah', files: [] })}>
-            + Unggah file
-          </button>
-        </div>
-      </header>
-
-      <section className="adm-art-stat" aria-label="Ringkasan artifact">
-        <div className="adm-kartu">
-          <span className="adm-label">Folder</span>
-          <b className="p-num">{r ? r.folder : '…'}</b>
-        </div>
-        {Object.entries(TIPE).map(([id, t]) => (
-          <div key={id} className="adm-kartu">
-            <span className="adm-label">{t.nama}</span>
-            <b className="p-num">{r ? r.perTipe[id] || 0 : '…'}</b>
+          <div className="adm-tombol">
+            <button className="btn" onClick={() => setModal({ jenis: 'folder', induk: folderAktif })}>
+              Buat folder
+            </button>
+            <button className="btn" onClick={() => setModal({ jenis: 'catatan', awal: { folder_id: folderAktif } })}>
+              Catatan baru
+            </button>
+            <button className="btn utama" onClick={() => setModal({ jenis: 'unggah', files: [] })}>
+              + Unggah file
+            </button>
           </div>
-        ))}
-        <div className="adm-kartu hitam">
-          <span className="adm-label">Disk server</span>
-          {r?.disk ? (
-            <>
-              <b className="p-num">{Math.round((r.disk.terpakai / r.disk.total) * 100)}% terpakai</b>
-              <span className="adm-redup p-num">
-                {ukuranFile(r.disk.terpakai)} dari {ukuranFile(r.disk.total)}
-              </span>
-              <div
-                className={'adm-art-disk' + (r.disk.terpakai / r.disk.total > 0.9 ? ' penuh' : '')}
-                role="meter"
-                aria-valuenow={Math.round((r.disk.terpakai / r.disk.total) * 100)}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-label="Disk server terpakai"
-              >
-                <div style={{ width: `${(r.disk.terpakai / r.disk.total) * 100}%` }} />
-              </div>
-              <span className="adm-redup">
-                Artifact {ukuranFile(r.terpakai)} · sisa {ukuranFile(r.disk.sisa)}
-              </span>
-            </>
-          ) : (
-            <>
-              <b className="p-num">{r ? ukuranFile(r.terpakai) : '…'}</b>
-              {r && <span className="adm-redup">dipakai Artifact · kapasitas disk nggak kebaca</span>}
-            </>
-          )}
         </div>
-      </section>
+        <Kapasitas r={r} />
+      </header>
 
       {pesan && (
         <p className={pesan.startsWith('Gagal') ? 'adm-error' : 'adm-ok'} role="status">
@@ -244,6 +203,73 @@ export default function Artifact({ api, tab }) {
         />
       )}
     </div>
+  );
+}
+
+// Kartu kapasitas: donut disk server (Artifact / lainnya / sisa) + jumlah per tipe. Angka disk dibaca dari server.
+function Kapasitas({ r }) {
+  if (!r) return <div className="adm-kartu adm-art-kapasitas"><Memuat apa="kapasitas" /></div>;
+  const d = r.disk;
+  const R = 42;
+  const K = 2 * Math.PI * R;
+  const pArt = d ? r.terpakai / d.total : 0;
+  const pLain = d ? Math.max(0, d.terpakai - r.terpakai) / d.total : 0;
+  const persen = d ? Math.round((d.terpakai / d.total) * 100) : null;
+  // Potongan artifact dikasih minimal 1% biar kelihatan kalau isinya masih kecil banget dibanding disk.
+  const busur = (p) => (p > 0 ? Math.max(p, 0.01) * K : 0);
+  return (
+    <section className="adm-kartu adm-art-kapasitas" aria-label="Kapasitas penyimpanan">
+      <div className="adm-art-donut">
+        <svg viewBox="0 0 100 100" role="img" aria-label={d ? `Disk server ${persen} persen terpakai. Artifact ${ukuranFile(r.terpakai)}, sisa ${ukuranFile(d.sisa)}.` : 'Kapasitas disk nggak kebaca'}>
+          <circle cx="50" cy="50" r={R} fill="none" stroke="#E4E4E7" strokeWidth="14" />
+          {d && (
+            <>
+              <circle cx="50" cy="50" r={R} fill="none" stroke="#3F3F46" strokeWidth="14" strokeDasharray={`${pLain * K} ${K}`} transform="rotate(-90 50 50)" />
+              <circle
+                cx="50"
+                cy="50"
+                r={R}
+                fill="none"
+                stroke="var(--biru)"
+                strokeWidth="14"
+                strokeDasharray={`${busur(pArt)} ${K}`}
+                strokeDashoffset={-pLain * K}
+                transform="rotate(-90 50 50)"
+              />
+            </>
+          )}
+        </svg>
+        <div className="adm-art-donut-tengah">
+          <b className="p-num" style={persen > 90 ? { color: 'var(--merah)' } : undefined}>
+            {d ? `${persen}%` : '?'}
+          </b>
+          <span>terpakai</span>
+        </div>
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <span className="adm-label">Disk server</span>
+        {d ? (
+          <ul className="adm-art-legenda">
+            <li>
+              <i style={{ background: 'var(--biru)' }} /> Artifact <b className="p-num">{ukuranFile(r.terpakai)}</b>
+            </li>
+            <li>
+              <i style={{ background: '#3F3F46' }} /> Lainnya <b className="p-num">{ukuranFile(Math.max(0, d.terpakai - r.terpakai))}</b>
+            </li>
+            <li>
+              <i style={{ background: '#E4E4E7' }} /> Sisa <b className="p-num" style={persen > 90 ? { color: 'var(--merah)' } : undefined}>{ukuranFile(d.sisa)}</b>
+            </li>
+          </ul>
+        ) : (
+          <p className="adm-redup" style={{ margin: '4px 0' }}>Kapasitas disk nggak kebaca. Artifact pakai {ukuranFile(r.terpakai)}.</p>
+        )}
+        <p className="adm-art-jumlah">
+          {r.folder} folder · {Object.entries(TIPE)
+            .map(([id, t]) => `${r.perTipe[id] || 0} ${t.nama.toLowerCase()}`)
+            .join(' · ')}
+        </p>
+      </div>
+    </section>
   );
 }
 

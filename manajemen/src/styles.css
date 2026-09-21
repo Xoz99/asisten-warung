@@ -324,14 +324,19 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
 }
 
 /* ---- Artifact ---- */
-.adm-art-stat{display:grid;grid-template-columns:repeat(6,minmax(0,1fr)) minmax(0,1.4fr);gap:12px;margin:0 0 20px}
-.adm-art-stat .adm-kartu{display:flex;flex-direction:column;gap:4px;padding:12px 14px}
-.adm-art-stat b{font-size:24px;line-height:1.1}
-.adm-art-stat .hitam{background:var(--hitam);color:var(--putih)}
-.adm-art-stat .hitam .adm-label,.adm-art-stat .hitam .adm-redup{color:#D4D4D8}
-.adm-art-disk{height:10px;border:2px solid var(--putih);margin:4px 0 2px}
-.adm-art-disk div{height:100%;background:var(--kuning)}
-.adm-art-disk.penuh div{background:var(--merah)}
+.adm-art-kepala{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;margin-bottom:22px}
+.adm-art-kepala>div:first-child{flex:1 1 320px;min-width:0}
+.adm-art-kapasitas{display:flex;gap:16px;align-items:center;padding:14px 16px;flex:0 1 430px;min-width:0}
+.adm-art-donut{position:relative;width:112px;height:112px;flex:none}
+.adm-art-donut svg{width:100%;height:100%;display:block}
+.adm-art-donut-tengah{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.05}
+.adm-art-donut-tengah b{font-size:22px}
+.adm-art-donut-tengah span{font-size:11px;color:var(--redup)}
+.adm-art-legenda{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:3px;font-size:14px}
+.adm-art-legenda li{display:flex;align-items:center;gap:8px}
+.adm-art-legenda i{width:12px;height:12px;border:2px solid var(--hitam);flex:none}
+.adm-art-legenda b{margin-left:auto;padding-left:10px}
+.adm-art-jumlah{margin:8px 0 0;font-size:12px;color:var(--redup);border-top:1px solid #E4E4E7;padding-top:6px}
 .adm-art{display:grid;grid-template-columns:260px minmax(0,1fr);gap:20px;align-items:start}
 .adm-art-pohon{padding-bottom:10px;position:sticky;top:84px}
 .adm-art-simpul{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border:2px solid transparent;color:var(--tinta);text-decoration:none;font-weight:600;font-size:14px}
@@ -364,16 +369,12 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
 .adm-art-pratinjau pre{margin:0;padding:14px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;max-height:50vh;overflow:auto;width:100%;align-self:stretch;background:var(--putih)}
 .adm-art-tanpa{display:flex;flex-direction:column;gap:8px;align-items:center;text-align:center;padding:24px}
 .adm-art-tanpa b{font-size:28px;border:var(--garis);padding:14px 18px;background:var(--putih)}
-@media (max-width:1280px){.adm-art-stat{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media (max-width:900px){
   .adm-art{grid-template-columns:minmax(0,1fr)}
   .adm-art-pohon{position:static}
 }
 @media (max-width:560px){
-  .adm-art-stat{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-  .adm-art-stat .adm-kartu{padding:8px 10px;box-shadow:3px 3px 0 var(--hitam)}
-  .adm-art-stat .adm-label{font-size:10px}
-  .adm-art-stat b{font-size:19px}
-  .adm-art-stat .hitam{grid-column:1 / -1}
+  .adm-art-kapasitas{flex-basis:100%;padding:12px}
+  .adm-art-donut{width:92px;height:92px}
   .adm-art-grid{grid-template-columns:minmax(0,1fr)}
 }
