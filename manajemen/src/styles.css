@@ -329,6 +329,9 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
 .adm-art-stat b{font-size:24px;line-height:1.1}
 .adm-art-stat .hitam{background:var(--hitam);color:var(--putih)}
 .adm-art-stat .hitam .adm-label,.adm-art-stat .hitam .adm-redup{color:#D4D4D8}
+.adm-art-disk{height:10px;border:2px solid var(--putih);margin:4px 0 2px}
+.adm-art-disk div{height:100%;background:var(--kuning)}
+.adm-art-disk.penuh div{background:var(--merah)}
 .adm-art{display:grid;grid-template-columns:260px minmax(0,1fr);gap:20px;align-items:start}
 .adm-art-pohon{padding-bottom:10px;position:sticky;top:84px}
 .adm-art-simpul{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border:2px solid transparent;color:var(--tinta);text-decoration:none;font-weight:600;font-size:14px}

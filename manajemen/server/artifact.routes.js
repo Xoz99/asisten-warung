@@ -135,6 +135,20 @@ async function turunan(folderId) {
   return rows.map((r) => r.id);
 }
 
+// Kapasitas disk tempat file Artifact disimpan (disk VPS beneran, dibaca langsung dari sistem operasi).
+async function infoDisk() {
+  try {
+    const s = await fs.promises.statfs(DIR);
+    const total = s.blocks * s.bsize;
+    const sisa = s.bavail * s.bsize;
+    return { total, sisa, terpakai: total - s.bfree * s.bsize };
+  } catch {
+    return null;
+  }
+}
+// Sisain ruang buat database, log, dan sistem - upload ditolak kalau bakal makan cadangan ini.
+const CADANGAN_DISK = 1024 ** 3;
+
 router.get('/artifact/ringkasan', async (req, res, next) => {
   try {
     const [{ rows: tipe }, { rows: folder }, { rows: ukuran }, { rows: sampah }, { rows: pemilik }] = await Promise.all([
@@ -152,6 +166,7 @@ router.get('/artifact/ringkasan', async (req, res, next) => {
       sampah: sampah[0].n,
       pemilik,
       maksMb: MAKS_MB,
+      disk: await infoDisk(),
     });
   } catch (e) {
     next(e);
@@ -369,6 +384,11 @@ router.post('/artifact/unggah', async (req, res, next) => {
     const folder = versiDari ? null : await folderValid(req.query.folder || null);
     const tipe = TIPE.includes(req.query.tipe) && req.query.tipe !== 'catatan' ? req.query.tipe : mime.startsWith('video/') ? 'video' : mime.startsWith('image/') || ext === 'zip' ? 'aset' : 'dokumen';
 
+    const disk = await infoDisk();
+    const ukuranKirim = Number(req.get('content-length') || 0);
+    if (disk && ukuranKirim && disk.sisa - ukuranKirim < CADANGAN_DISK) {
+      throw salah('Disk server hampir penuh. Hapus permanen file lama di Sampah, atau tambah kapasitas VPS.', 507);
+    }
     const berkas = `${crypto.randomUUID()}.${ext}`;
     lokasi = path.join(DIR, berkas);
     const ukuran = await simpanAliran(req, lokasi);

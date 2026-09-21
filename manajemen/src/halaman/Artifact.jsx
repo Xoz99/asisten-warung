@@ -106,9 +106,33 @@ export default function Artifact({ api, tab }) {
           </div>
         ))}
         <div className="adm-kartu hitam">
-          <span className="adm-label">Terpakai</span>
-          <b className="p-num">{r ? ukuranFile(r.terpakai) : '…'}</b>
-          {r && <span className="adm-redup">maks {r.maksMb} MB per file</span>}
+          <span className="adm-label">Disk server</span>
+          {r?.disk ? (
+            <>
+              <b className="p-num">{Math.round((r.disk.terpakai / r.disk.total) * 100)}% terpakai</b>
+              <span className="adm-redup p-num">
+                {ukuranFile(r.disk.terpakai)} dari {ukuranFile(r.disk.total)}
+              </span>
+              <div
+                className={'adm-art-disk' + (r.disk.terpakai / r.disk.total > 0.9 ? ' penuh' : '')}
+                role="meter"
+                aria-valuenow={Math.round((r.disk.terpakai / r.disk.total) * 100)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="Disk server terpakai"
+              >
+                <div style={{ width: `${(r.disk.terpakai / r.disk.total) * 100}%` }} />
+              </div>
+              <span className="adm-redup">
+                Artifact {ukuranFile(r.terpakai)} · sisa {ukuranFile(r.disk.sisa)}
+              </span>
+            </>
+          ) : (
+            <>
+              <b className="p-num">{r ? ukuranFile(r.terpakai) : '…'}</b>
+              {r && <span className="adm-redup">dipakai Artifact · kapasitas disk nggak kebaca</span>}
+            </>
+          )}
         </div>
       </section>
 
