@@ -307,6 +307,13 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
 .adm-langkah li.lewat span{background:var(--hijau)}
 .adm-setuju{display:flex;gap:10px;align-items:flex-start;margin-top:14px;font-size:14px;cursor:pointer}
 .adm-setuju .adm-centang{margin-top:2px;flex:none}
+.adm-pilihan{border:0;padding:0;margin:16px 0 0;display:flex;flex-direction:column;gap:6px;min-width:0}
+.adm-pilihan legend{font-size:11px;margin-bottom:8px;line-height:1.5}
+.adm-pilihan legend .adm-redup{text-transform:none;letter-spacing:0;font-weight:400}
+.field.adm-pilihan label{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;margin:0;border:var(--garis-tipis);background:var(--putih);cursor:pointer;font-size:14px;min-height:44px;text-transform:none;letter-spacing:0;font-weight:500;line-height:1.4}
+.field.adm-pilihan label.on{background:var(--kuning)}
+.adm-pilihan label:has(input:disabled){opacity:.5;cursor:not-allowed}
+.field.adm-pilihan input.adm-centang{width:20px;height:20px;min-height:0;padding:0;margin-top:0;flex:none;box-shadow:none}
 .adm-jawaban{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px;margin:0}
 .adm-jawaban dt{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--redup)}
 .adm-jawaban dd{margin:2px 0 0;font-weight:500;overflow-wrap:anywhere}

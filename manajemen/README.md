@@ -27,6 +27,28 @@ manajemen.konsulin.com {
 
 Update: `git pull && npm install && npm run build && pm2 restart konsulin-manajemen`.
 
+### Form daftar Sales Partner di domain publik
+
+Form lamaran (`/daftar`) di-build terpisah (`vite.daftar.config.js` -> `dist-daftar/`), jadi bundle-nya nggak bawa kode
+panel admin. Pasang di domain publik dan isi `DAFTAR_URL=https://konsulin.com/daftar` di `.env`. Di Caddy, domain publik
+cuma nerusin dua jalur ini ke Makalin, sisanya tetap ke situs konsulin.com:
+
+```
+konsulin.com {
+    handle /daftar* {
+        reverse_proxy <host>:4100
+    }
+    handle /api/publik/* {
+        reverse_proxy <host>:4100
+    }
+    handle {
+        # konfigurasi situs konsulin.com yang sekarang
+    }
+}
+```
+
+Link lama `makalin.konsulin.com/daftar?s=...` otomatis dialihin ke `DAFTAR_URL` (kode `?s=` ikut kebawa).
+
 ## Login admin
 
 Tiap orang punya akun sendiri (username + password), dan semua perubahan kecatat di **Admin & aktivitas**.

@@ -42,7 +42,7 @@ export default function Rekrutmen({ api, tab }) {
     setVersi((v) => v + 1);
     muatRingkasan();
   }, [muatRingkasan]);
-  const linkDaftar = `${window.location.origin}/daftar`;
+  const linkDaftar = `${r?.linkDaftar || window.location.origin + '/daftar'}`;
 
   return (
     <>
@@ -426,13 +426,14 @@ function Detail({ api, id, onTutup, onBerubah, onBuka }) {
 }
 
 // Jawaban form lamaran + CV/foto. Urutan tampil = urutan di form.
-const URUT_JAWABAN = ['tanggalLahir', 'jenisKelamin', 'kota', 'kecamatan', 'pendidikan', 'pekerjaan', 'pengalamanSales', 'bidangPengalaman', 'waktuKerja', 'ketersediaan', 'kendaraan', 'hpAndroid', 'area', 'kenalWarung', 'sosmed'];
+const URUT_JAWABAN = ['tanggalLahir', 'jenisKelamin', 'kota', 'kecamatan', 'pendidikan', 'pekerjaan', 'pengalamanSales', 'bidangPengalaman', 'waktuKerja', 'ketersediaan', 'kendaraan', 'hpAndroid', 'area', 'kenalWarung', 'skemaKerja', 'tempatProspek', 'tempatProspekLain', 'waktuHubungi', 'sosmed'];
 function DataLamaran({ jawaban, label, dokumen, onError }) {
   if (!jawaban && !dokumen?.length) return null;
   const j = jawaban || {};
   const nilai = (k) => {
     if (k === 'tanggalLahir') return `${tgl(j[k])} (${Math.floor((Date.now() - new Date(j[k]).getTime()) / (365.25 * 86400000))} tahun)`;
     if (k === 'hpAndroid') return j[k] ? 'Punya HP Android + kuota' : 'Belum punya HP Android';
+    if (Array.isArray(j[k])) return j[k].join('; ');
     if (k === 'sosmed' && /^https?:\/\//.test(j[k])) return <a href={j[k]} target="_blank" rel="noopener noreferrer">{j[k]}</a>;
     return j[k];
   };
@@ -768,7 +769,7 @@ function Sumber({ api }) {
         </Kosong>
       ) : (
         data.kampanye.map((k) => (
-          <KartuKampanye key={k.id} api={api} k={k} titik={data.titik.filter((t) => t.kampanye_id === k.id)} kanal={data.kanal} onBerubah={muat} setPesan={setPesan} />
+          <KartuKampanye key={k.id} api={api} k={k} titik={data.titik.filter((t) => t.kampanye_id === k.id)} kanal={data.kanal} linkDaftar={data.linkDaftar} onBerubah={muat} setPesan={setPesan} />
         ))
       )}
       <section className="adm-kolom" style={{ marginTop: 22 }}>
@@ -820,13 +821,13 @@ function Sumber({ api }) {
   );
 }
 
-function KartuKampanye({ api, k, titik, kanal, onBerubah, setPesan }) {
+function KartuKampanye({ api, k, titik, kanal, linkDaftar, onBerubah, setPesan }) {
   const [f, setF] = useState({ kanal: 'FB', area: k.area ? k.area.slice(0, 3).toUpperCase() : '', deskripsi: '', biaya: '' });
   const [error, setError] = useState('');
   const totalBiaya = k.biaya + titik.reduce((a, t) => a + t.biaya, 0);
   const diterima = titik.reduce((a, t) => a + t.diterima, 0);
   const salin = (kode) => {
-    const link = `${window.location.origin}/daftar?s=${kode}`;
+    const link = `${linkDaftar || window.location.origin + '/daftar'}?s=${kode}`;
     navigator.clipboard?.writeText(link).then(() => setPesan(`Link ${kode} disalin: ${link}`), () => window.prompt('Salin link ini:', link));
   };
   const ubahStatus = async (t, status) => {

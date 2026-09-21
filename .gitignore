@@ -35,3 +35,6 @@ Thumbs.db
 # Upload/berkas sementara runtime
 uploads/
 tmp/
+
+# Build form daftar publik (manajemen)
+dist-daftar/

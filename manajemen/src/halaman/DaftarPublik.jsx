@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { panggil } from '../lib/api.js';
 
-// Form lamaran calon Sales Partner - publik, tanpa login (makalin.konsulin.com/daftar?s=KODE).
+// Form lamaran calon Sales Partner - publik, tanpa login (konsulin.com/daftar?s=KODE, build terpisah: vite.daftar.config.js).
 // 3 langkah biar nggak kerasa panjang: data diri -> pengalaman & kesiapan -> dokumen & persetujuan.
 // ?s= = kode titik sebar (sumber keyakinan tinggi). Tanpa kode & tanpa referral, "tahu dari mana" wajib (§7.3).
 const LANGKAH = ['Data diri', 'Pengalaman & kesiapan', 'Dokumen & persetujuan'];
@@ -10,7 +10,9 @@ const AWAL = {
   nama: '', noHp: '', email: '', tanggalLahir: '', jenisKelamin: '', kota: '', kecamatan: '', pendidikan: '',
   pekerjaan: '', pengalamanSales: '', bidangPengalaman: '', waktuKerja: '', ketersediaan: '', kendaraan: '', hpAndroid: null,
   area: '', kenalWarung: '', alasan: '', sosmed: '', referral: '', dropdown: '', setujuData: false, setujuWa: true,
+  skemaKerja: '', waktuHubungi: '', tempatProspek: [], tempatProspekLain: '',
 };
+const PROSPEK_LAIN = 'Saya memiliki ide lain';
 
 export default function DaftarPublik() {
   const params = new URLSearchParams(window.location.search);
@@ -60,8 +62,13 @@ export default function DaftarPublik() {
         kosong('area', 'Area yang mau digarap'),
         kosong('kenalWarung', 'Jumlah warung yang dikenal'),
         isi.alasan.trim().length < 20 ? 'Ceritain alasanmu minimal 20 huruf' : null,
+        !isi.skemaKerja ? 'Pilih skema kerja yang paling nyaman buat kamu' : null,
+        !isi.tempatProspek.length ? 'Pilih tempat terbaik buat nemuin pemilik usaha' : null,
+        isi.tempatProspek.includes(PROSPEK_LAIN) && isi.tempatProspekLain.trim().length < 5 ? 'Tulis ide tempatmu (minimal 5 huruf)' : null,
       ],
-      2: [perluDropdown && !isi.dropdown ? 'Pilih tahu Konsulin dari mana' : null, !isi.setujuData ? 'Centang persetujuan pemakaian data' : null],
+      2: [
+        !cv ? 'Upload CV kamu dulu' : null,
+        !isi.waktuHubungi ? 'Pilih waktu terbaik buat dihubungi' : null,perluDropdown && !isi.dropdown ? 'Pilih tahu Konsulin dari mana' : null, !isi.setujuData ? 'Centang persetujuan pemakaian data' : null],
     }[i];
     return cek.find(Boolean) || '';
   };
@@ -122,6 +129,35 @@ export default function DaftarPublik() {
       </select>
     </div>
   );
+  // Pilihan berbentuk daftar (radio / centang) - buat pertanyaan yang opsinya panjang.
+  const opsi = (k, label, daftar, maks) => {
+    const banyak = Array.isArray(isi[k]);
+    const penuh = banyak && maks && isi[k].length >= maks;
+    return (
+      <fieldset className="field adm-pilihan">
+        <legend className="adm-label">
+          {label}
+          {maks ? <span className="adm-redup"> (pilih maksimal {maks})</span> : null}
+        </legend>
+        {(daftar || []).map((o) => {
+          const dipilih = banyak ? isi[k].includes(o) : isi[k] === o;
+          return (
+            <label key={o} className={dipilih ? 'on' : ''}>
+              <input
+                type={banyak ? 'checkbox' : 'radio'}
+                name={`d-${k}`}
+                className="adm-centang"
+                checked={dipilih}
+                disabled={!dipilih && penuh}
+                onChange={() => setError('') || setIsi((x) => ({ ...x, [k]: banyak ? (dipilih ? x[k].filter((y) => y !== o) : [...x[k], o]) : o }))}
+              />
+              <span>{o === PROSPEK_LAIN ? 'Saya memiliki ide lain (tulis di bawah)' : o}</span>
+            </label>
+          );
+        })}
+      </fieldset>
+    );
+  };
   const berkas = (label, nilai, set, jenis, accept) => (
     <div className="field">
       <span className="adm-label" style={{ fontSize: 11, display: 'block', marginBottom: 6 }}>
@@ -224,16 +260,20 @@ export default function DaftarPublik() {
                   <textarea id="d-alasan" value={isi.alasan} onChange={ubah('alasan')} placeholder="Ceritain singkat: pengalamanmu, target penghasilan, atau kenapa cocok" />
                   <span className="adm-redup">{isi.alasan.trim().length}/20 huruf minimal</span>
                 </div>
+                {opsi('skemaKerja', 'Skema kerja mana yang paling bikin kamu nyaman?', P.skemaKerja)}
+                {opsi('tempatProspek', 'Menurut kamu, di mana tempat terbaik buat nemuin pemilik usaha / UMKM yang butuh solusi software?', P.tempatProspek, 2)}
+                {isi.tempatProspek.includes(PROSPEK_LAIN) && f('tempatProspekLain', 'Ide tempat lainnya', { placeholder: 'Misal: pasar tradisional, grup WA RT', maxLength: 200 })}
               </>
             )}
 
             {langkah === 2 && (
               <>
-                {berkas('CV / riwayat hidup (opsional)', cv, setCv, 'cv', 'application/pdf,image/jpeg,image/png')}
+                {berkas('CV / riwayat hidup', cv, setCv, 'cv', 'application/pdf,image/jpeg,image/png')}
                 {berkas('Foto diri (opsional)', foto, setFoto, 'foto', 'image/jpeg,image/png')}
                 {f('sosmed', 'Link Instagram / Facebook / LinkedIn (opsional)', { placeholder: 'https://' })}
                 {f('referral', 'Kode referral (kalau diajak teman)', { placeholder: 'REF-A1B2C3', autoCapitalize: 'characters' })}
                 {perluDropdown && pilih('dropdown', 'Tahu Konsulin dari mana?', info?.pilihanSumber)}
+                {opsi('waktuHubungi', 'Kalau kamu terpilih, kapan waktu terbaik tim kami ngehubungin lewat WhatsApp?', P.waktuHubungi)}
                 <label className="adm-setuju">
                   <input type="checkbox" className="adm-centang" checked={isi.setujuData} onChange={ubah('setujuData')} />
                   <span>Saya setuju data di lamaran ini dipakai Konsulin buat proses seleksi Sales Partner. Data pelamar yang nggak lolos dihapus setelah 2 tahun.</span>

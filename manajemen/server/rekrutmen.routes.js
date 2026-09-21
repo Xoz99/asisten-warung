@@ -144,7 +144,18 @@ export const PILIHAN = {
   waktuKerja: ['Full time', 'Part time'],
   kendaraan: ['Motor sendiri', 'Mobil sendiri', 'Nggak punya kendaraan'],
   kenalWarung: ['Belum kenal', '1-5 warung', '6-20 warung', 'Lebih dari 20 warung'],
+  skemaKerja: ['Full komisi berbasis performa + passive income', 'Gaji pokok', 'Saya punya skema lain (nanti saya diskusikan)'],
+  waktuHubungi: ['Pagi (09.00-12.00)', 'Siang (12.00-15.00)', 'Sore (15.00-18.00)', 'Malam (setelah 18.00)'],
+  tempatProspek: [
+    'Langsung datang ke sentra bisnis atau ruko di sekitar lokasi saya',
+    'Relasi pribadi atau teman yang memiliki usaha',
+    'Komunitas bisnis atau asosiasi UMKM',
+    'Platform marketplace atau forum diskusi bisnis',
+    'Media sosial (Facebook Groups, LinkedIn, Instagram)',
+    'Saya memiliki ide lain',
+  ],
 };
+export const PROSPEK_LAIN = 'Saya memiliki ide lain';
 
 // Bersihin jawaban form publik. `wajib` = true buat form daftar publik (semua isian penting wajib); input manual
 // recruiter boleh sebagian.
@@ -180,6 +191,14 @@ function bersihkanJawaban(b, wajib) {
   pilih('kenalWarung');
   isian('alasan', 1000, 20);
   isian('sosmed', 200, 0);
+  pilih('skemaKerja');
+  pilih('waktuHubungi');
+  // Tempat cari calon pelanggan: pilih 1-2. "Ide lain" wajib ditulis idenya.
+  const prospek = Array.isArray(b.tempatProspek) ? [...new Set(b.tempatProspek)].filter((x) => PILIHAN.tempatProspek.includes(x)) : [];
+  if (prospek.length > 2) throw salah('Tempat cari pelanggan maksimal pilih 2');
+  if (prospek.length) j.tempatProspek = prospek;
+  else if (wajib) throw salah('Pilih tempat terbaik buat nemuin pemilik usaha (maksimal 2)');
+  if (prospek.includes(PROSPEK_LAIN)) isian('tempatProspekLain', 200, 5);
   if (wajib && b.setujuData !== true) throw salah('Centang persetujuan pemakaian data dulu');
   j.setujuData = b.setujuData === true;
   j.setujuWa = b.setujuWa === true;
@@ -189,7 +208,11 @@ const LABEL = {
   jenisKelamin: 'Jenis kelamin', pendidikan: 'Pendidikan terakhir', pekerjaan: 'Pekerjaan sekarang', pengalamanSales: 'Pengalaman jualan',
   waktuKerja: 'Waktu kerja', kendaraan: 'Kendaraan', kenalWarung: 'Jumlah warung yang dikenal', kota: 'Kota / kabupaten', kecamatan: 'Kecamatan',
   ketersediaan: 'Hari & jam tersedia', area: 'Area yang mau digarap', alasan: 'Alasan tertarik', bidangPengalaman: 'Bidang pengalaman', sosmed: 'Link sosmed',
+  skemaKerja: 'Skema kerja yang diinginkan', waktuHubungi: 'Waktu terbaik dihubungi', tempatProspek: 'Tempat cari pelanggan', tempatProspekLain: 'Ide tempat cari pelanggan',
 };
+// Link form daftar yang dibagiin ke calon pelamar. Di produksi form-nya di domain publik (konsulin.com/daftar), bukan
+// di domain internal makalin - lihat README.
+export const DAFTAR_URL = (process.env.DAFTAR_URL || '').replace(/\/+$/, '');
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DOKUMEN_DIR = process.env.DOKUMEN_DIR || path.resolve(__dirname, '../data/dokumen');
@@ -316,6 +339,7 @@ publikRouter.post('/daftar', daftarLimiter, async (req, res, next) => {
       return res.status(400).json({ error: 'Pilih dulu tahu Konsulin dari mana' });
     }
     const jawaban = bersihkanJawaban(b, true);
+    if (!b.cv) return res.status(400).json({ error: 'Upload CV kamu dulu' });
     const dokumen = [
       b.cv ? { jenis: 'cv', ...bacaDokumen(b.cv, 'cv') } : null,
       b.foto ? { jenis: 'foto', ...bacaDokumen(b.foto, 'foto') } : null,
@@ -379,6 +403,7 @@ router.get('/rekrutmen/ringkasan', async (req, res, next) => {
     ]);
     const per = Object.fromEntries(status.map((r) => [r.status, r.n]));
     res.json({
+      linkDaftar: DAFTAR_URL,
       perStatus: per,
       aktif: TAHAP.filter((t) => t !== 'hired').reduce((a, t) => a + (per[t] || 0), 0),
       mingguIni: minggu[0].n,
@@ -674,7 +699,7 @@ router.get('/rekrutmen/kampanye', async (req, res, next) => {
     const { rows: referral } = await query(
       `SELECT count(*)::int AS pelamar, count(*) FILTER (WHERE status='hired')::int AS diterima FROM mj_lamaran WHERE referrer_orang_id IS NOT NULL`
     );
-    res.json({ kampanye, titik, rendah, referral: referral[0], kanal: KANAL });
+    res.json({ kampanye, titik, rendah, referral: referral[0], kanal: KANAL, linkDaftar: DAFTAR_URL });
   } catch (e) {
     next(e);
   }
