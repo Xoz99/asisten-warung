@@ -732,9 +732,27 @@ function sisaHari(t) {
 }
 
 // Link & kode referral sales. Warung yang daftar lewat link ini (atau ngetik kodenya) otomatis jadi toko sales ini.
+const KUNCI_LINK_CIUT = 'makalin_link_sales_ciut';
+
 function LinkSales({ link, sales, milikSendiri }) {
   const [qr, setQr] = useState(null);
   const [pesan, setPesan] = useState('');
+  // Disembunyiin / ditampilin - diingat di browser ini aja (preferensi tampilan, bukan data).
+  const [ciut, setCiut] = useState(() => {
+    try {
+      return localStorage.getItem(KUNCI_LINK_CIUT) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const gantiCiut = (v) => {
+    setCiut(v);
+    try {
+      localStorage.setItem(KUNCI_LINK_CIUT, v ? '1' : '0');
+    } catch {
+      /* diblok - cukup di memori */
+    }
+  };
   useEffect(() => {
     let batal = false;
     QRCode.toDataURL(link, { width: 480, margin: 2, errorCorrectionLevel: 'M' })
@@ -750,10 +768,37 @@ function LinkSales({ link, sales, milikSendiri }) {
       () => setPesan('Link disalin.'),
       () => window.prompt('Salin link ini:', link)
     ) ?? window.prompt('Salin link ini:', link);
+  const judul = milikSendiri ? 'Link & kode kamu' : 'Link & kode sales';
+  if (ciut) {
+    return (
+      <section className="adm-kartu adm-lap-link-ciut" aria-label="Link dan kode sales">
+        <span className="adm-label">Kode sales</span>
+        <b className="adm-mono" style={{ marginRight: 'auto' }}>
+          {sales?.kode}
+        </b>
+        {pesan && (
+          <span className="adm-redup" role="status">
+            {pesan}
+          </span>
+        )}
+        <button className="btn kecil" onClick={salin}>
+          Salin link
+        </button>
+        <button className="btn kecil" onClick={() => gantiCiut(false)} aria-expanded={false}>
+          Tampilkan
+        </button>
+      </section>
+    );
+  }
   return (
     <section className="adm-kartu adm-lap-link" aria-label="Link dan kode sales">
       <div style={{ minWidth: 0 }}>
-        <span className="adm-label">{milikSendiri ? 'Link & kode kamu' : 'Link & kode sales'}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+          <span className="adm-label">{judul}</span>
+          <button className="btn kecil" onClick={() => gantiCiut(true)} aria-expanded={true}>
+            Sembunyikan
+          </button>
+        </div>
         <p style={{ margin: '6px 0 0' }}>
           Kode sales: <b className="adm-mono" style={{ fontSize: 22 }}>{sales?.kode}</b>
         </p>
