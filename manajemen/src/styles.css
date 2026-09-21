@@ -534,10 +534,12 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
    Panel biru + lembar putih membulat. Lebih lembut dari panel admin, karena ini pintu masuk admin & sales. */
 .mk{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;background:var(--putih)}
 .mk-hero{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:48px 24px 72px;color:var(--putih);text-align:center;
-  background:radial-gradient(circle at 50% 38%,rgba(255,255,255,.14) 0 22%,transparent 22.5%),radial-gradient(circle at 50% 38%,rgba(255,255,255,.08) 0 34%,transparent 34.5%),var(--biru);min-height:34vh}
-.mk-logo{width:76px;height:76px;display:grid;place-items:center;border-radius:22px;background:var(--kuning);color:var(--hitam);font-size:40px;font-weight:700;border:3px solid var(--hitam);box-shadow:0 5px 0 rgba(0,0,0,.35);margin-bottom:8px}
-.mk-hero b{font-size:30px;letter-spacing:-.01em}
-.mk-hero span:last-child{font-size:15px;opacity:.9}
+  background:radial-gradient(circle at 50% 42%,rgba(255,255,255,.13) 0 150px,transparent 151px),radial-gradient(circle at 50% 42%,rgba(255,255,255,.07) 0 230px,transparent 231px),var(--biru);min-height:34vh}
+.mk-logo{width:108px;height:108px;display:grid;place-items:center;border-radius:30px;background:var(--kuning);color:var(--hitam);font-size:58px;font-weight:700;border:3px solid var(--hitam);box-shadow:0 6px 0 rgba(0,0,0,.35);margin-bottom:18px}
+.mk-wordmark{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1}
+.mk-wordmark b{font-size:clamp(48px,14vw,68px);font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+.mk-wordmark span{font-size:clamp(20px,5.6vw,26px);margin-top:4px}
+.mk-wordmark em{font-style:normal;color:var(--kuning)}
 .mk-lembar{flex:none;display:flex;flex-direction:column;background:var(--putih);border-radius:28px 28px 0 0;margin-top:-32px;position:relative;padding:28px 20px 20px}
 .mk-form{width:100%;max-width:400px;margin:0 auto}
 .mk-form h1{font-size:28px;margin:0;text-transform:none;letter-spacing:-.01em}
@@ -560,9 +562,10 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
 .mk-kaki{text-align:center;color:var(--redup);font-size:13px;margin:0;padding-top:24px}
 @media (min-width:900px){
   .mk{flex-direction:row}
-  .mk-hero{flex:1;min-height:100vh;padding:48px;background:radial-gradient(circle at 50% 44%,rgba(255,255,255,.14) 0 14%,transparent 14.5%),radial-gradient(circle at 50% 44%,rgba(255,255,255,.08) 0 24%,transparent 24.5%),var(--biru)}
-  .mk-logo{width:96px;height:96px;font-size:50px;border-radius:26px}
-  .mk-hero b{font-size:40px}
+  .mk-hero{flex:1;min-height:100vh;padding:48px;background:radial-gradient(circle at 50% 43%,rgba(255,255,255,.13) 0 180px,transparent 181px),radial-gradient(circle at 50% 43%,rgba(255,255,255,.07) 0 280px,transparent 281px),var(--biru)}
+  .mk-logo{width:124px;height:124px;font-size:66px;border-radius:34px}
+  .mk-wordmark b{font-size:80px}
+  .mk-wordmark span{font-size:30px}
   .mk-lembar{flex:0 0 min(520px,46%);margin:0;border-radius:0;justify-content:center;padding:48px}
   .mk-kaki{margin-top:0;position:absolute;bottom:24px;left:0;right:0}
 }

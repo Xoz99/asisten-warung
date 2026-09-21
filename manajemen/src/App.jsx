@@ -267,8 +267,12 @@ function Masuk({ error, onMasuk }) {
     <div className="mk">
       <section className="mk-hero" aria-hidden="true">
         <span className="mk-logo">M</span>
-        <b>Makalin</b>
-        <span>by Konsulin</span>
+        <span className="mk-wordmark">
+          <b>Makalin</b>
+          <span>
+            by <em>konsulin</em>
+          </span>
+        </span>
       </section>
 
       <main className="mk-lembar">
