@@ -29,7 +29,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 .adm{display:flex;min-height:100vh}
 .adm-samping{width:264px;flex:none;background:var(--putih);border-right:var(--garis);display:flex;flex-direction:column;gap:18px;padding:18px 14px;position:sticky;top:0;height:100vh;overflow-y:auto}
 .adm-merek{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;letter-spacing:-.02em}
-.adm-merek-kotak{width:36px;height:36px;display:grid;place-items:center;background:var(--hitam);color:var(--kuning);font-weight:700;font-size:18px;flex:none}
+.adm-merek-kotak{width:36px;height:36px;display:grid;place-items:center;background:var(--putih);border:2px solid var(--hitam);flex:none;overflow:hidden}
+.adm-merek-kotak img,.sl-merek-kotak img,.mk-logo img{width:80%;height:80%;object-fit:contain;display:block}
 .adm-merek small{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--redup)}
 .adm-samping nav{flex:1;display:flex;flex-direction:column;gap:14px}
 .adm-nav-grup{display:flex;flex-direction:column;gap:4px}
@@ -435,7 +436,7 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
 .sl-app{min-height:100vh;background:var(--kertas);padding-bottom:calc(84px + env(safe-area-inset-bottom))}
 .sl-atas{position:sticky;top:0;z-index:15;display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:var(--putih);border-bottom:2px solid var(--hitam)}
 .sl-merek{display:flex;align-items:center;gap:10px;color:var(--tinta);text-decoration:none;font-size:17px}
-.sl-merek-kotak{width:32px;height:32px;display:grid;place-items:center;background:var(--hitam);color:var(--kuning);font-weight:700;border-radius:8px}
+.sl-merek-kotak{width:34px;height:34px;display:grid;place-items:center;background:var(--putih);border:2px solid var(--hitam);border-radius:9px;overflow:hidden}
 .sl-avatar{width:40px;height:40px;display:grid;place-items:center;border-radius:50%;background:var(--kuning);border:2px solid var(--hitam);font-weight:700;color:var(--tinta);text-decoration:none;flex:none}
 .sl-avatar.on{outline:3px solid var(--biru);outline-offset:2px}
 .sl-avatar.besar{width:64px;height:64px;font-size:26px}
@@ -535,7 +536,7 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
 .mk{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;background:var(--putih)}
 .mk-hero{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:48px 24px 72px;color:var(--putih);text-align:center;
   background:radial-gradient(circle at 50% 42%,rgba(255,255,255,.13) 0 150px,transparent 151px),radial-gradient(circle at 50% 42%,rgba(255,255,255,.07) 0 230px,transparent 231px),var(--biru);min-height:34vh}
-.mk-logo{width:108px;height:108px;display:grid;place-items:center;border-radius:30px;background:var(--kuning);color:var(--hitam);font-size:58px;font-weight:700;border:3px solid var(--hitam);box-shadow:0 6px 0 rgba(0,0,0,.35);margin-bottom:18px}
+.mk-logo{width:108px;height:108px;display:grid;place-items:center;border-radius:30px;background:var(--putih);border:3px solid var(--hitam);box-shadow:0 6px 0 rgba(0,0,0,.35);margin-bottom:18px;overflow:hidden}
 .mk-wordmark{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1}
 .mk-wordmark b{font-size:clamp(48px,14vw,68px);font-weight:700;text-transform:uppercase;letter-spacing:.03em}
 .mk-wordmark span{font-size:clamp(20px,5.6vw,26px);margin-top:4px}
@@ -563,9 +564,10 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
 @media (min-width:900px){
   .mk{flex-direction:row}
   .mk-hero{flex:1;min-height:100vh;padding:48px;background:radial-gradient(circle at 50% 43%,rgba(255,255,255,.13) 0 180px,transparent 181px),radial-gradient(circle at 50% 43%,rgba(255,255,255,.07) 0 280px,transparent 281px),var(--biru)}
-  .mk-logo{width:124px;height:124px;font-size:66px;border-radius:34px}
+  .mk-logo{width:124px;height:124px;border-radius:34px}
   .mk-wordmark b{font-size:80px}
   .mk-wordmark span{font-size:30px}
   .mk-lembar{flex:0 0 min(520px,46%);margin:0;border-radius:0;justify-content:center;padding:48px}
   .mk-kaki{margin-top:0;position:absolute;bottom:24px;left:0;right:0}
 }
+.mk-logo img{width:66%;height:66%}

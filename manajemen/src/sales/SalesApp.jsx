@@ -62,7 +62,7 @@ export default function SalesApp({ api, admin, onKeluar }) {
       <header className="sl-atas">
         <a href="#/beranda" className="sl-merek" aria-label="Beranda Makalin Sales">
           <span className="sl-merek-kotak" aria-hidden="true">
-            M
+            <img src="/logo-konsulin.png" alt="" />
           </span>
           <span>
             Makalin <b>Sales</b>

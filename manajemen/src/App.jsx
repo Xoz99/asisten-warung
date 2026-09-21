@@ -178,7 +178,7 @@ function Samping({ halaman, admin, notifBaru, buka }) {
     <aside className={'adm-samping' + (buka ? ' buka' : '')} aria-label="Menu utama">
       <div className="adm-merek">
         <span className="adm-merek-kotak" aria-hidden="true">
-          M
+          <img src="/logo-konsulin.png" alt="" />
         </span>
         <div>
           Makalin Ops
@@ -285,7 +285,9 @@ function Masuk({ error, onMasuk }) {
   return (
     <div className="mk">
       <section className="mk-hero" aria-hidden="true">
-        <span className="mk-logo">M</span>
+        <span className="mk-logo">
+          <img src="/logo-konsulin.png" alt="" />
+        </span>
         <span className="mk-wordmark">
           <b>Makalin</b>
           <span>
