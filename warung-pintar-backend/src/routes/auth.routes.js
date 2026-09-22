@@ -1,3 +1,4 @@
+import { JWT_SECRET } from '../config/jwt.js';
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -12,7 +13,7 @@ import { cariSalesAktif, pastikanTabelSales } from '../services/sales.service.js
 import { PESAN_DEMO, akunDemo, pastikanKolomDemo, tolakAkunDemo } from '../services/akunDemo.service.js';
 
 const router = Router();
-const SECRET = process.env.JWT_SECRET || 'dev-secret-ganti-ini';
+const SECRET = JWT_SECRET;
 
 const OTP_MENIT = 10;         // umur kode sejak dikirim
 const OTP_MAKS_SALAH = 5;     // batas salah masukin kode sebelum kodenya dianggap hangus

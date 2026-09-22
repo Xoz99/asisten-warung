@@ -1,3 +1,4 @@
+import { JWT_SECRET } from '../config/jwt.js';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 import { normalisasiNoHp } from '../utils/noHp.js';
@@ -44,7 +45,7 @@ function kunciAkun(req) {
   const header = req.headers.authorization || '';
   if (header.startsWith('Bearer ')) {
     try {
-      const p = jwt.verify(header.slice(7), process.env.JWT_SECRET || 'dev-secret-ganti-ini');
+      const p = jwt.verify(header.slice(7), JWT_SECRET);
       if (p.warungId) return 'w:' + p.warungId;
     } catch {
       // token busuk - jatuh ke identitas body/IP di bawah
@@ -88,4 +89,13 @@ export const pinLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Terlalu banyak PIN salah. Coba lagi 15 menit lagi, atau pakai Lupa PIN.' },
+});
+
+export const aiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 12,
+  keyGenerator: (req) => 'w:' + req.warungId,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Terlalu banyak permintaan AI. Coba lagi sebentar.' },
 });

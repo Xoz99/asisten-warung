@@ -3,12 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Backend API Warung Pintar — sesuai PRD (auth, produk/stok, transaksi, kasbon, pelanggan, serah terima jaga, laporan, OCR nota, voice parsing, visual/face matching, cuaca, asisten, koperasi digital, langganan sembako, tukar tambah stok)",
+  "description": "Backend API Warung Pintar \u2014 sesuai PRD (auth, produk/stok, transaksi, kasbon, pelanggan, serah terima jaga, laporan, OCR nota, voice parsing, visual/face matching, cuaca, asisten, koperasi digital, langganan sembako, tukar tambah stok)",
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
     "migrate": "node src/migrate.js",
-    "seed:demo": "node src/seedDemo.js"
+    "seed:demo": "node src/seedDemo.js",
+    "test:security": "node --test test/security.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -23,5 +24,8 @@
     "multer": "^2.0.0",
     "pg": "^8.12.0",
     "tesseract.js": "^5.1.0"
+  },
+  "overrides": {
+    "qs": "^6.16.0"
   }
 }

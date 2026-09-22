@@ -34,16 +34,24 @@ router.get('/', async (req, res, next) => {
 // biar aman kalau 2 device catat transaksi bersamaan (multi-user 1 akun warung).
 // clientId dipakai buat idempotency waktu offline-first sync (catat transaksi harus tetap
 // jalan walau sinyal jelek, baru di-sync begitu online — kalau clientId sudah pernah masuk, jangan dobel).
-async function simpanTransaksi(client, { warungId, penjagaNama, mode, metode, pembeliId, pembeliNama, items, sumberInput, clientId }) {
+export async function simpanTransaksi(client, { warungId, penjagaNama, mode, metode, pembeliId, pembeliNama, items, sumberInput, clientId }) {
   if (clientId) {
-    const cek = await client.query('SELECT id FROM transaksi WHERE client_id=$1', [clientId]);
+    // Serialize retries within this tenant before touching stock or debt.
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [JSON.stringify([warungId, clientId])]);
+    const cek = await client.query('SELECT * FROM transaksi WHERE client_id=$1 AND warung_id=$2', [clientId, warungId]);
     if (cek.rows.length) {
-      const trx = await client.query('SELECT * FROM transaksi WHERE id=$1', [cek.rows[0].id]);
       const itemRows = await client.query('SELECT * FROM transaksi_item WHERE transaksi_id=$1', [cek.rows[0].id]);
-      return { ...trx.rows[0], items: itemRows.rows, sudahAda: true };
+      return { ...cek.rows[0], items: itemRows.rows, sudahAda: true };
     }
   }
 
+  if (pembeliId) {
+    const { rows } = await client.query('SELECT id FROM pelanggan WHERE id=$1 AND warung_id=$2 FOR KEY SHARE', [pembeliId, warungId]);
+    if (!rows.length) throw Object.assign(new Error('Pelanggan tidak ditemukan'), { status: 400 });
+  }
+  if (items.some((it) => !it || !Number.isFinite(it.qty) || it.qty <= 0)) {
+    throw Object.assign(new Error('Jumlah barang harus angka positif'), { status: 400 });
+  }
   let total = 0;
   let laba = 0;
   const rincian = [];
@@ -80,7 +88,7 @@ router.post('/bayar', async (req, res, next) => {
   try {
     await client.query('BEGIN');
     const { items, metode, penjagaNama, pembeliId, pembeliNama, sumberInput, clientId } = req.body;
-    if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: 'items wajib diisi' });
+    if (!Array.isArray(items) || !items.length) throw Object.assign(new Error('items wajib diisi'), { status: 400 });
     const trx = await simpanTransaksi(client, {
       warungId: req.warungId,
       penjagaNama,
@@ -116,8 +124,8 @@ router.post('/kasbon', async (req, res, next) => {
   try {
     await client.query('BEGIN');
     const { items, penjagaNama, pembeliId, pembeliNama, sumberInput, clientId } = req.body;
-    if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: 'items wajib diisi' });
-    if (!pembeliNama) return res.status(400).json({ error: 'pembeliNama wajib diisi' });
+    if (!Array.isArray(items) || !items.length) throw Object.assign(new Error('items wajib diisi'), { status: 400 });
+    if (!pembeliNama) throw Object.assign(new Error('pembeliNama wajib diisi'), { status: 400 });
     const trx = await simpanTransaksi(client, {
       warungId: req.warungId,
       penjagaNama,

@@ -154,7 +154,7 @@ CREATE INDEX IF NOT EXISTS idx_pelanggan_wajah_pelanggan ON pelanggan_wajah(pela
 
 CREATE TABLE IF NOT EXISTS transaksi (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  client_id TEXT UNIQUE, -- id yang dibuat client saat offline, buat sinkronisasi idempotent
+  client_id TEXT, -- id yang dibuat client saat offline, buat sinkronisasi idempotent
   warung_id UUID NOT NULL REFERENCES warung(id) ON DELETE CASCADE,
   penjaga_nama TEXT,
   mode TEXT NOT NULL CHECK (mode IN ('bayar','kasbon')),
@@ -509,3 +509,9 @@ CREATE TABLE IF NOT EXISTS kepemilikan_warung (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_kepemilikan_aktif ON kepemilikan_warung (warung_id) WHERE valid_to IS NULL;
 ALTER TABLE pendaftaran_otp ADD COLUMN IF NOT EXISTS atribusi JSONB;
+
+-- Tenant-scoped offline idempotency; also upgrades existing installations.
+BEGIN;
+ALTER TABLE transaksi DROP CONSTRAINT IF EXISTS transaksi_client_id_key;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_transaksi_warung_client ON transaksi(warung_id, client_id);
+COMMIT;

@@ -1,5 +1,5 @@
 import { Jimp, JimpMime } from 'jimp';
-import { cekJatahAi, catatPemakaianAi } from './aiQuota.service.js';
+import { reservasiJatahAi, selesaikanJatahAi } from './aiQuota.service.js';
 import { ATURAN_MEMORI } from './memori.service.js';
 import { ATURAN_KULAKAN } from './kulakan.service.js';
 import { infoUsaha, panduanMarginReferensi } from './profilUsaha.service.js';
@@ -19,11 +19,8 @@ const TIMEOUT_MS = 12000;
 // Inti panggilan ke Gemini - dipakai bareng sama tanyaGemini (teks) & bacaNotaGemini (gambar).
 // Balikin teks jawaban mentah, atau throw kalau gagal (pemanggilnya yang tangani fallback).
 //
-// `warungId` (opsional): kalau dikasih, panggilan ini ikut kena JATAH TOKEN HARIAN (lihat
-// aiQuota.service.js) - dicek DULU sebelum manggil API (kalau abis, Gemini nggak jadi dipanggil sama
-// sekali, hemat biaya beneran), dicatat SETELAH sukses. Cuma fungsi scan/nota/suara (barcode-ai,
-// visual-ai, cari-referensi, nota, parse-ai) yang ngasih ini - tanyaGemini (chat Mang AI) SENGAJA
-// nggak ngasih, jadi otomatis nggak kena batasan (lihat komentar lengkap kenapa di aiQuota.service.js).
+// Every paid call requires warungId and reserves the shared daily balance before fetch.
+// Actual usage is reconciled before returning; ambiguous failures retain the reservation.
 // `timeoutMs` (opsional): default 12 detik cukup buat panggilan pendek (barcode/visual/parse suara),
 // TAPI kependekan buat yang keluarannya panjang - chat Mang AI yang lagi nyusun daftar belanja bisa
 // ngeluarin 25 barang x 6 field sekaligus, nulisnya aja udah lebih lama dari 12 detik. Timeout di
@@ -33,17 +30,7 @@ async function panggilGemini(body, warungId, timeoutMs = TIMEOUT_MS) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw Object.assign(new Error('GEMINI_API_KEY belum diisi di .env'), { status: 500 });
 
-  if (warungId) {
-    const jatah = await cekJatahAi(warungId);
-    if (!jatah.boleh) {
-      throw Object.assign(
-        new Error(
-          `Jatah AI harian warung ini udah habis (${jatah.jatah.toLocaleString('id-ID')} token/hari untuk plan ${jatah.plan}). Reset otomatis besok jam 00:00, atau upgrade plan buat jatah lebih besar.`
-        ),
-        { status: 402, jatahAiHabis: true }
-      );
-    }
-  }
+  const reservasi = await reservasiJatahAi(warungId);
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -63,22 +50,18 @@ async function panggilGemini(body, warungId, timeoutMs = TIMEOUT_MS) {
 
   const data = await res.json().catch(() => null);
   if (!res.ok) {
+    // Explicit request rejection did not generate output; allow the fallback provider.
+    // Network errors/5xx are ambiguous and conservatively keep the reservation.
+    if ([400, 401, 403, 404, 429].includes(res.status)) await selesaikanJatahAi(reservasi, 0);
     // 429 = quota/rate-limit habis, 403 = key invalid/belum verifikasi billing - dua-duanya sering
     // kejadian di free tier, makanya pemanggil selalu punya fallback buat kasus ini
     const pesan = data?.error?.message || `Gemini error ${res.status}`;
     throw Object.assign(new Error(pesan), { status: res.status });
   }
 
+  await selesaikanJatahAi(reservasi, data?.usageMetadata?.totalTokenCount);
   const teks = data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '';
   if (!teks.trim()) throw Object.assign(new Error('Gemini balikin jawaban kosong'), { status: 502 });
-  // Dicatat SETELAH sukses (bukan sebelum) - kalau requestnya gagal duluan (timeout/network/dst),
-  // nggak fair nyatet token seolah kepake padahal jawabannya nggak pernah kedapetan user. Sengaja
-  // nggak di-`await` (nyimpen usage nggak boleh bikin respons ke user ikut lambat/gagal) - kegagalan
-  // nyatet usage cuma bikin angkanya nggak 100% akurat, bukan hal fatal.
-  if (warungId) {
-    const totalTokens = data?.usageMetadata?.totalTokenCount || 0;
-    catatPemakaianAi(warungId, totalTokens).catch((e) => console.warn('[gemini] gagal nyatet token usage:', e.message));
-  }
   return teks.trim();
 }
 

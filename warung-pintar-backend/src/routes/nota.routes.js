@@ -1,3 +1,4 @@
+import { aiLimiter } from '../middleware/rateLimit.js';
 import { Router } from 'express';
 import Tesseract from 'tesseract.js';
 import { Jimp, JimpMime } from 'jimp';
@@ -91,7 +92,7 @@ function ekstrakBaris(teks) {
 // lebih lemah ke foto dunia nyata) biar fitur ini nggak pernah mati total (PRD 10.4 & 11).
 // Foto dikirim sebagai data URL base64 (dari jepretFrame di client) - samain sama pola upload
 // foto lain di app ini (produk/pelanggan/wajah), bukan multipart form-data.
-router.post('/scan', async (req, res, next) => {
+router.post('/scan', aiLimiter, async (req, res, next) => {
   try {
     const { fotoBase64 } = req.body;
     if (!fotoBase64) return res.status(400).json({ error: 'fotoBase64 wajib diisi' });

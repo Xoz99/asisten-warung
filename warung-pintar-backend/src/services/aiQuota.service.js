@@ -1,35 +1,10 @@
 import { query } from '../db.js';
 
-// Jatah token AI HARIAN per plan langganan - 1 TANGKI BARENG dipakai Gemini MAUPUN OpenRouter (lihat
-// panggilGemini di gemini.service.js & panggilOpenRouter di openrouter.service.js, dua-duanya nge-
-// cek+nyatet ke tabel & fungsi yang SAMA di file ini) - berlaku buat SEMUA pemakaian AI: fitur
-// scan/nota/suara (barcode-ai, visual-ai/visual-ai-banyak, cari-referensi produk, scan nota
-// belanja, parse suara AI) DAN chat Mang AI.
-//
-// Chat dulu SENGAJA dikecualiin, alasannya "model chat jauh lebih murah per panggilan dibanding
-// Vision". Itu bener selama balesannya cuma beberapa kalimat. Begitu chat bisa ngusulin DAFTAR
-// BELANJA (aksi "belanja_banyak"), satu pesan bisa ngeluarin 2.500 token output ditambah konteks
-// warung yang ikut tiap pesan - jalur tak-terhitung sebesar itu nggak kelihatan di angka manapun,
-// dan justru dia yang paling gampang nguras jatah dari sisi provider.
-//
-// Chat NGGAK ikut mati pas jatah abis: panggilan Gemini/OpenRouter-nya ditolak duluan (402), tapi
-// route chat nangkep itu dan jatuh ke jawabRuleBased (lihat asisten.routes.js) - jadi user tetap
-// dapet jawaban, cuma versi kaku tanpa AI. Beda dari fitur scan/nota yang emang nggak punya
-// cadangan setara, makanya di situ `jatahAiHabis` diteruskan ke frontend jadi ajakan upgrade.
-//
-// KENAPA 1 tangki bareng (bukan jatah kepisah per provider): OpenRouter di sini perannya "gantiin"
-// Gemini pas dia gagal (down/limit dari sisi Google) - kalau jatahnya kepisah, orang bisa muter-muter
-// nunggu Gemini "gagal" buat dapet jatah EKSTRA dari OpenRouter tanpa batas, itu bukan tujuannya.
-// Efek sampingnya malah bagus: begitu Gemini abis jatah HARInya, OpenRouter OTOMATIS nerusin pake
-// SISA jatah yang sama (swap provider di belakang layar, user nggak kerasa putus) - baru bener-bener
-// keblokir kalau tangkinya kosong buat DUA-duanya (lihat cobaGeminiLaluOpenRouter di aiFallback.js).
-//
-// Reset HARIAN (bukan bulanan) - biar warung yang kepake banyak di 1 hari nggak keblokir lama-lama,
-// besok jatahnya penuh lagi otomatis.
-//
-// ⚠️ Angka di bawah PERKIRAAN KASAR (belum divalidasi dari data pemakaian beneran, jumlah token per
-// panggilan Vision itu variatif tergantung resolusi foto) - sengaja dikumpulin di 1 tempat ini biar
-// gampang disetel ulang belakangan tanpa nyebar ke banyak file kalau ternyata kegedean/kekecilan.
+// Shared daily budget for every Gemini/OpenRouter feature, including chat.
+// Admission reserves a per-call allowance before contacting a provider. Successful
+// responses reconcile actual usage; explicit rejected requests refund their reservation.
+// Unknown usage retains only that call's allowance, leaving other calls/fallback available.
+// Chat can still fall back to local rules when paid AI is unavailable.
 export const JATAH_TOKEN_HARIAN = {
   trial: 15000,
   bulanan: 50000,
@@ -42,37 +17,49 @@ function jatahUntukPlan(plan) {
   return JATAH_TOKEN_HARIAN[plan] ?? JATAH_TOKEN_HARIAN.trial;
 }
 
-// Dipanggil DI DALAM panggilGemini (gemini.service.js) SEBELUM beneran manggil API Gemini - kalau
-// jatah hari ini abis, Gemini nggak jadi dipanggil sama sekali (hemat biaya ASLI, bukan cuma nolak
-// belakangan setelah kepanggil). `CASE WHEN ai_token_tanggal = CURRENT_DATE` di query nanganin reset
-// harian tanpa perlu cron/scheduled job terpisah - begitu tanggalnya beda dari hari ini, kepakenya
-// dianggap 0 lagi di query ini (belum ditulis ulang ke kolomnya sampai catatPemakaianAi kepanggil).
+// Read-only status for UI; provider admission MUST use reservasiJatahAi.
 export async function cekJatahAi(warungId) {
   const { rows } = await query(
     `SELECT plan, CASE WHEN ai_token_tanggal = CURRENT_DATE THEN ai_token_hari_ini ELSE 0 END AS terpakai
-     FROM warung WHERE id=$1`,
-    [warungId]
-  );
+     FROM warung WHERE id=$1`, [warungId]);
   const w = rows[0];
-  // warungId nggak ketemu itu harusnya nggak kejadian (req.warungId udah divalidasi middleware auth
-  // sebelum nyampe ke sini) - kalau toh kejadian, jangan sampai nge-block gara-gara ini sendiri,
-  // biarin lolos & biar error LAIN (kalau ada) yang beneran nangkep masalahnya.
-  if (!w) return { boleh: true, sisa: Infinity, jatah: Infinity, terpakai: 0, plan: 'trial' };
+  if (!w) return { boleh: false, sisa: 0, jatah: 0, terpakai: 0, plan: 'trial' };
   const jatah = jatahUntukPlan(w.plan);
   const terpakai = Number(w.terpakai) || 0;
   return { boleh: terpakai < jatah, sisa: Math.max(0, jatah - terpakai), jatah, terpakai, plan: w.plan };
 }
 
-// Nyatetin token yang BENERAN kepake, dipanggil SETELAH panggilan Gemini sukses (lihat panggilGemini)
-// - upsert-style lewat CASE di query yang sama: kalau tanggal kesimpen udah beda dari hari ini,
-// mulai ulang dari 0 + token baru ini (bukan numpuk dari kemarin).
-export async function catatPemakaianAi(warungId, tokens) {
-  if (!tokens || tokens <= 0) return;
+// Reserve at most 4096 tokens per call, atomically across processes/providers.
+// This is an accounting estimate, not an exact provider token count; reconcile actual
+// usage after completion. A timeout/crash retains this call's allowance, not the entire
+// daily balance. The final call may reserve less if the daily balance is almost empty.
+export const RESERVASI_TOKEN_AI = 4096;
+export async function reservasiJatahAi(warungId) {
+  if (!warungId) throw Object.assign(new Error('Identitas warung wajib diisi'), { status: 401 });
+  const { rows } = await query(
+    `WITH budget AS (
+       SELECT id, CASE WHEN ai_token_tanggal = CURRENT_DATE THEN ai_token_hari_ini ELSE 0 END AS terpakai, CASE plan
+         WHEN 'bulanan' THEN $2::bigint WHEN 'triwulan' THEN $3::bigint
+         WHEN 'tahunan' THEN $4::bigint WHEN 'permanen' THEN $5::bigint
+         ELSE $6::bigint END AS jatah
+       FROM warung WHERE id=$1 FOR UPDATE
+     )
+     UPDATE warung w SET ai_token_hari_ini = b.terpakai + LEAST($7::bigint, b.jatah - b.terpakai), ai_token_tanggal = CURRENT_DATE
+     FROM budget b WHERE w.id=b.id
+       AND b.terpakai < b.jatah
+     RETURNING w.ai_token_tanggal::text AS tanggal, b.jatah, b.terpakai, LEAST($7::bigint, b.jatah - b.terpakai) AS dipesan`,
+    [warungId, JATAH_TOKEN_HARIAN.bulanan, JATAH_TOKEN_HARIAN.triwulan,
+      JATAH_TOKEN_HARIAN.tahunan, JATAH_TOKEN_HARIAN.permanen, JATAH_TOKEN_HARIAN.trial, RESERVASI_TOKEN_AI]);
+  if (!rows.length) throw Object.assign(new Error('Jatah AI habis atau sedang dipesan oleh permintaan berjalan. Coba lagi nanti.'), { status: 402, jatahAiHabis: true });
+  return { warungId, tanggal: rows[0].tanggal, jatah: Number(rows[0].jatah), terpakai: Number(rows[0].terpakai), dipesan: Number(rows[0].dipesan) };
+}
+
+export async function selesaikanJatahAi(reservasi, tokens) {
+  // Unknown usage (timeout, missing metadata) keeps this call's reservation. Refunding
+  // unknown provider usage would allow repeated timeouts to bypass the daily budget.
+  if (!Number.isSafeInteger(tokens) || tokens < 0) return;
   await query(
-    `UPDATE warung SET
-       ai_token_hari_ini = CASE WHEN ai_token_tanggal = CURRENT_DATE THEN ai_token_hari_ini + $2 ELSE $2 END,
-       ai_token_tanggal = CURRENT_DATE
-     WHERE id=$1`,
-    [warungId, tokens]
-  );
+    `UPDATE warung SET ai_token_hari_ini = ai_token_hari_ini + $3
+     WHERE id=$1 AND ai_token_tanggal = $2::date`,
+    [reservasi.warungId, reservasi.tanggal, tokens - reservasi.dipesan]);
 }

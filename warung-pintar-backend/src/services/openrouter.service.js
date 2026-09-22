@@ -9,14 +9,8 @@
 // panjang di gemini.service.js), percuma cadangannya numpang lewat Google juga, sama-sama kena.
 // Sama gayanya kayak gemini.service.js - fetch polos, nggak nambah dependency cuma buat ini.
 //
-// JATAH TOKEN HARIAN (lihat aiQuota.service.js): OpenRouter di sini "gantiin" Gemini pas dia gagal -
-// jadi SATU TANGKI jatah yang SAMA dipakai bareng buat dua-duanya (bukan jatah terpisah per
-// provider). Efeknya: pas Gemini abis jatah hariannya, OpenRouter OTOMATIS nerusin pake SISA jatah
-// yang sama (user nggak kerasa "putus", cuma pindah mesin di belakang layar) - baru bener-bener
-// keblokir (dikasih tau "jatah habis") kalau tangkinya beneran kosong buat DUA-duanya. Ini KENAPA
-// fungsi scan/nota/suara/referensi di bawah SEMUA nerima `warungId` (chat/tanyaOpenRouter SENGAJA
-// TIDAK - obrolan nggak kena batasan ini sama sekali, lihat komentar di aiQuota.service.js).
-import { cekJatahAi, catatPemakaianAi } from './aiQuota.service.js';
+// All paid calls, including chat, reserve the same daily tenant budget as Gemini.
+import { reservasiJatahAi, selesaikanJatahAi } from './aiQuota.service.js';
 import { ATURAN_MEMORI } from './memori.service.js';
 import { ATURAN_KULAKAN } from './kulakan.service.js';
 import { infoUsaha, panduanMarginReferensi } from './profilUsaha.service.js';
@@ -29,10 +23,7 @@ const TIMEOUT_MS = 12000;
 // string ATAU array of parts kalau ada gambar - lihat pesanDenganFoto). Balikin teks jawaban mentah,
 // atau throw kalau gagal (pemanggilnya yang tangani fallback berikutnya).
 //
-// `warungId` (opsional, SAMA perannya kayak di panggilGemini - lihat gemini.service.js): kalau
-// dikasih, dicek DULU ke jatah harian (tangki yang SAMA dipakai Gemini) sebelum manggil API, dicatat
-// SETELAH sukses pakai `usage.total_tokens` dari respons OpenRouter (field ini emang disediain
-// OpenRouter/OpenAI-style API, isinya token beneran kepake - bukan estimasi kita sendiri).
+// warungId is required. Reserve before fetch and await usage reconciliation.
 async function panggilOpenRouter(messages, { maxTokens = 500, jsonMode = false, warungId } = {}) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   // OpenRouter itu CADANGAN OPSIONAL - nggak diisi itu keadaan normal, bukan kerusakan.
@@ -41,17 +32,7 @@ async function panggilOpenRouter(messages, { maxTokens = 500, jsonMode = false, 
   // warung nekan "Cari referensi" - dia nggak ngerti itu apa, dan itu bukan urusan dia.
   if (!apiKey) throw Object.assign(new Error('OPENROUTER_API_KEY belum diisi di .env'), { status: 500, internal: true });
 
-  if (warungId) {
-    const jatah = await cekJatahAi(warungId);
-    if (!jatah.boleh) {
-      throw Object.assign(
-        new Error(
-          `Jatah AI harian warung ini udah habis (${jatah.jatah.toLocaleString('id-ID')} token/hari untuk plan ${jatah.plan}). Reset otomatis besok jam 00:00, atau upgrade plan buat jatah lebih besar.`
-        ),
-        { status: 402, jatahAiHabis: true }
-      );
-    }
-  }
+  const reservasi = await reservasiJatahAi(warungId);
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
@@ -89,19 +70,17 @@ async function panggilOpenRouter(messages, { maxTokens = 500, jsonMode = false, 
 
   const data = await res.json().catch(() => null);
   if (!res.ok) {
+    // Explicit request rejection did not generate output; allow the fallback provider.
+    // Network errors/5xx are ambiguous and conservatively keep the reservation.
+    if ([400, 401, 403, 404, 429].includes(res.status)) await selesaikanJatahAi(reservasi, 0);
     // 429 = quota/rate-limit habis, 401/403 = key bermasalah - sama pola kayak gemini.service.js
     const pesan = data?.error?.message || `OpenRouter error ${res.status}`;
     throw Object.assign(new Error(pesan), { status: res.status });
   }
 
+  await selesaikanJatahAi(reservasi, data?.usage?.total_tokens);
   const teks = data?.choices?.[0]?.message?.content || '';
   if (!teks.trim()) throw Object.assign(new Error('OpenRouter balikin jawaban kosong'), { status: 502 });
-  // Dicatat SETELAH sukses, ke TANGKI YANG SAMA kayak Gemini (lihat komentar panjang di atas) -
-  // nggak di-`await` (nyimpen usage nggak boleh bikin respons ke user ikut lambat/gagal).
-  if (warungId) {
-    const totalTokens = data?.usage?.total_tokens || 0;
-    catatPemakaianAi(warungId, totalTokens).catch((e) => console.warn('[openrouter] gagal nyatet token usage:', e.message));
-  }
   return teks.trim();
 }
 

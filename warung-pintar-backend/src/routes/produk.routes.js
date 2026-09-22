@@ -1,3 +1,4 @@
+import { aiLimiter } from '../middleware/rateLimit.js';
 import { Router } from 'express';
 import { opsiHargaJual } from '../utils/hargaJual.js';
 import { query } from '../db.js';
@@ -12,7 +13,7 @@ const router = Router();
 // baru (Stok.jsx) buat nyaranin isi kemasan & kisaran harga dari pengetahuan umum Gemini, biar
 // nggak input satu-satu dari nol. Lihat komentar lengkap soal batasannya (perkiraan, bukan harga
 // pasti/live) di cariReferensiProdukGemini (gemini.service.js).
-router.post('/cari-referensi', async (req, res, next) => {
+router.post('/cari-referensi', aiLimiter, async (req, res, next) => {
   try {
     const q = (req.body.query || '').trim();
     if (!q) return res.status(400).json({ error: 'query wajib diisi' });

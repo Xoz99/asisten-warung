@@ -1,3 +1,4 @@
+import { aiLimiter } from '../middleware/rateLimit.js';
 import { Router } from 'express';
 import { query } from '../db.js';
 import { cosineSimilarity } from '../utils/cosine.js';
@@ -126,7 +127,7 @@ router.post('/visual', async (req, res, next) => {
 // Lihat komentar lengkap di bacaBarcodeGemini (gemini.service.js) soal KENAPA ini baca angka
 // TERCETAK, bukan "mendekode" barcode-nya. Kalau angkanya ketemu, alur selanjutnya SAMA kayak
 // barcode yang berhasil discan biasa (lookup produk by barcode di client, lihat handleBarcode).
-router.post('/barcode-ai', async (req, res, next) => {
+router.post('/barcode-ai', aiLimiter, async (req, res, next) => {
   try {
     const { fotoBase64 } = req.body;
     if (!fotoBase64) return res.status(400).json({ error: 'fotoBase64 wajib diisi' });
@@ -147,7 +148,7 @@ router.post('/barcode-ai', async (req, res, next) => {
 // (Gemini cuma disuruh milih SATU produk paling cocok atau bilang nggak ketemu, bukan nge-ranking
 // beberapa kandidat kayak cosine similarity). `skor: null` (bukan angka 0-1) dipakai frontend buat
 // mbedain badge "Disaranin AI" dari hasil cosine similarity biasa.
-router.post('/visual-ai', async (req, res, next) => {
+router.post('/visual-ai', aiLimiter, async (req, res, next) => {
   try {
     const { fotoBase64 } = req.body;
     if (!fotoBase64) return res.status(400).json({ error: 'fotoBase64 wajib diisi' });
@@ -190,7 +191,7 @@ router.post('/visual-ai', async (req, res, next) => {
 // ARRAY [{qty, produk}] - beda dari /visual-ai yang cuma 0-1 item, di sini bisa banyak sekaligus.
 // Lihat komentar lengkap soal taruhannya (checkout beneran, bukan daftar barang) di
 // cariBanyakBarangGemini (gemini.service.js).
-router.post('/visual-ai-banyak', async (req, res, next) => {
+router.post('/visual-ai-banyak', aiLimiter, async (req, res, next) => {
   try {
     const { fotoBase64 } = req.body;
     if (!fotoBase64) return res.status(400).json({ error: 'fotoBase64 wajib diisi' });

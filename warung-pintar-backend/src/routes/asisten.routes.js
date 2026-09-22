@@ -1,3 +1,4 @@
+import { aiLimiter } from '../middleware/rateLimit.js';
 import { Router } from 'express';
 import { query } from '../db.js';
 import { tanyaGemini } from '../services/gemini.service.js';
@@ -516,7 +517,7 @@ function bersihkanRiwayat(riwayat) {
     .map((r) => ({ peran: r.peran === 'user' ? 'user' : 'model', teks: r.teks.trim().slice(0, TEKS_RIWAYAT_MAKS_PANJANG) }));
 }
 
-router.post('/tanya', async (req, res, next) => {
+router.post('/tanya', aiLimiter, async (req, res, next) => {
   try {
     const teksAsli = req.body.teks || '';
     const teks = teksAsli.toLowerCase();

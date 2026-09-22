@@ -11,7 +11,7 @@ router.get('/', async (req, res, next) => {
               -- ngitung ulang otomatis dari foto pelanggannya, tanpa pemilik warung harus foto ulang satu-satu.
               EXISTS (SELECT 1 FROM pelanggan_wajah w WHERE w.pelanggan_id = p.id AND jsonb_typeof(w.embedding) = 'object') AS punya_wajah,
               EXISTS (SELECT 1 FROM pelanggan_wajah w WHERE w.pelanggan_id = p.id AND jsonb_typeof(w.embedding) = 'array') AS punya_wajah_lama
-       FROM pelanggan p LEFT JOIN kasbon k ON k.pelanggan_id = p.id
+       FROM pelanggan p LEFT JOIN kasbon k ON k.pelanggan_id = p.id AND k.warung_id = p.warung_id
        WHERE p.warung_id = $1
        GROUP BY p.id ORDER BY p.nama`,
       [req.warungId]

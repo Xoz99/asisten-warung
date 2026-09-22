@@ -1,3 +1,4 @@
+import { aiLimiter } from '../middleware/rateLimit.js';
 import { Router } from 'express';
 import { query } from '../db.js';
 import { parseUcapan } from '../services/voice.service.js';
@@ -26,7 +27,7 @@ router.post('/parse', async (req, res, next) => {
 // atas) sama sekali nggak nemu apa-apa dari transkrip. Lihat komentar lengkap soal kenapa di
 // parseUcapanGemini (gemini.service.js). Balikin bentuk [{qty, produk}] (bukan {id,qty} mentah)
 // biar konsisten sama /scan/visual-ai-banyak - frontend nggak perlu nge-lookup ulang detail produk.
-router.post('/parse-ai', async (req, res, next) => {
+router.post('/parse-ai', aiLimiter, async (req, res, next) => {
   try {
     const { transkrip } = req.body;
     if (!transkrip) return res.status(400).json({ error: 'transkrip wajib diisi' });

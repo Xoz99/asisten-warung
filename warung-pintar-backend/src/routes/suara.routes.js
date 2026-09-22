@@ -1,3 +1,4 @@
+import { aiLimiter } from '../middleware/rateLimit.js';
 import { Router } from 'express';
 import { transkripSuaraGemini } from '../services/gemini.service.js';
 
@@ -9,7 +10,7 @@ const router = Router();
 // Nggak dikasih fallback ke OpenRouter kayak jalur AI yang lain: model teks gratis di sana nggak
 // nerima audio sama sekali, jadi "cadangan" di situ cuma bakal ngasih error yang lebih
 // membingungkan. Kalau Gemini-nya lagi mati, yang bener ya nyuruh user ngetik manual.
-router.post('/transkrip', async (req, res, next) => {
+router.post('/transkrip', aiLimiter, async (req, res, next) => {
   try {
     const { audio } = req.body;
     if (!audio) return res.status(400).json({ error: 'audio wajib diisi' });
