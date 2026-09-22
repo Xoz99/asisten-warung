@@ -86,15 +86,14 @@ export default function Admin({ api, admin }) {
   useEffect(() => {
     api('GET', '/lapangan/wp-sales').then(setWpSales, () => setWpSales([]));
   }, [api]);
-  const [log, setLog] = useState(null);
+  const [versiLog, setVersiLog] = useState(0);
   const [error, setError] = useState('');
   const [pesan, setPesan] = useState('');
 
   const muat = useCallback(async () => {
     try {
-      const [a, l] = await Promise.all([api('GET', '/admin'), api('GET', '/log')]);
-      setDaftar(a);
-      setLog(l);
+      setDaftar(await api('GET', '/admin'));
+      setVersiLog((v) => v + 1);
     } catch (e) {
       setError(e.message);
     }
@@ -102,8 +101,8 @@ export default function Admin({ api, admin }) {
 
   useEffect(() => {
     let batal = false;
-    Promise.all([api('GET', '/admin'), api('GET', '/log')])
-      .then(([a, l]) => !batal && (setDaftar(a), setLog(l)))
+    api('GET', '/admin')
+      .then((a) => !batal && setDaftar(a))
       .catch((e) => !batal && setError(e.message));
     return () => {
       batal = true;
@@ -165,30 +164,84 @@ export default function Admin({ api, admin }) {
           <FormTambah onTambah={(isi) => aksi(() => api('POST', '/admin', isi), `Akun ${isi.peran} ${isi.nama} ditambah ✓ - kasih tau username & password-nya`)} />
         </section>
 
-        <section className="adm-kartu">
-          <h2>Aktivitas terbaru</h2>
-          {!log ? (
-            <p className="adm-sub">Memuat…</p>
-          ) : log.length === 0 ? (
-            <p className="adm-sub">Belum ada aktivitas.</p>
-          ) : (
-            <ul className="adm-daftar">
-              {log.map((l) => (
-                <li key={l.id}>
-                  <div>
-                    <b>{l.admin_nama || '(admin dihapus)'}</b> {NAMA_AKSI[l.aksi] || l.aksi}
-                    <div className="adm-redup">{ringkasDetail(l.detail)}</div>
-                  </div>
-                  <span className="adm-redup" style={{ whiteSpace: 'nowrap' }}>
-                    {waktu(l.created_at)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        <Aktivitas api={api} versi={versiLog} />
       </div>
     </>
+  );
+}
+
+// Catatan siapa ngapain, 20 per halaman.
+function Aktivitas({ api, versi }) {
+  const [halaman, setHalaman] = useState(1);
+  const [data, setData] = useState(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let batal = false;
+    api('GET', `/log?halaman=${halaman}`)
+      .then((d) => !batal && (setData(d), setError('')))
+      .catch((e) => !batal && setError(e.message));
+    return () => {
+      batal = true;
+    };
+  }, [api, halaman, versi]);
+  const jumlahHalaman = data ? Math.max(1, Math.ceil(data.total / data.perHalaman)) : 1;
+  const ke = (n) => setHalaman(Math.max(1, Math.min(jumlahHalaman, n)));
+  return (
+    <section className="adm-kartu" style={{ padding: 0 }}>
+      <h2 style={{ margin: 0, padding: '18px 18px 0' }}>Aktivitas terbaru</h2>
+      <div style={{ padding: '0 18px 12px' }}>
+        {error ? (
+          <p className="adm-error">{error}</p>
+        ) : !data ? (
+          <p className="adm-sub">Memuat…</p>
+        ) : data.items.length === 0 ? (
+          <p className="adm-sub">Belum ada aktivitas.</p>
+        ) : (
+          <ul className="adm-daftar">
+            {data.items.map((l) => (
+              <li key={l.id}>
+                <div>
+                  <b>{l.admin_nama || '(admin dihapus)'}</b> {NAMA_AKSI[l.aksi] || l.aksi}
+                  <div className="adm-redup">{ringkasDetail(l.detail)}</div>
+                </div>
+                <span className="adm-redup" style={{ whiteSpace: 'nowrap' }}>
+                  {waktu(l.created_at)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      {data && data.total > data.perHalaman && (
+        <div className="adm-halaman">
+          <span className="adm-label" style={{ fontSize: 11 }}>
+            Menampilkan {(data.halaman - 1) * data.perHalaman + 1}-{Math.min(data.total, data.halaman * data.perHalaman)} dari {data.total} aktivitas
+          </span>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button className="btn kecil" onClick={() => ke(halaman - 1)} disabled={halaman <= 1} aria-label="Halaman sebelumnya">
+              ‹
+            </button>
+            {Array.from({ length: jumlahHalaman }, (_, i) => i + 1)
+              .filter((n) => n === 1 || n === jumlahHalaman || Math.abs(n - halaman) <= 1)
+              .map((n, i, arr) => (
+                <span key={n} style={{ display: 'contents' }}>
+                  {i > 0 && n - arr[i - 1] > 1 && (
+                    <span className="adm-redup" style={{ alignSelf: 'center' }} aria-hidden="true">
+                      …
+                    </span>
+                  )}
+                  <button className={'btn kecil' + (n === halaman ? ' utama' : '')} onClick={() => ke(n)} aria-current={n === halaman ? 'page' : undefined}>
+                    {n}
+                  </button>
+                </span>
+              ))}
+            <button className="btn kecil" onClick={() => ke(halaman + 1)} disabled={halaman >= jumlahHalaman} aria-label="Halaman berikutnya">
+              ›
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 

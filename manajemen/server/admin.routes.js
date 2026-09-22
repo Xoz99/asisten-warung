@@ -95,10 +95,16 @@ router.post('/saya/password', async (req, res, next) => {
   }
 });
 
+// Catatan aktivitas, per halaman (terbaru dulu).
+const PER_HALAMAN_LOG = 20;
 router.get('/log', async (req, res, next) => {
   try {
-    const { rows } = await query('SELECT id, admin_nama, aksi, detail, created_at FROM mj_log ORDER BY created_at DESC LIMIT 200');
-    res.json(rows);
+    const halaman = Math.max(1, Math.min(10000, Math.floor(Number(req.query.halaman) || 1)));
+    const [{ rows }, { rows: jumlah }] = await Promise.all([
+      query('SELECT id, admin_nama, aksi, detail, created_at FROM mj_log ORDER BY created_at DESC, id DESC LIMIT $1 OFFSET $2', [PER_HALAMAN_LOG, (halaman - 1) * PER_HALAMAN_LOG]),
+      query('SELECT count(*)::int AS n FROM mj_log'),
+    ]);
+    res.json({ items: rows, total: jumlah[0].n, halaman, perHalaman: PER_HALAMAN_LOG });
   } catch (e) {
     next(e);
   }
