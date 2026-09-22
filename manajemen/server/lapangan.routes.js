@@ -5,6 +5,8 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { catatLog, query, pool } from './db.js';
 import { query as queryWp, pastikanTabelSales } from './produk/warung-pintar/db.js';
+import { pastikanTabelOps } from './ops.routes.js';
+import { normalisasiNoHp } from './utils/noHp.js';
 
 // Sales Lapangan: bank keberatan pelanggan (kategori, ucapan, fakta produk buat ngejawab) + log kunjungan sales
 // (respon sales, respon pelanggan, hasil, insight, foto bukti WEBP, titik GPS otomatis dari HP).
@@ -80,6 +82,9 @@ function pastikanTabel() {
       // Lokasi diambil otomatis dari GPS HP waktu nyatet (bukan link yang ditempel manual).
       await query(`ALTER TABLE mj_lapangan_log ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION, ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION,
         ADD COLUMN IF NOT EXISTS akurasi_m INT, ADD COLUMN IF NOT EXISTS lokasi_at TIMESTAMPTZ`);
+      // Tiap kunjungan nempel ke satu kartu CRM per toko (mj_lead di ops.routes.js).
+      await pastikanTabelOps();
+      await query('ALTER TABLE mj_lapangan_log ADD COLUMN IF NOT EXISTS lead_id UUID');
       const { rows } = await query('SELECT count(*)::int AS n FROM mj_keberatan');
       if (!rows[0].n) {
         for (const b of BANK_AWAL) await query('INSERT INTO mj_keberatan (kategori, ucapan, fakta) VALUES ($1,$2,$3)', [b.kategori, b.ucapan, b.fakta]);
@@ -170,6 +175,63 @@ router.patch('/lapangan/keberatan/:id', async (req, res, next) => {
     next(e);
   }
 });
+
+// ---------------- Toko di CRM ----------------
+// Satu kartu CRM (mj_lead) per toko. Kunjungan pertama ke toko baru bikin kartunya; kunjungan berikutnya nempel ke
+// kartu yang sama dan mindahin tahapnya sesuai hasil.
+const TAHAP_DARI_HASIL = { berhasil: 'trial', tertarik: 'awareness', pikir: 'awareness', ditolak: 'stuck' };
+const NAMA_TAHAP = { awareness: 'Awareness', trial: 'Trial 7 hari', konversi: 'Konversi', repeat_order: 'Repeat order', stuck: 'Stuck' };
+const LABEL_HASIL = { berhasil: 'Berhasil (daftar / trial)', tertarik: 'Tertarik, follow up', pikir: 'Pikir-pikir', ditolak: 'Ditolak' };
+
+router.get('/lapangan/crm-toko', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT id, perusahaan AS nama, pic_nama, telepon, tahap FROM mj_lead WHERE pemilik_id=$1 ORDER BY updated_at DESC LIMIT 500`,
+      [req.admin.id]
+    );
+    res.json(rows);
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Dipanggil di dalam transaksi simpan log. Balikin { lead_id, toko }.
+async function tautkanKeCrm(c, req, log, b) {
+  const toko = teks(b.toko, 100);
+  if (!toko) throw salah('Nama toko wajib diisi');
+  let lead = null;
+  if (POLA_UUID.test(b.lead_id || '')) {
+    const { rows } = await c.query('SELECT * FROM mj_lead WHERE id=$1 AND ($2::boolean OR pemilik_id=$3) FOR UPDATE', [b.lead_id, req.admin.peran !== 'sales', req.admin.id]);
+    lead = rows[0] || null;
+  }
+  if (!lead) {
+    const { rows } = await c.query('SELECT * FROM mj_lead WHERE lower(perusahaan)=lower($1) AND pemilik_id=$2 ORDER BY updated_at DESC LIMIT 1 FOR UPDATE', [toko, req.admin.id]);
+    lead = rows[0] || null;
+  }
+  const tahapHasil = TAHAP_DARI_HASIL[log.hasil] || 'awareness';
+  const pemilik = teks(b.pemilik_nama, 80) || null;
+  const hp = b.pemilik_hp ? normalisasiNoHp(b.pemilik_hp) || teks(b.pemilik_hp, 20) : null;
+  const catat = async (jenis, isi) => c.query('INSERT INTO mj_lead_aktivitas (lead_id, admin_nama, jenis, isi) VALUES ($1,$2,$3,$4)', [lead.id, req.admin.nama, jenis, isi]);
+  if (!lead) {
+    const { rows } = await c.query(
+      `INSERT INTO mj_lead (perusahaan, pic_nama, telepon, sumber, tahap, pemilik_id) VALUES ($1,$2,$3,'Kunjungan lapangan',$4,$5) RETURNING *`,
+      [toko, pemilik, hp, tahapHasil, req.admin.id]
+    );
+    lead = rows[0];
+    await catat('tahap', `Kartu dibuat dari kunjungan lapangan, tahap ${NAMA_TAHAP[tahapHasil]}`);
+  } else {
+    // Kunjungan nggak nurunin toko yang udah bayar (Konversi / Repeat order), dan "tertarik" nggak ngebalikin Trial ke Awareness.
+    const boleh = !['konversi', 'repeat_order'].includes(lead.tahap) && !(lead.tahap === 'trial' && tahapHasil === 'awareness');
+    const pindah = boleh && tahapHasil !== lead.tahap;
+    await c.query(
+      `UPDATE mj_lead SET updated_at=now(), pic_nama=COALESCE(pic_nama,$2), telepon=COALESCE(telepon,$3)${pindah ? ', tahap=$4, tahap_sejak=now()' : ''} WHERE id=$1`,
+      pindah ? [lead.id, pemilik, hp, tahapHasil] : [lead.id, pemilik, hp]
+    );
+    if (pindah) await catat('tahap', `Tahap: ${NAMA_TAHAP[lead.tahap] || lead.tahap} → ${NAMA_TAHAP[tahapHasil]} (dari kunjungan #${log.nomor})`);
+  }
+  await catat('kunjungan', `Kunjungan #${log.nomor} oleh ${req.admin.nama}: ${log.kategori}, ${LABEL_HASIL[log.hasil]}. "${log.ucapan}"`);
+  return { lead_id: lead.id, toko: lead.perusahaan };
+}
 
 // ---------------- Log kunjungan ----------------
 const KOLOM_LOG = `l.*, l.tanggal::text AS tanggal, ad.nama AS sales_nama, k.fakta AS fakta,
@@ -299,9 +361,11 @@ router.post('/lapangan/log', async (req, res, next) => {
         [req.admin.id, k?.id || null, x.kategori, x.ucapan, x.respon_sales, x.respon_customer, x.hasil, x.catatan, x.id_kunjungan, x.tanggal,
           x.lokasi_url || null, x.lat ?? null, x.lng ?? null, x.akurasi_m ?? null, x.lokasi_at || null]
       );
+      const crm = await tautkanKeCrm(c, req, { ...x, nomor: rows[0].nomor }, b);
+      await c.query('UPDATE mj_lapangan_log SET lead_id=$2, id_kunjungan=$3 WHERE id=$1', [rows[0].id, crm.lead_id, crm.toko]);
       await simpanFoto(c, rows[0].id, foto);
       await c.query('COMMIT');
-      hasil = rows[0];
+      hasil = { ...rows[0], lead_id: crm.lead_id };
     } catch (e) {
       await c.query('ROLLBACK');
       throw e;

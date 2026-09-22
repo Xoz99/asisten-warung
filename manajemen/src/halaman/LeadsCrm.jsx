@@ -586,8 +586,8 @@ function Kanban({ leads, onBuka, onPindah }) {
 }
 
 // ---------------- Inspector ----------------
-const JENIS_AKTIVITAS = { catatan: 'Catatan', telepon: 'Telepon', meeting: 'Meeting', email: 'Email', tahap: 'Perubahan' };
-const WARNA_AKTIVITAS = { tahap: 'ungu', telepon: 'hijau', meeting: 'kuning', email: 'biru', catatan: '' };
+const JENIS_AKTIVITAS = { catatan: 'Catatan', telepon: 'Telepon', meeting: 'Meeting', email: 'Email', tahap: 'Perubahan', kunjungan: 'Kunjungan' };
+const WARNA_AKTIVITAS = { tahap: 'ungu', telepon: 'hijau', meeting: 'kuning', email: 'biru', catatan: '', kunjungan: 'oranye' };
 
 function Inspector({ api, lead, admins, onTutup, onBerubah }) {
   const [edit, setEdit] = useState(false);

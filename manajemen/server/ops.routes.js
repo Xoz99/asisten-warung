@@ -23,7 +23,7 @@ const KATEGORI_KELUAR = ['gaji', 'operasional', 'marketing', 'server', 'pajak', 
 const KATEGORI_MASUK = ['penjualan', 'proyek', 'investasi', 'lainnya'];
 
 let siap = null;
-function pastikanTabelOps() {
+export function pastikanTabelOps() {
   if (!siap) {
     siap = (async () => {
       await query(`CREATE TABLE IF NOT EXISTS mj_lead (

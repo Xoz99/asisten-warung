@@ -19,6 +19,7 @@ export const STATUS_TOKO = {
   trial_habis: { nama: 'Trial habis', warna: '' },
   berhenti: { nama: 'Berhenti', warna: 'merah' },
 };
+const NAMA_TAHAP_CRM = { awareness: 'Awareness', trial: 'Trial 7 hari', konversi: 'Konversi', repeat_order: 'Repeat order', stuck: 'Stuck' };
 const koordinat = (lat, lng) => `${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`;
 export const HASIL = {
   berhasil: { nama: 'Berhasil (daftar / trial)', pendek: 'Berhasil', warna: 'hijau', isi: 'var(--hijau)' },
@@ -111,7 +112,7 @@ function Log({ api, sales, versi, onBuka, onCatat }) {
   const kategori = useMemo(() => [...new Set([...(bank || []).map((k) => k.kategori), ...(data || []).map((l) => l.kategori)])].sort(), [bank, data]);
 
   const ekspor = () => {
-    const kepala = ['No', 'Tanggal', 'Sales', 'Kategori', 'Ucapan pelanggan', 'Fakta produk', 'Respon sales', 'Respon customer', 'Hasil', 'Catatan / insight', 'No kunjungan / ID cust', 'Latitude', 'Longitude', 'Akurasi GPS (m)', 'Waktu GPS', 'Jumlah foto'];
+    const kepala = ['No', 'Tanggal', 'Sales', 'Kategori', 'Ucapan pelanggan', 'Fakta produk', 'Respon sales', 'Respon customer', 'Hasil', 'Catatan / insight', 'Toko', 'Latitude', 'Longitude', 'Akurasi GPS (m)', 'Waktu GPS', 'Jumlah foto'];
     const sel = (v) => {
       const s = v == null ? '' : String(v);
       return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -222,7 +223,7 @@ function Log({ api, sales, versi, onBuka, onCatat }) {
                   <th>Respon customer</th>
                   <th>Hasil</th>
                   <th>Catatan / insight</th>
-                  <th>Kunjungan</th>
+                  <th>Toko</th>
                   <th>Lokasi (lat, long)</th>
                   <th>Foto</th>
                 </tr>
@@ -503,6 +504,9 @@ function LokasiGps({ gps, status, error, lama, onAmbil }) {
 export function FormLog({ api, awal, wajibGps, onTutup, onSelesai }) {
   const edit = Boolean(awal.id);
   const { data: bank } = useData(api, '/lapangan/keberatan');
+  // Toko yang pernah dia kunjungi (kartu CRM miliknya) - buat saran nama toko biar kunjungan nempel ke kartu yang sama.
+  const { data: tokoCrm } = useData(api, edit ? null : '/lapangan/crm-toko');
+  const [pemilikToko, setPemilikToko] = useState({ nama: '', hp: '' });
   const [isi, setIsi] = useState(() => ({
     tanggal: awal.tanggal || hariIniWib(),
     id_kunjungan: awal.id_kunjungan || '',
@@ -544,6 +548,7 @@ export function FormLog({ api, awal, wajibGps, onTutup, onSelesai }) {
   }, []);
   const ubah = (k) => (e) => setIsi((x) => ({ ...x, [k]: e.target.value }));
   const dipilih = bank?.find((k) => k.id === isi.keberatan_id) || null;
+  const tokoLama = !edit && isi.id_kunjungan.trim() ? (tokoCrm || []).find((t) => t.nama.trim().toLowerCase() === isi.id_kunjungan.trim().toLowerCase()) || null : null;
   const sisaFoto = MAKS_FOTO - fotoLama.length - fotoBaru.length;
   const gaya = { maxWidth: 'none', width: '100%', minHeight: 44 };
 
@@ -590,7 +595,14 @@ export function FormLog({ api, awal, wajibGps, onTutup, onSelesai }) {
               await api('PATCH', `/lapangan/log/${awal.id}`, { ...body, foto_baru: fotoBaru, hapus_foto: hapusFoto });
               onSelesai(`Kunjungan #${awal.nomor} disimpan.`);
             } else {
-              const h = await api('POST', '/lapangan/log', { ...body, foto: fotoBaru });
+              const h = await api('POST', '/lapangan/log', {
+                ...body,
+                toko: isi.id_kunjungan,
+                lead_id: tokoLama?.id || null,
+                pemilik_nama: tokoLama ? null : pemilikToko.nama,
+                pemilik_hp: tokoLama ? null : pemilikToko.hp,
+                foto: fotoBaru,
+              });
               onSelesai(`Kunjungan #${h.nomor} dicatat.`);
             }
           } catch (err) {
@@ -605,10 +617,48 @@ export function FormLog({ api, awal, wajibGps, onTutup, onSelesai }) {
             <input id="l-tgl" type="date" value={isi.tanggal} max={hariIniWib()} onChange={ubah('tanggal')} required />
           </div>
           <div className="field">
-            <label htmlFor="l-id">No kunjungan / ID pelanggan</label>
-            <input id="l-id" value={isi.id_kunjungan} onChange={ubah('id_kunjungan')} maxLength={80} placeholder="Misal: 12 atau Warung Bu Siti" />
+            <label htmlFor="l-id">Toko</label>
+            <input
+              id="l-id"
+              value={isi.id_kunjungan}
+              onChange={ubah('id_kunjungan')}
+              maxLength={100}
+              placeholder="Misal: Warung Bu Siti"
+              list="l-toko-lama"
+              autoComplete="off"
+              readOnly={edit}
+              required={!edit}
+            />
+            <datalist id="l-toko-lama">
+              {(tokoCrm || []).map((t) => (
+                <option key={t.id} value={t.nama} />
+              ))}
+            </datalist>
           </div>
         </div>
+        {!edit && isi.id_kunjungan.trim() && (
+          tokoLama ? (
+            <p className="adm-redup" style={{ margin: '6px 0 0' }}>
+              Toko lama, nempel ke kartu CRM yang sama (sekarang di tahap <b>{NAMA_TAHAP_CRM[tokoLama.tahap] || tokoLama.tahap}</b>).
+            </p>
+          ) : (
+            <div className="adm-kartu" style={{ boxShadow: 'none', padding: 12, marginTop: 10 }}>
+              <p style={{ margin: 0 }}>
+                <b>Toko baru.</b> <span className="adm-redup">Dibikinin kartu CRM baru atas namamu.</span>
+              </p>
+              <div className="adm-baris" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
+                <div className="field">
+                  <label htmlFor="l-pemilik">Nama pemilik (opsional)</label>
+                  <input id="l-pemilik" value={pemilikToko.nama} onChange={(e) => setPemilikToko((x) => ({ ...x, nama: e.target.value }))} maxLength={80} placeholder="Bu Siti" />
+                </div>
+                <div className="field">
+                  <label htmlFor="l-pemilik-hp">No. HP pemilik (opsional)</label>
+                  <input id="l-pemilik-hp" value={pemilikToko.hp} onChange={(e) => setPemilikToko((x) => ({ ...x, hp: e.target.value }))} inputMode="tel" maxLength={20} placeholder="0812…" />
+                </div>
+              </div>
+            </div>
+          )
+        )}
 
         <div className="field">
           <label htmlFor="l-bank">Keberatan pelanggan</label>
@@ -714,7 +764,7 @@ export function FormLog({ api, awal, wajibGps, onTutup, onSelesai }) {
             Batal
           </button>
           {wajibGps && !edit && !gps && <span className="adm-redup" style={{ alignSelf: 'center', marginRight: 'auto' }}>Ambil lokasi GPS dulu buat nyimpen.</span>}
-          <button type="submit" className="btn utama" disabled={sibuk || !isi.hasil || isi.ucapan.trim().length < 3 || isi.respon_sales.trim().length < 3 || (wajibGps && !edit && !gps)}>
+          <button type="submit" className="btn utama" disabled={sibuk || !isi.hasil || isi.ucapan.trim().length < 3 || isi.respon_sales.trim().length < 3 || (!edit && !isi.id_kunjungan.trim()) || (wajibGps && !edit && !gps)}>
             {sibuk ? 'Menyimpan…' : 'Simpan'}
           </button>
         </div>
