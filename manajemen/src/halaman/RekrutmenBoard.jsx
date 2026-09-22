@@ -385,7 +385,7 @@ export function DetailKandidat({ api, id, urutan = [], onTutup, onBerubah, onBuk
             <div className="rk-kontak">
               <span className="adm-mono">{tampilHp(l.no_hp)}</span>
               {l.email && <span className="adm-mono">{l.email}</span>}
-              <button className="btn kecil" onClick={() => bukaWa(l.no_hp, `Halo ${depan(l.nama)}, ini dari tim rekrutmen Sales Partner Konsulin.`)}>
+              <button className="btn kecil" onClick={() => bukaWa(l.no_hp, alur.wa.sapa)}>
                 WhatsApp
               </button>
               <a className="btn kecil" href={`tel:+${nomorWa(l.no_hp)}`}>
@@ -855,9 +855,10 @@ function Keluarkan({ saran, kirim }) {
   );
 }
 
-function teksMateri(nama, materi) {
-  const baris = materi.map((m) => `• ${m.nama}${m.url ? `: ${m.url}` : ''}${m.keterangan ? ` (${m.keterangan})` : ''}`);
-  return `Halo ${depan(nama)}, makasih udah daftar jadi Sales Partner Konsulin.\n\nKamu lolos tahap screening. Sebelum interview, pelajari produknya dulu ya:\n${baris.join('\n')}\n• Kuis 5 soal: {LINK_KUIS}\n\nWaktunya 3 hari. Kalau udah daftar di aplikasinya dan kuisnya benar semua, kamu dapet link buat pilih jadwal interview sendiri.`;
+// Isi template materi (dari Pengaturan). {link_kuis} dibiarin jadi {LINK_KUIS}: linknya ditempel server waktu dikirim.
+function teksMateri(template, nama, materi) {
+  const baris = materi.map((m) => `• ${m.nama}${m.url ? `: ${m.url}` : ''}${m.keterangan ? ` (${m.keterangan})` : ''}`).join('\n');
+  return template.replaceAll('{nama}', depan(nama)).replaceAll('{materi}', baris).replaceAll('{link_kuis}', '{LINK_KUIS}');
 }
 
 function ModalMateri({ api, l, paksa, onTutup, onSelesai }) {
@@ -872,8 +873,8 @@ function ModalMateri({ api, l, paksa, onTutup, onSelesai }) {
     if (data && pilih === null) setPilih(new Set(aktif.map((m) => Number(m.id))));
   }, [data, aktif, pilih]);
   useEffect(() => {
-    if (pilih && !ubahManual) setTeks(teksMateri(l.nama, aktif.filter((m) => pilih.has(Number(m.id)))));
-  }, [pilih, aktif, l.nama, ubahManual]);
+    if (pilih && !ubahManual && data) setTeks(teksMateri(data.templateMateri, l.nama, aktif.filter((m) => pilih.has(Number(m.id)))));
+  }, [pilih, aktif, l.nama, ubahManual, data]);
   const soalAktif = (data?.soal || []).filter((s) => s.aktif).length;
   return (
     <Modal judul={`Kirim paket materi ke ${l.nama}`} onTutup={onTutup} lebar={620}>
@@ -882,7 +883,7 @@ function ModalMateri({ api, l, paksa, onTutup, onSelesai }) {
       ) : (
         <>
           {paksa && <p className="adm-error" style={{ marginTop: 0 }}>Syarat wajib belum lengkap. Kamu meloloskan manual, dan ini kecatat di riwayat.</p>}
-          {soalAktif < data.jumlahSoal && <p className="adm-error">Soal kuis aktif baru {soalAktif}. Tambahin dulu di tab Kuis &amp; materi.</p>}
+          {soalAktif < data.jumlahSoal && <p className="adm-error">Soal kuis aktif baru {soalAktif}. Tambahin dulu di tab Pengaturan.</p>}
           <p className="adm-redup" style={{ marginTop: 0 }}>Pilih materi yang dikirim. Link kuis unik buat kandidat ini ditempel otomatis pas kamu kirim.</p>
           <div className="rk-materi-pilih">
             {aktif.map((m) => (
@@ -907,7 +908,7 @@ function ModalMateri({ api, l, paksa, onTutup, onSelesai }) {
                 </span>
               </label>
             ))}
-            {aktif.length === 0 && <p className="adm-redup">Belum ada materi aktif. Tambah di tab Kuis &amp; materi.</p>}
+            {aktif.length === 0 && <p className="adm-redup">Belum ada materi aktif. Tambah di tab Pengaturan.</p>}
           </div>
           <div className="field">
             <label htmlFor="rk-wa">Pesan WhatsApp</label>
@@ -1005,7 +1006,7 @@ export function KuisMateri({ api }) {
             ))}
           </ul>
           <p className="adm-label" style={{ fontSize: 10, margin: '14px 0 6px' }}>
-            Contoh pesan WA
+            Contoh pesan WA (template "Paket materi + kuis" di bawah)
           </p>
           <pre className="rk-pratinjau">{data.contohTeks}</pre>
         </section>
@@ -1044,9 +1045,116 @@ export function KuisMateri({ api }) {
           </ol>
         </section>
       </div>
+      <TemplateWa api={api} onBerubah={muat} />
       {edit?.jenis === 'materi' && <FormMateri api={api} awal={edit.awal} onTutup={() => setEdit(null)} onSelesai={() => (setEdit(null), muat())} />}
       {edit?.jenis === 'soal' && <FormSoal api={api} awal={edit.awal} onTutup={() => setEdit(null)} onSelesai={() => (setEdit(null), muat())} />}
     </>
+  );
+}
+
+// ---- Template pesan WA (bisa diedit semua admin) ----
+function TemplateWa({ api, onBerubah }) {
+  const { data, error, muat } = useData(api, '/rekrutmen/template');
+  if (error) return <Gagal apa="template WA" pesan={error} onUlang={muat} />;
+  if (!data) return <Memuat apa="template WA" />;
+  return (
+    <section className="adm-kartu" style={{ marginTop: 16 }}>
+      <h2 style={{ marginTop: 0 }}>Template pesan WA</h2>
+      <p className="adm-redup" style={{ marginTop: 0 }}>
+        Pesan yang disiapin buat kandidat di tiap tahap. Tulisan dalam kurung kurawal kayak <span className="adm-mono">{'{nama}'}</span> otomatis diganti waktu pesan dibikin. Klik penandanya buat nyisipin.
+      </p>
+      <div className="rk-template-grid">
+        {data.template.map((t) => (
+          <KartuTemplate
+            key={t.kunci + (t.diubah_at || '')}
+            api={api}
+            t={t}
+            contoh={data.contoh}
+            onSimpan={() => {
+              muat();
+              onBerubah?.();
+            }}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function KartuTemplate({ api, t, contoh, onSimpan }) {
+  const [isi, setIsi] = useState(t.isi);
+  const [pesan, setPesan] = useState('');
+  const [sibuk, setSibuk] = useState(false);
+  const ref = useRef(null);
+  const berubah = isi !== t.isi;
+  const kurang = t.wajib.filter((k) => !isi.includes(`{${k}}`));
+  const pratinjau = isi.replace(/\{(\w+)\}/g, (m, k) => (t.penanda.includes(k) && contoh[k] !== undefined ? contoh[k] : m));
+  const sisip = (k) => {
+    const el = ref.current;
+    const tanda = `{${k}}`;
+    if (!el) return setIsi((x) => x + tanda);
+    const a = el.selectionStart ?? isi.length;
+    const b = el.selectionEnd ?? isi.length;
+    setIsi(isi.slice(0, a) + tanda + isi.slice(b));
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(a + tanda.length, a + tanda.length);
+    });
+  };
+  const kirim = async (metode) => {
+    setSibuk(true);
+    setPesan('');
+    try {
+      await api(metode, `/rekrutmen/template/${t.kunci}`, metode === 'PUT' ? { isi } : undefined);
+      setPesan(metode === 'PUT' ? 'Disimpan.' : 'Dibalikin ke bawaan.');
+      onSimpan();
+    } catch (e) {
+      setPesan('Gagal: ' + e.message);
+    } finally {
+      setSibuk(false);
+    }
+  };
+  return (
+    <div className="rk-template">
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
+        <b>{t.judul}</b>
+        <span className="adm-redup" style={{ fontSize: 12 }}>
+          {t.diubah ? `Diubah ${t.diubah_oleh || '-'} · ${waktu(t.diubah_at)}` : 'Bawaan'}
+        </span>
+      </div>
+      <p className="adm-redup" style={{ margin: '2px 0 8px', fontSize: 13 }}>
+        {t.ket}
+      </p>
+      <textarea ref={ref} className="adm-input" style={{ minHeight: t.kunci === 'materi' || t.kunci === 'trial' ? 170 : 90, fontSize: 13 }} value={isi} onChange={(e) => setIsi(e.target.value)} aria-label={`Isi template ${t.judul}`} />
+      <div className="rk-penanda">
+        {t.penanda.map((k) => (
+          <button key={k} type="button" className={`adm-chip ${t.wajib.includes(k) ? 'kuning' : ''}`} onClick={() => sisip(k)} title={t.wajib.includes(k) ? 'Wajib ada' : 'Sisipkan'}>
+            {`{${k}}`}
+          </button>
+        ))}
+      </div>
+      {kurang.length > 0 && <p className="adm-error" style={{ fontSize: 12 }}>Wajib ada {kurang.map((k) => `{${k}}`).join(', ')}.</p>}
+      <details className="rk-pratinjau-lipat">
+        <summary>Pratinjau</summary>
+        <pre className="rk-pratinjau">{pratinjau}</pre>
+      </details>
+      {pesan && <p className={pesan.startsWith('Gagal') ? 'adm-error' : 'adm-ok'} style={{ fontSize: 13 }}>{pesan}</p>}
+      <div className="adm-tombol" style={{ marginTop: 8 }}>
+        <button className="btn kecil utama" disabled={sibuk || !berubah || kurang.length > 0 || !isi.trim()} onClick={() => kirim('PUT')}>
+          Simpan
+        </button>
+        {berubah && (
+          <button className="btn kecil" onClick={() => setIsi(t.isi)}>
+            Batal ubah
+          </button>
+        )}
+        {t.diubah && (
+          <button className="btn kecil" disabled={sibuk} onClick={() => window.confirm(`Balikin "${t.judul}" ke pesan bawaan?`) && kirim('DELETE')}>
+            Balikin ke bawaan
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 

@@ -59,6 +59,10 @@ function pastikan() {
         lamaran_id UUID REFERENCES mj_lamaran(id) ON DELETE SET NULL, dipesan_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ DEFAULT now(), UNIQUE (pewawancara_id, mulai)
       )`);
+      // Template pesan WA yang bisa diedit admin (Rekrutmen -> Pengaturan). Kosong = pakai bawaan di TEMPLATE.
+      await query(`CREATE TABLE IF NOT EXISTS mj_rek_template (
+        kunci TEXT PRIMARY KEY, isi TEXT NOT NULL, diubah_oleh TEXT, diubah_at TIMESTAMPTZ DEFAULT now()
+      )`);
       // Isi awal: link APK, dan 5 soal dari fakta yang ada di sistem (harga paket, trial, bagi hasil). Admin bisa ubah.
       const { rows: m } = await query('SELECT count(*)::int AS n FROM mj_rek_materi');
       if (!m[0].n) {
@@ -314,13 +318,69 @@ const depan = (n) => {
 };
 const linkKuis = (t) => `${PUBLIK_URL()}/kuis/${t}`;
 const linkJadwal = (t) => `${PUBLIK_URL()}/jadwal/${t}`;
-export function teksMateri(nama, materi, link = '{LINK_KUIS}') {
-  const baris = materi.map((m) => `• ${m.nama}${m.url ? `: ${m.url}` : ''}${m.keterangan ? ` (${m.keterangan})` : ''}`);
-  return `Halo ${depan(nama)}, makasih udah daftar jadi Sales Partner Konsulin.\n\nKamu lolos tahap screening. Sebelum interview, pelajari produknya dulu ya:\n${baris.join('\n')}\n• Kuis 5 soal: ${link}\n\nWaktunya 3 hari. Kalau udah daftar di aplikasinya dan kuisnya benar semua, kamu dapet link buat pilih jadwal interview sendiri.`;
+// Template bawaan. {penanda} diganti waktu pesan dibikin; penanda `wajib` harus ada biar pesannya tetap berguna.
+export const TEMPLATE = {
+  sapa: {
+    judul: 'Sapaan pembuka',
+    ket: 'Tombol WhatsApp di panel kandidat.',
+    wajib: [],
+    penanda: ['nama'],
+    isi: 'Halo {nama}, ini dari tim rekrutmen Sales Partner Konsulin.',
+  },
+  materi: {
+    judul: 'Paket materi + kuis',
+    ket: 'Dikirim waktu kandidat lolos screening.',
+    wajib: ['link_kuis'],
+    penanda: ['nama', 'materi', 'link_kuis'],
+    isi: 'Halo {nama}, makasih udah daftar jadi Sales Partner Konsulin.\n\nKamu lolos tahap screening. Sebelum interview, pelajari produknya dulu ya:\n{materi}\n• Kuis 5 soal: {link_kuis}\n\nWaktunya 3 hari. Kalau udah daftar di aplikasinya dan kuisnya benar semua, kamu dapet link buat pilih jadwal interview sendiri.',
+  },
+  kuis_ulang: {
+    judul: 'Kirim ulang kuis',
+    ket: 'Kesempatan kedua buat kandidat yang kuisnya belum benar semua, atau link kuis yang ketinggalan.',
+    wajib: ['link_kuis'],
+    penanda: ['nama', 'link_kuis'],
+    isi: 'Halo {nama}, ini link kuisnya ya: {link_kuis}',
+  },
+  ingatkan_apk: {
+    judul: 'Ingatkan daftar aplikasi',
+    ket: 'Buat kandidat yang belum daftar di Asisten Warung.',
+    wajib: [],
+    penanda: ['nama', 'link_apk'],
+    isi: 'Halo {nama}, udah sempet coba aplikasinya? Daftar di sini pakai nomor WA ini ya: {link_apk}. Kabarin kalau ada kendala.',
+  },
+  jadwal: {
+    judul: 'Link pilih jadwal interview',
+    ket: 'Dikirim waktu kandidat sampai tahap Interview.',
+    wajib: ['link_jadwal'],
+    penanda: ['nama', 'link_jadwal'],
+    isi: 'Halo {nama}, selamat kamu lanjut ke tahap interview. Pilih jadwal yang cocok di sini ya: {link_jadwal}',
+  },
+  trial: {
+    judul: 'Info trial lapangan',
+    ket: 'Dikirim waktu kandidat lulus interview.',
+    wajib: ['kode'],
+    penanda: ['nama', 'kode', 'link_referral'],
+    isi: 'Halo {nama}, selamat kamu lulus interview. Trial lapangan mulai sekarang:\n• Kode sales kamu: {kode}\n• Link daftar buat warung: {link_referral}\n\nTarget: 3 warung daftar dalam 24 jam, lalu 3 warung bayar langganan dalam 6 hari. Semua kehitung otomatis kalau warungnya daftar pakai link atau kode kamu.',
+  },
+};
+let cacheTemplate = null;
+async function templateAktif() {
+  if (!cacheTemplate || Date.now() - cacheTemplate.at > 30000) {
+    const { rows } = await query('SELECT kunci, isi FROM mj_rek_template');
+    cacheTemplate = { at: Date.now(), isi: Object.fromEntries(rows.map((r) => [r.kunci, r.isi])) };
+  }
+  return cacheTemplate.isi;
 }
-const teksJadwal = (nama, t) => `Halo ${depan(nama)}, selamat kamu lanjut ke tahap interview. Pilih jadwal yang cocok di sini ya: ${linkJadwal(t)}`;
-const teksTrial = (nama, kode) =>
-  `Halo ${depan(nama)}, selamat kamu lulus interview. Trial lapangan mulai sekarang:\n• Kode sales kamu: ${kode}\n• Link daftar buat warung: ${URL_WARUNG()}/?ref=${kode}\n\nTarget: 3 warung daftar dalam 24 jam, lalu 3 warung bayar langganan dalam 6 hari. Semua kehitung otomatis kalau warungnya daftar pakai link atau kode kamu.`;
+export const isiPenanda = (isi, v) => isi.replace(/\{(\w+)\}/g, (m, k) => (v[k] !== undefined && v[k] !== null ? String(v[k]) : m));
+async function pesan(kunci, v) {
+  const t = await templateAktif();
+  return isiPenanda(t[kunci] || TEMPLATE[kunci].isi, v);
+}
+const barisMateri = (materi) => materi.map((m) => `• ${m.nama}${m.url ? `: ${m.url}` : ''}${m.keterangan ? ` (${m.keterangan})` : ''}`).join('\n');
+// {link_kuis} dibiarin jadi {LINK_KUIS} dulu: linknya baru ada setelah token kuis dibikin (lihat loloskan).
+const teksMateri = (nama, materi) => pesan('materi', { nama: depan(nama), materi: barisMateri(materi), link_kuis: '{LINK_KUIS}' });
+const teksJadwal = (nama, t) => pesan('jadwal', { nama: depan(nama), link_jadwal: linkJadwal(t) });
+const teksTrial = (nama, kode) => pesan('trial', { nama: depan(nama), kode, link_referral: `${URL_WARUNG()}/?ref=${kode}` });
 
 // ---------------- Board ----------------
 router.get('/rekrutmen/board', async (req, res, next) => {
@@ -377,10 +437,11 @@ router.get('/rekrutmen/lamaran/:id/alur', async (req, res, next) => {
       ...x,
       link: { kuis: t.kuis ? linkKuis(t.kuis) : null, jadwal: t.jadwal ? linkJadwal(t.jadwal) : null, referral: l.trial_kode ? `${URL_WARUNG()}/?ref=${l.trial_kode}` : null },
       wa: {
-        jadwal: t.jadwal ? teksJadwal(l.nama, t.jadwal) : null,
-        kuisUlang: t.kuis ? `Halo ${depan(l.nama)}, ini link kuisnya ya: ${linkKuis(t.kuis)}` : null,
-        ingatkanApk: `Halo ${depan(l.nama)}, udah sempet coba aplikasinya? Kabarin ya kalau ada kendala daftar.`,
-        trial: l.trial_kode ? teksTrial(l.nama, l.trial_kode) : null,
+        sapa: await pesan('sapa', { nama: depan(l.nama) }),
+        jadwal: t.jadwal ? await teksJadwal(l.nama, t.jadwal) : null,
+        kuisUlang: t.kuis ? await pesan('kuis_ulang', { nama: depan(l.nama), link_kuis: linkKuis(t.kuis) }) : null,
+        ingatkanApk: await pesan('ingatkan_apk', { nama: depan(l.nama), link_apk: URL_WARUNG() }),
+        trial: l.trial_kode ? await teksTrial(l.nama, l.trial_kode) : null,
       },
     });
   } catch (e) {
@@ -391,9 +452,11 @@ router.get('/rekrutmen/lamaran/:id/alur', async (req, res, next) => {
 // Loloskan screening + kirim paket materi: new/screening/screening_passed -> pelajari_produk, token kuis baru.
 async function loloskan(id, aktor, { materiId = null, teksWa = null, paksa = false } = {}) {
   const { rows: soal } = await query('SELECT count(*)::int AS n FROM mj_rek_soal WHERE aktif');
-  if (soal[0].n < JUMLAH_SOAL) throw salah(`Soal kuis aktif baru ${soal[0].n}. Tambahin sampai ${JUMLAH_SOAL} di tab Kuis & materi dulu.`);
+  if (soal[0].n < JUMLAH_SOAL) throw salah(`Soal kuis aktif baru ${soal[0].n}. Tambahin sampai ${JUMLAH_SOAL} di Rekrutmen → Pengaturan dulu.`);
   const { rows: materiSemua } = await query('SELECT * FROM mj_rek_materi WHERE aktif ORDER BY urutan, id');
   const materi = materiId ? materiSemua.filter((m) => materiId.includes(Number(m.id))) : materiSemua;
+  const { rows: nm } = await query('SELECT o.nama FROM mj_lamaran l JOIN mj_orang o ON o.id=l.orang_id WHERE l.id=$1', [id]);
+  const bawaan = nm.length ? await teksMateri(nm[0].nama, materi) : '';
   return transaksi(async (c) => {
     const l = await ambilLamaran(c, id);
     if (!['new', 'screening', 'screening_passed'].includes(l.status)) throw salah('Kandidat ini udah lewat tahap screening');
@@ -416,7 +479,7 @@ async function loloskan(id, aktor, { materiId = null, teksWa = null, paksa = fal
       dari = { ...dari, status: ke };
     }
     const token = await tokenBaru(c, id, 'kuis');
-    const final = (teksWa && teksWa.includes('{LINK_KUIS}') ? teksWa : teksMateri(l.nama, materi)).replaceAll('{LINK_KUIS}', linkKuis(token));
+    const final = (teksWa && teksWa.includes('{LINK_KUIS}') ? teksWa : bawaan).replaceAll('{LINK_KUIS}', linkKuis(token));
     return { id, nama: l.nama, teks: final };
   });
 }
@@ -474,7 +537,7 @@ router.post('/rekrutmen/lamaran/:id/kuis-ulang', async (req, res, next) => {
       if (!['pelajari_produk', 'product_test'].includes(l.status)) throw salah('Kuis cuma buat tahap Belajar & tes');
       const token = await tokenBaru(c, l.id, 'kuis');
       await catatEvent(c, l.id, 'catatan', { isi: 'Link kuis baru dikirim (kesempatan ulang)' }, req.admin.nama);
-      return { teks: `Halo ${depan(l.nama)}, ini kesempatan kedua buat kuisnya ya: ${linkKuis(token)}`, hp: await hpKandidat(l.id) };
+      return { teks: await pesan('kuis_ulang', { nama: depan(l.nama), link_kuis: linkKuis(token) }), hp: await hpKandidat(l.id) };
     });
     res.json(r);
   } catch (e) {
@@ -506,7 +569,7 @@ router.post('/rekrutmen/lamaran/:id/link-jadwal', async (req, res, next) => {
       const token = t[0]?.token || (await tokenBaru(c, l.id, 'jadwal'));
       await c.query('UPDATE mj_lamaran SET jadwal_link_at=now() WHERE id=$1', [l.id]);
       await catatEvent(c, l.id, 'catatan', { isi: 'Link pilih jadwal interview dikirim via WA' }, req.admin.nama);
-      return { teks: teksJadwal(l.nama, token), hp: await hpKandidat(l.id) };
+      return { teks: await teksJadwal(l.nama, token), hp: await hpKandidat(l.id) };
     });
     res.json(r);
   } catch (e) {
@@ -564,7 +627,7 @@ router.post('/rekrutmen/lamaran/:id/interview-hasil', async (req, res, next) => 
       throw e;
     }
     await catatLog(req, 'rekrutmen.attempt', { nama: pre[0].nama, tahap: 'interview', hasil });
-    res.json({ ok: true, trial: sales ? { kode: sales.kode, teks: teksTrial(pre[0].nama, sales.kode), hp: pre[0].no_hp } : null });
+    res.json({ ok: true, trial: sales ? { kode: sales.kode, teks: await teksTrial(pre[0].nama, sales.kode), hp: pre[0].no_hp } : null });
   } catch (e) {
     next(e);
   }
@@ -624,7 +687,8 @@ router.post('/rekrutmen/lamaran/:id/kembalikan', async (req, res, next) => {
 router.get('/rekrutmen/materi', async (req, res, next) => {
   try {
     const [{ rows: materi }, { rows: soal }] = await Promise.all([query('SELECT * FROM mj_rek_materi ORDER BY urutan, id'), query('SELECT * FROM mj_rek_soal ORDER BY urutan, id')]);
-    res.json({ materi, soal, jumlahSoal: JUMLAH_SOAL, contohTeks: teksMateri('Budi', materi.filter((m) => m.aktif)) });
+    const t = await templateAktif();
+    res.json({ materi, soal, jumlahSoal: JUMLAH_SOAL, templateMateri: t.materi || TEMPLATE.materi.isi, contohTeks: (await teksMateri('Budi', materi.filter((m) => m.aktif))).replace('{LINK_KUIS}', `${PUBLIK_URL()}/kuis/contoh`) });
   } catch (e) {
     next(e);
   }
@@ -694,6 +758,65 @@ router.patch('/rekrutmen/soal/:id', async (req, res, next) => {
 router.delete('/rekrutmen/soal/:id', async (req, res, next) => {
   try {
     await query('DELETE FROM mj_rek_soal WHERE id=$1', [Number(req.params.id) || 0]);
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ---- Template pesan WA ----
+router.get('/rekrutmen/template', async (req, res, next) => {
+  try {
+    const { rows } = await query('SELECT kunci, isi, diubah_oleh, diubah_at FROM mj_rek_template');
+    const ada = Object.fromEntries(rows.map((r) => [r.kunci, r]));
+    const contoh = { nama: 'Budi', materi: '• Aplikasi Asisten Warung: ' + URL_WARUNG(), link_kuis: `${PUBLIK_URL()}/kuis/contoh`, link_jadwal: `${PUBLIK_URL()}/jadwal/contoh`, link_apk: URL_WARUNG(), kode: 'BUDI27', link_referral: `${URL_WARUNG()}/?ref=BUDI27` };
+    res.json({
+      contoh,
+      template: Object.entries(TEMPLATE).map(([kunci, t]) => ({
+        kunci,
+        judul: t.judul,
+        ket: t.ket,
+        penanda: t.penanda,
+        wajib: t.wajib,
+        bawaan: t.isi,
+        isi: ada[kunci]?.isi || t.isi,
+        diubah: !!ada[kunci],
+        diubah_oleh: ada[kunci]?.diubah_oleh || null,
+        diubah_at: ada[kunci]?.diubah_at || null,
+      })),
+    });
+  } catch (e) {
+    next(e);
+  }
+});
+router.put('/rekrutmen/template/:kunci', async (req, res, next) => {
+  try {
+    const t = TEMPLATE[req.params.kunci];
+    if (!t) throw salah('Template nggak dikenal', 404);
+    const isi = typeof req.body.isi === 'string' ? req.body.isi.replace(/\r/g, '').trim().slice(0, 3000) : '';
+    if (!isi) throw salah('Isi pesan wajib diisi');
+    const kurang = t.wajib.filter((k) => !isi.includes(`{${k}}`));
+    if (kurang.length) throw salah(`Pesan ini wajib ada ${kurang.map((k) => `{${k}}`).join(', ')}, biar kandidat dapet linknya`);
+    const asing = [...isi.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).filter((k) => !t.penanda.includes(k));
+    if (asing.length) throw salah(`Penanda ${[...new Set(asing)].map((k) => `{${k}}`).join(', ')} nggak dikenal di template ini`);
+    await query(
+      'INSERT INTO mj_rek_template (kunci, isi, diubah_oleh, diubah_at) VALUES ($1,$2,$3,now()) ON CONFLICT (kunci) DO UPDATE SET isi=EXCLUDED.isi, diubah_oleh=EXCLUDED.diubah_oleh, diubah_at=now()',
+      [req.params.kunci, isi, req.admin.nama]
+    );
+    cacheTemplate = null;
+    await catatLog(req, 'rekrutmen.template.ubah', { template: t.judul });
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+router.delete('/rekrutmen/template/:kunci', async (req, res, next) => {
+  try {
+    const t = TEMPLATE[req.params.kunci];
+    if (!t) throw salah('Template nggak dikenal', 404);
+    await query('DELETE FROM mj_rek_template WHERE kunci=$1', [req.params.kunci]);
+    cacheTemplate = null;
+    await catatLog(req, 'rekrutmen.template.ubah', { template: t.judul, jadi: 'bawaan' });
     res.json({ ok: true });
   } catch (e) {
     next(e);

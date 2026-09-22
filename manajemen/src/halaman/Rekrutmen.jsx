@@ -29,7 +29,7 @@ const hariSejak = (t) => Math.max(0, Math.floor((Date.now() - new Date(t).getTim
 const TABS = [
   { id: 'papan', nama: 'Board kandidat' },
   { id: 'jadwal', nama: 'Ketersediaan interview' },
-  { id: 'kuis', nama: 'Kuis & materi' },
+  { id: 'kuis', nama: 'Pengaturan' },
   { id: 'sumber', nama: 'Sumber & kampanye' },
   { id: 'arsip', nama: 'Arsip' },
 ];

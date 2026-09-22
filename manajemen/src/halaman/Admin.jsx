@@ -31,6 +31,8 @@ export const NAMA_AKSI = {
   'rekrutmen.kampanye.tambah': 'bikin kampanye rekrutmen',
   'rekrutmen.titik.tambah': 'nambah titik sebar',
   'rekrutmen.titik.status': 'ubah status posting',
+  'rekrutmen.template.ubah': 'ubah template WA rekrutmen',
+  'rekrutmen.slot.tambah': 'nambah slot interview',
   'admin.ubah_peran': 'ganti peran akun',
   'komisi.tutup': 'nutup bulan bagi hasil',
   'komisi.cairkan': 'nyairin bagi hasil sales',

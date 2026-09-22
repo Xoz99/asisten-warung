@@ -926,3 +926,11 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 .rk-slot.dipilih{background:#DDF3E6}
 .rk-slot.lewat{opacity:.5}
 @media (max-width:640px){.rk-funnel{grid-template-columns:repeat(5,minmax(70px,1fr));overflow-x:auto}.rk-funnel b{font-size:18px}}
+.rk-template-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
+@media (max-width:420px){.rk-template-grid{grid-template-columns:minmax(0,1fr)}}
+.rk-template{border:var(--garis-tipis);padding:12px;display:flex;flex-direction:column;min-width:0}
+.rk-penanda{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.rk-penanda .adm-chip{cursor:pointer;font-family:ui-monospace,Menlo,monospace;text-transform:none;letter-spacing:0}
+.rk-pratinjau-lipat{margin-top:8px}
+.rk-pratinjau-lipat summary{cursor:pointer;font-weight:700;font-size:12px}
+.rk-pratinjau-lipat .rk-pratinjau{margin-top:6px}
