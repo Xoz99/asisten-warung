@@ -236,7 +236,7 @@ function Log({ api, sales, versi, onBuka, onCatat }) {
                     <td>
                       <span className="adm-chip">{l.kategori}</span>
                     </td>
-                    <td className="adm-lap-sel">{l.ucapan}</td>
+                    <td className="adm-lap-sel">{l.ucapan || <span className="adm-redup">Langsung mau, tanpa keberatan</span>}</td>
                     <td className="adm-lap-sel">{l.respon_sales}</td>
                     <td className="adm-lap-sel">{l.respon_customer || <span className="adm-redup">-</span>}</td>
                     <td>
@@ -268,7 +268,7 @@ function Log({ api, sales, versi, onBuka, onCatat }) {
                     <span className="adm-chip">{l.kategori}</span>
                     <span className={`adm-chip ${HASIL[l.hasil]?.warna}`}>{HASIL[l.hasil]?.pendek}</span>
                   </div>
-                  <b>"{l.ucapan}"</b>
+                  <b>{l.ucapan ? `"${l.ucapan}"` : 'Langsung mau, tanpa keberatan'}</b>
                   <span className="adm-redup">Kamu: {l.respon_sales}</span>
                   <span className="adm-redup">
                     #{l.nomor} · {tgl(l.tanggal)}
@@ -355,7 +355,7 @@ export function Detail({ api, l, admin, onTutup, onUbah, onHapus }) {
           {tgl(l.tanggal)} · {l.sales_nama || 'Sales dihapus'}
           {l.id_kunjungan ? ` · ${l.id_kunjungan}` : ''}
         </p>
-        {bagian('Ucapan pelanggan', l.ucapan)}
+        {bagian('Ucapan pelanggan', l.ucapan || (l.kategori === 'Tanpa keberatan' ? 'Nggak ada keberatan, pemilik langsung mau.' : ''))}
         {l.fakta && (
           <div className="adm-kartu" style={{ boxShadow: 'none', padding: 12, marginTop: 14, background: 'var(--kertas)' }}>
             <span className="adm-label" style={{ fontSize: 11 }}>
@@ -525,7 +525,9 @@ export function FormLog({ api, awal, wajibGps, onTutup, onSelesai }) {
     hasil: awal.hasil || '',
     catatan: awal.catatan || '',
   }));
-  const [lainnya, setLainnya] = useState(edit && !awal.keberatan_id);
+  // Kunjungan tanpa keberatan (pemilik langsung mau): ucapan & contekan disembunyiin, respon jadi opsional.
+  const [tanpa, setTanpa] = useState(edit && awal.kategori === 'Tanpa keberatan');
+  const [lainnya, setLainnya] = useState(edit && !awal.keberatan_id && awal.kategori !== 'Tanpa keberatan');
   const [fotoLama, setFotoLama] = useState(awal.foto || []);
   const [hapusFoto, setHapusFoto] = useState([]);
   const [fotoBaru, setFotoBaru] = useState([]);
@@ -566,6 +568,12 @@ export function FormLog({ api, awal, wajibGps, onTutup, onSelesai }) {
 
   const pilihBank = (e) => {
     const v = e.target.value;
+    setTanpa(v === '__tanpa');
+    if (v === '__tanpa') {
+      setLainnya(false);
+      setIsi((x) => ({ ...x, keberatan_id: '' }));
+      return;
+    }
     if (v === '__lain') {
       setLainnya(true);
       setIsi((x) => ({ ...x, keberatan_id: '' }));
@@ -597,7 +605,7 @@ export function FormLog({ api, awal, wajibGps, onTutup, onSelesai }) {
           setError('');
           setSibuk(true);
           try {
-            const body = { ...isi, keberatan_id: lainnya ? null : isi.keberatan_id || null, ...(gps ? { gps } : {}) };
+            const body = { ...isi, keberatan_id: lainnya || tanpa ? null : isi.keberatan_id || null, tanpa_keberatan: tanpa, ...(tanpa ? { ucapan: '' } : {}), ...(gps ? { gps } : {}) };
             if (edit) {
               await api('PATCH', `/lapangan/log/${awal.id}`, { ...body, foto_baru: fotoBaru, hapus_foto: hapusFoto });
               onSelesai(`Kunjungan #${awal.nomor} disimpan.`);
@@ -669,8 +677,9 @@ export function FormLog({ api, awal, wajibGps, onTutup, onSelesai }) {
 
         <div className="field">
           <label htmlFor="l-bank">Keberatan pelanggan</label>
-          <select id="l-bank" value={lainnya ? '__lain' : isi.keberatan_id} onChange={pilihBank} style={gaya} required={!lainnya}>
+          <select id="l-bank" value={tanpa ? '__tanpa' : lainnya ? '__lain' : isi.keberatan_id} onChange={pilihBank} style={gaya} required={!lainnya && !tanpa}>
             <option value="">{bank ? 'Pilih dari bank keberatan' : 'Memuat…'}</option>
+            <option value="__tanpa">Nggak ada keberatan (langsung mau)</option>
             {(bank || []).map((k) => (
               <option key={k.id} value={k.id}>
                 {k.kategori}: {k.ucapan.length > 70 ? k.ucapan.slice(0, 70) + '…' : k.ucapan}
@@ -685,7 +694,7 @@ export function FormLog({ api, awal, wajibGps, onTutup, onSelesai }) {
             <input id="l-kat" value={isi.kategori} onChange={ubah('kategori')} maxLength={60} placeholder="Misal: Sinyal / Internet" required />
           </div>
         )}
-        {dipilih && !lainnya && (
+        {dipilih && !lainnya && !tanpa && (
           <div className="adm-kartu" style={{ boxShadow: 'none', padding: 12, marginTop: 12, background: 'var(--kertas)' }}>
             <span className="adm-label" style={{ fontSize: 11 }}>
               Fakta buat ngejawab
@@ -693,13 +702,23 @@ export function FormLog({ api, awal, wajibGps, onTutup, onSelesai }) {
             <p style={{ margin: '4px 0 0' }}>{dipilih.fakta}</p>
           </div>
         )}
+        {!tanpa && (
+          <div className="field">
+            <label htmlFor="l-ucapan">Ucapan pelanggan (kata-katanya langsung)</label>
+            <textarea id="l-ucapan" value={isi.ucapan} onChange={ubah('ucapan')} rows={2} maxLength={1000} required />
+          </div>
+        )}
         <div className="field">
-          <label htmlFor="l-ucapan">Ucapan pelanggan (kata-katanya langsung)</label>
-          <textarea id="l-ucapan" value={isi.ucapan} onChange={ubah('ucapan')} rows={2} maxLength={1000} required />
-        </div>
-        <div className="field">
-          <label htmlFor="l-respon">Respon kamu</label>
-          <textarea id="l-respon" value={isi.respon_sales} onChange={ubah('respon_sales')} rows={3} maxLength={2000} placeholder="Apa yang kamu bilang ke pelanggan" required />
+          <label htmlFor="l-respon">{tanpa ? 'Yang kamu tawarin / jelasin (opsional)' : 'Respon kamu'}</label>
+          <textarea
+            id="l-respon"
+            value={isi.respon_sales}
+            onChange={ubah('respon_sales')}
+            rows={tanpa ? 2 : 3}
+            maxLength={2000}
+            placeholder={tanpa ? 'Misal: demo catat jualan, langsung daftar trial' : 'Apa yang kamu bilang ke pelanggan'}
+            required={!tanpa}
+          />
         </div>
         <div className="field">
           <label htmlFor="l-cust">Respon customer</label>
@@ -771,7 +790,7 @@ export function FormLog({ api, awal, wajibGps, onTutup, onSelesai }) {
             Batal
           </button>
           {wajibGps && !edit && !gps && <span className="adm-redup" style={{ alignSelf: 'center', marginRight: 'auto' }}>Ambil lokasi GPS dulu buat nyimpen.</span>}
-          <button type="submit" className="btn utama" disabled={sibuk || !isi.hasil || isi.ucapan.trim().length < 3 || isi.respon_sales.trim().length < 3 || (!edit && !isi.id_kunjungan.trim()) || (wajibGps && !edit && !gps)}>
+          <button type="submit" className="btn utama" disabled={sibuk || !isi.hasil || (!tanpa && (isi.ucapan.trim().length < 3 || isi.respon_sales.trim().length < 3)) || (!edit && !isi.id_kunjungan.trim()) || (wajibGps && !edit && !gps)}>
             {sibuk ? 'Menyimpan…' : 'Simpan'}
           </button>
         </div>

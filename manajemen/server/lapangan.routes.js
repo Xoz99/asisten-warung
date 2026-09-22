@@ -232,7 +232,7 @@ async function tautkanKeCrm(c, req, log, b) {
     );
     if (pindah) await catat('tahap', `Tahap: ${NAMA_TAHAP[lead.tahap] || lead.tahap} → ${NAMA_TAHAP[tahapHasil]} (dari kunjungan #${log.nomor})`);
   }
-  await catat('kunjungan', `Kunjungan #${log.nomor} oleh ${req.admin.nama}: ${log.kategori}, ${LABEL_HASIL[log.hasil]}. "${log.ucapan}"`);
+  await catat('kunjungan', `Kunjungan #${log.nomor} oleh ${req.admin.nama}: ${log.kategori}, ${LABEL_HASIL[log.hasil]}.${log.ucapan ? ` "${log.ucapan}"` : ''}`);
   return { lead_id: lead.id, toko: lead.perusahaan };
 }
 
@@ -274,7 +274,11 @@ router.get('/lapangan/log', async (req, res, next) => {
   }
 });
 
+// Kunjungan yang pemiliknya langsung mau (nggak ada keberatan) dicatat dengan kategori ini.
+export const TANPA_KEBERATAN = 'Tanpa keberatan';
+
 function bersihkanLog(b) {
+  const tanpa = b.tanpa_keberatan === true;
   const x = {
     kategori: teks(b.kategori, 60),
     ucapan: teks(b.ucapan, 1000),
@@ -298,9 +302,14 @@ function bersihkanLog(b) {
     x.lokasi_at = Number.isFinite(t.getTime()) && t <= new Date(Date.now() + 60000) ? t.toISOString() : new Date().toISOString();
     x.lokasi_url = `https://www.google.com/maps?q=${lat.toFixed(6)},${lng.toFixed(6)}`;
   }
-  if (!x.kategori) throw salah('Pilih kategori keberatan');
-  if (x.ucapan.length < 3) throw salah('Tulis ucapan pelanggannya');
-  if (x.respon_sales.length < 3) throw salah('Tulis respon kamu ke pelanggan');
+  if (tanpa) {
+    // Ucapan & respon boleh kosong: nggak ada keberatan yang perlu dijawab.
+    x.kategori = TANPA_KEBERATAN;
+  } else {
+    if (!x.kategori) throw salah('Pilih kategori keberatan');
+    if (x.ucapan.length < 3) throw salah('Tulis ucapan pelanggannya');
+    if (x.respon_sales.length < 3) throw salah('Tulis respon kamu ke pelanggan');
+  }
   if (!HASIL.includes(x.hasil)) throw salah('Pilih hasilnya');
   if (!x.tanggal) throw salah('Tanggal kunjungan wajib diisi');
   if (x.tanggal > hariIni()) throw salah('Tanggal kunjungan nggak boleh di masa depan');
@@ -347,7 +356,7 @@ async function keberatanValid(id) {
 router.post('/lapangan/log', async (req, res, next) => {
   try {
     const b = req.body || {};
-    const k = await keberatanValid(b.keberatan_id);
+    const k = b.tanpa_keberatan === true ? null : await keberatanValid(b.keberatan_id);
     const x = bersihkanLog({ ...b, kategori: k ? k.kategori : b.kategori });
     // Bukti kunjungan: akun sales wajib nyalain GPS. Admin boleh nyatet tanpa lokasi (mis. input dari kantor).
     if (req.admin.peran === 'sales' && x.lat === undefined) throw salah('Lokasi GPS belum kebaca. Nyalain GPS / izinin lokasi di browser, lalu ambil lokasi lagi.');
@@ -397,7 +406,7 @@ router.patch('/lapangan/log/:id', async (req, res, next) => {
   try {
     const l = await logMilik(req, req.params.id);
     const b = req.body || {};
-    const k = await keberatanValid(b.keberatan_id);
+    const k = b.tanpa_keberatan === true ? null : await keberatanValid(b.keberatan_id);
     const x = bersihkanLog({ ...b, kategori: k ? k.kategori : b.kategori });
     const fotoBaru = (Array.isArray(b.foto_baru) ? b.foto_baru : []).map(bacaFoto);
     const hapusFoto = (Array.isArray(b.hapus_foto) ? b.hapus_foto : []).filter((i) => POLA_UUID.test(i));

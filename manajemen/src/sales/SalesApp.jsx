@@ -202,7 +202,7 @@ function KartuLog({ daftar, onBuka }) {
               <span className="sl-tag">{l.kategori}</span>
               <span className={`sl-hasil ${l.hasil}`}>{HASIL[l.hasil]?.pendek}</span>
             </div>
-            <b>"{l.ucapan}"</b>
+            <b>{l.ucapan ? `"${l.ucapan}"` : 'Langsung mau, tanpa keberatan'}</b>
             <span className="sl-redup">
               {tgl(l.tanggal)}
               {l.id_kunjungan ? ` · ${l.id_kunjungan}` : ''}
