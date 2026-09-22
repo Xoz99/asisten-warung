@@ -35,6 +35,7 @@ export const NAMA_AKSI = {
   'rekrutmen.template.ubah': 'ubah template WA rekrutmen',
   'rekrutmen.slot.tambah': 'nambah slot interview',
   'admin.ubah_peran': 'ganti peran akun',
+  'admin.ubah_jabatan': 'ganti jabatan akun',
   'komisi.tutup': 'nutup bulan bagi hasil',
   'komisi.cairkan': 'nyairin bagi hasil sales',
   'komisi.konfirmasi_masuk': 'bilang bagi hasilnya udah masuk',
@@ -155,6 +156,7 @@ export default function Admin({ api, admin }) {
                   diriSendiri={a.id === admin?.id}
                   onAktif={(aktif) => aksi(() => api('PATCH', '/admin/' + a.id, { aktif }), `${a.nama} ${aktif ? 'diaktifin' : 'dinonaktifin'}`)}
                   onReset={(password) => aksi(() => api('PATCH', '/admin/' + a.id, { password }), `Password ${a.nama} direset ✓`)}
+                  onJabatan={(jabatan) => aksi(() => api('PATCH', '/admin/' + a.id, { jabatan }), jabatan ? `Jabatan ${a.nama}: ${jabatan}` : `Jabatan ${a.nama} dikosongin`)}
                   onPeran={(peran) => aksi(() => api('PATCH', '/admin/' + a.id, { peran }), `${a.nama} sekarang ${peran}. Dia perlu masuk ulang.`)}
                   wpSales={wpSales}
                   onHubung={(wp_sales_id) => aksi(() => api('PATCH', '/admin/' + a.id, { wp_sales_id }), wp_sales_id ? `${a.nama} dihubungin ke kode sales.` : `${a.nama} dilepas dari kode sales.`)}
@@ -246,7 +248,7 @@ function Aktivitas({ api, versi }) {
   );
 }
 
-function BarisAdmin({ a, diriSendiri, onAktif, onReset, onPeran, wpSales, onHubung }) {
+function BarisAdmin({ a, diriSendiri, onAktif, onReset, onPeran, onJabatan, wpSales, onHubung }) {
   const [reset, setReset] = useState(false);
   const [pw, setPw] = useState('');
   return (
@@ -255,26 +257,37 @@ function BarisAdmin({ a, diriSendiri, onAktif, onReset, onPeran, wpSales, onHubu
         <div>
           <b style={a.aktif ? undefined : { color: 'var(--abu)' }}>{a.nama}</b> <span className="adm-redup">@{a.username}</span>
           <span className={`adm-chip ${a.peran === 'sales' ? 'kuning' : ''}`} style={{ marginLeft: 6 }}>
-            {a.peran === 'sales' ? 'Sales' : 'Admin'}
+            {a.jabatan || (a.peran === 'sales' ? 'Sales' : 'Admin')}
           </span>
           {diriSendiri && <span className="adm-lencana" style={{ marginLeft: 6 }}>kamu</span>}
           <div className="adm-redup">
             {a.aktif ? 'Aktif' : 'Nonaktif'} · terakhir masuk {waktu(a.terakhir_masuk)}
           </div>
         </div>
-        {!diriSendiri && (
-          <div className="adm-tombol" style={{ marginTop: 0 }}>
-            <button className="btn kecil" onClick={() => setReset((v) => !v)}>
-              Reset password
-            </button>
-            <button className="btn kecil" onClick={() => window.confirm(`Jadiin ${a.nama} ${a.peran === 'sales' ? 'admin (bisa buka semua halaman)' : 'sales (cuma Sales Lapangan)'}?`) && onPeran(a.peran === 'sales' ? 'admin' : 'sales')}>
-              Jadiin {a.peran === 'sales' ? 'admin' : 'sales'}
-            </button>
-            <button className="btn kecil" onClick={() => onAktif(!a.aktif)}>
-              {a.aktif ? 'Nonaktifkan' : 'Aktifkan'}
-            </button>
-          </div>
-        )}
+        <div className="adm-tombol" style={{ marginTop: 0 }}>
+          <button
+            className="btn kecil"
+            onClick={() => {
+              const j = window.prompt(`Jabatan ${a.nama} (mis. Dirut). Kosongin buat balik ke "${a.peran === 'sales' ? 'Sales' : 'Admin'}".`, a.jabatan || '');
+              if (j !== null) onJabatan(j.trim());
+            }}
+          >
+            Jabatan
+          </button>
+          {!diriSendiri && (
+            <>
+              <button className="btn kecil" onClick={() => setReset((v) => !v)}>
+                Reset password
+              </button>
+              <button className="btn kecil" onClick={() => window.confirm(`Jadiin ${a.nama} ${a.peran === 'sales' ? 'admin (bisa buka semua halaman)' : 'sales (cuma Sales Lapangan)'}?`) && onPeran(a.peran === 'sales' ? 'admin' : 'sales')}>
+                Jadiin {a.peran === 'sales' ? 'admin' : 'sales'}
+              </button>
+              <button className="btn kecil" onClick={() => onAktif(!a.aktif)}>
+                {a.aktif ? 'Nonaktifkan' : 'Aktifkan'}
+              </button>
+            </>
+          )}
+        </div>
       </div>
       {a.peran === 'sales' && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>

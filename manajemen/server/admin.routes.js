@@ -14,7 +14,7 @@ const PERAN = ['admin', 'sales'];
 
 router.get('/admin', async (req, res, next) => {
   try {
-    const { rows } = await query('SELECT id, username, nama, peran, wp_sales_id, aktif, terakhir_masuk, created_at FROM mj_admin ORDER BY created_at');
+    const { rows } = await query('SELECT id, username, nama, peran, jabatan, wp_sales_id, aktif, terakhir_masuk, created_at FROM mj_admin ORDER BY created_at');
     res.json(rows);
   } catch (e) {
     next(e);
@@ -54,6 +54,14 @@ router.patch('/admin/:id', async (req, res, next) => {
       if (!rows.length) return res.status(404).json({ error: 'Akun tidak ditemukan' });
       await catatLog(req, 'admin.hubung_sales', { username: rows[0].username, terhubung: Boolean(wp) });
       return res.json({ ok: true });
+    }
+    // Label jabatan (boleh buat akun sendiri juga; nggak mutusin sesi karena cuma tampilan).
+    if (req.body.jabatan !== undefined) {
+      const jabatan = typeof req.body.jabatan === 'string' ? req.body.jabatan.replace(/\s+/g, ' ').trim().slice(0, 30) || null : null;
+      const { rows } = await query('UPDATE mj_admin SET jabatan=$2 WHERE id=$1 RETURNING username', [req.params.id, jabatan]);
+      if (!rows.length) return res.status(404).json({ error: 'Akun tidak ditemukan' });
+      await catatLog(req, 'admin.ubah_jabatan', { username: rows[0].username, jabatan: jabatan || '-' });
+      return res.json({ ok: true, jabatan });
     }
     if (aktif === false && req.params.id === req.admin.id) return res.status(400).json({ error: 'Nggak bisa nonaktifin akun sendiri' });
     if (peran !== undefined && !PERAN.includes(peran)) return res.status(400).json({ error: 'Peran nggak dikenal' });

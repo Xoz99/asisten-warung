@@ -88,7 +88,7 @@ export default function Profile({ api, admin, onKeluar, onProfil }) {
         <div className="pf-identitas">
           <div className="pf-nama">
             <h2>{p.nama}</h2>
-            <span className="adm-chip">{p.peran === 'sales' ? 'Sales' : 'Admin'}</span>
+            <span className="adm-chip">{profil?.jabatan || (p.peran === 'sales' ? 'Sales' : 'Admin')}</span>
           </div>
           <p className="adm-redup">@{p.username}</p>
           <dl className="pf-info">

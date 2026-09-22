@@ -361,7 +361,7 @@ router.get('/tim-sales/:id/foto', async (req, res, next) => {
 // ---------------- Sales: profil sendiri ----------------
 // ---------------- Admin: profil sendiri ----------------
 async function profilAdmin(id) {
-  const { rows } = await query('SELECT id, username, nama, peran, email, no_hp, (foto IS NOT NULL) AS ada_foto, terakhir_masuk, created_at FROM mj_admin WHERE id=$1', [id]);
+  const { rows } = await query('SELECT id, username, nama, peran, jabatan, email, no_hp, (foto IS NOT NULL) AS ada_foto, terakhir_masuk, created_at FROM mj_admin WHERE id=$1', [id]);
   return rows[0];
 }
 router.get('/saya/profil', async (req, res, next) => {

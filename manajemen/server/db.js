@@ -41,6 +41,8 @@ export function pastikanTabel() {
       await query("ALTER TABLE mj_admin ADD COLUMN IF NOT EXISTS peran TEXT NOT NULL DEFAULT 'admin'");
       // Akun sales Makalin <-> data sales di Warung Pintar (tabel sales, kode sales). Diisi admin.
       await query('ALTER TABLE mj_admin ADD COLUMN IF NOT EXISTS wp_sales_id UUID');
+      // Label jabatan yang tampil (mis. Dirut). Cuma tampilan - hak akses tetap dari `peran`.
+      await query('ALTER TABLE mj_admin ADD COLUMN IF NOT EXISTS jabatan TEXT');
     })().catch((e) => {
       siap = null;
       throw e;
