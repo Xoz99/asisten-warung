@@ -125,6 +125,24 @@ export default function Admin({ api, admin }) {
     }
   };
 
+  const baris = (a) => (
+    <BarisAdmin
+      key={a.id}
+      a={a}
+      diriSendiri={a.id === admin?.id}
+      onAktif={(aktif) => aksi(() => api('PATCH', '/admin/' + a.id, { aktif }), `${a.nama} ${aktif ? 'diaktifin' : 'dinonaktifin'}`)}
+      onReset={(password) => aksi(() => api('PATCH', '/admin/' + a.id, { password }), `Password ${a.nama} direset ✓`)}
+      onJabatan={(jabatan) => aksi(() => api('PATCH', '/admin/' + a.id, { jabatan }), jabatan ? `Jabatan ${a.nama}: ${jabatan}` : `Jabatan ${a.nama} dikosongin`)}
+      onPeran={(peran) => aksi(() => api('PATCH', '/admin/' + a.id, { peran }), `${a.nama} sekarang ${peran}. Dia perlu masuk ulang.`)}
+      wpSales={wpSales}
+      onHubung={(wp_sales_id) => aksi(() => api('PATCH', '/admin/' + a.id, { wp_sales_id }), wp_sales_id ? `${a.nama} dihubungin ke kode sales.` : `${a.nama} dilepas dari kode sales.`)}
+    />
+  );
+  // Aktif dulu, baru yang nonaktif; di dalamnya urut nama.
+  const urut = (xs) => [...xs].sort((a, b) => Number(b.aktif) - Number(a.aktif) || a.nama.localeCompare(b.nama, 'id'));
+  const daftarAdmin = daftar ? urut(daftar.filter((a) => a.peran !== 'sales')) : null;
+  const daftarSales = daftar ? urut(daftar.filter((a) => a.peran === 'sales')) : null;
+
   return (
     <>
       <header className="adm-kepala">
@@ -137,35 +155,39 @@ export default function Admin({ api, admin }) {
       {pesan && <p className="adm-ok">{pesan}</p>}
 
       <div className="adm-kolom">
-        <section className="adm-kartu">
-          <h2>Akun</h2>
-          <p className="adm-redup" style={{ marginTop: 0 }}>
-            Admin bisa buka semua halaman. Sales cuma bisa buka Sales Lapangan &amp; profilnya sendiri.
-          </p>
-          <p className="adm-redup" style={{ marginTop: 0 }}>
-            Mau nambah sales? Pakai <a href="#/lapangan/tim">Sales Lapangan → Tim sales</a> biar akun, kode referral, data karyawan, dan rekening pencairannya kebikin sekalian.
-          </p>
-          {!daftar ? (
-            <p className="adm-sub">Memuat…</p>
-          ) : (
-            <ul className="adm-daftar">
-              {daftar.map((a) => (
-                <BarisAdmin
-                  key={a.id}
-                  a={a}
-                  diriSendiri={a.id === admin?.id}
-                  onAktif={(aktif) => aksi(() => api('PATCH', '/admin/' + a.id, { aktif }), `${a.nama} ${aktif ? 'diaktifin' : 'dinonaktifin'}`)}
-                  onReset={(password) => aksi(() => api('PATCH', '/admin/' + a.id, { password }), `Password ${a.nama} direset ✓`)}
-                  onJabatan={(jabatan) => aksi(() => api('PATCH', '/admin/' + a.id, { jabatan }), jabatan ? `Jabatan ${a.nama}: ${jabatan}` : `Jabatan ${a.nama} dikosongin`)}
-                  onPeran={(peran) => aksi(() => api('PATCH', '/admin/' + a.id, { peran }), `${a.nama} sekarang ${peran}. Dia perlu masuk ulang.`)}
-                  wpSales={wpSales}
-                  onHubung={(wp_sales_id) => aksi(() => api('PATCH', '/admin/' + a.id, { wp_sales_id }), wp_sales_id ? `${a.nama} dihubungin ke kode sales.` : `${a.nama} dilepas dari kode sales.`)}
-                />
-              ))}
-            </ul>
-          )}
-          <FormTambah onTambah={(isi) => aksi(() => api('POST', '/admin', isi), `Akun ${isi.peran} ${isi.nama} ditambah ✓ - kasih tau username & password-nya`)} />
-        </section>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0 }}>
+          <section className="adm-kartu">
+            <div className="adm-kartu-kepala" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+              <h2 style={{ margin: 0 }}>Admin &amp; pimpinan</h2>
+              {daftarAdmin && <span className="adm-redup">{daftarAdmin.filter((a) => a.aktif).length} aktif</span>}
+            </div>
+            <p className="adm-redup" style={{ marginTop: 0 }}>
+              Bisa buka semua halaman Makalin. Jabatan (mis. Direktur Utama) cuma label, hak aksesnya sama.
+            </p>
+            {!daftarAdmin ? <p className="adm-sub">Memuat…</p> : <ul className="adm-daftar">{daftarAdmin.map(baris)}</ul>}
+            <FormTambah peran="admin" onTambah={(isi) => aksi(() => api('POST', '/admin', isi), `Admin ${isi.nama} ditambah ✓ - kasih tau username & password-nya`)} />
+          </section>
+
+          <section className="adm-kartu">
+            <div className="adm-kartu-kepala" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 }}>
+              <h2 style={{ margin: 0 }}>Sales lapangan</h2>
+              {daftarSales && <span className="adm-redup">{daftarSales.filter((a) => a.aktif).length} aktif</span>}
+            </div>
+            <p className="adm-redup" style={{ marginTop: 0 }}>
+              Cuma bisa buka Sales Lapangan &amp; profilnya sendiri. Data karyawan, kode referral, dan rekening pencairannya diatur di Tim sales.
+            </p>
+            {!daftarSales ? (
+              <p className="adm-sub">Memuat…</p>
+            ) : daftarSales.length === 0 ? (
+              <p className="adm-redup">Belum ada akun sales.</p>
+            ) : (
+              <ul className="adm-daftar">{daftarSales.map(baris)}</ul>
+            )}
+            <a className="btn utama" href="#/lapangan/tim" style={{ marginTop: 12 }}>
+              + Tambah sales di Tim sales
+            </a>
+          </section>
+        </div>
 
         <Aktivitas api={api} versi={versiLog} />
       </div>
@@ -326,19 +348,29 @@ function BarisAdmin({ a, diriSendiri, onAktif, onReset, onPeran, onJabatan, wpSa
   );
 }
 
-function FormTambah({ onTambah }) {
-  const kosong = { nama: '', username: '', password: '', peran: 'sales' };
+function FormTambah({ onTambah, peran = 'admin' }) {
+  const kosong = { nama: '', username: '', password: '', jabatan: '' };
+  const [buka, setBuka] = useState(false);
   const [isi, setIsi] = useState(kosong);
   const ubah = (k) => (e) => setIsi((x) => ({ ...x, [k]: e.target.value }));
+  if (!buka)
+    return (
+      <button className="btn" style={{ marginTop: 12 }} onClick={() => setBuka(true)}>
+        + Tambah {peran}
+      </button>
+    );
   return (
     <form
       className="adm-tambah"
       onSubmit={async (e) => {
         e.preventDefault();
-        if (await onTambah(isi)) setIsi(kosong);
+        if (await onTambah({ ...isi, peran })) {
+          setIsi(kosong);
+          setBuka(false);
+        }
       }}
     >
-      <h3>Tambah akun</h3>
+      <h3>Tambah {peran}</h3>
       <div className="adm-baris">
         <div className="field">
           <label>Nama</label>
@@ -353,16 +385,18 @@ function FormTambah({ onTambah }) {
           <input value={isi.password} onChange={ubah('password')} autoComplete="new-password" />
         </div>
         <div className="field">
-          <label htmlFor="t-peran">Peran</label>
-          <select id="t-peran" value={isi.peran} onChange={ubah('peran')} style={{ maxWidth: 'none', width: '100%', minHeight: 44 }}>
-            <option value="sales">Sales (cuma Sales Lapangan)</option>
-            <option value="admin">Admin (semua halaman)</option>
-          </select>
+          <label>Jabatan (opsional)</label>
+          <input value={isi.jabatan} onChange={ubah('jabatan')} maxLength={30} placeholder="mis. Manajer Operasional" />
         </div>
       </div>
-      <button className="btn utama" style={{ marginTop: 12 }} type="submit" disabled={!isi.nama.trim() || isi.username.trim().length < 3 || isi.password.length < 8}>
-        Tambah {isi.peran === 'sales' ? 'sales' : 'admin'}
-      </button>
+      <div className="adm-tombol">
+        <button className="btn utama" type="submit" disabled={!isi.nama.trim() || isi.username.trim().length < 3 || isi.password.length < 8}>
+          Tambah {peran}
+        </button>
+        <button type="button" className="btn" onClick={() => (setIsi(kosong), setBuka(false))}>
+          Batal
+        </button>
+      </div>
     </form>
   );
 }

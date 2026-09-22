@@ -75,6 +75,7 @@ h1{font-size:40px;line-height:1.05;letter-spacing:-.03em;margin:0;text-transform
 .adm-kartu-kepala.hitam .adm-redup{color:#D4D4D8}
 .adm-kepala{display:flex;align-items:center;justify-content:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:22px}
 .adm-kepala .adm-tombol{margin-top:0}
+.adm-kepala>div:not(.adm-tombol){margin-right:auto}
 .btn{border:var(--garis);background:var(--putih);color:var(--tinta);font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:11px 16px;min-height:44px;cursor:pointer;box-shadow:var(--bayang);display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;font-size:13px}
 .btn:hover{box-shadow:5px 5px 0 var(--hitam)}
 .btn:active{transform:translate(4px,4px);box-shadow:0 0 0 var(--hitam)}

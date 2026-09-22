@@ -30,8 +30,14 @@ router.post('/admin', async (req, res, next) => {
     const salah = cekPassword(req.body.password);
     if (salah) return res.status(400).json({ error: salah });
     const { rows } = await query(
-      'INSERT INTO mj_admin (username, nama, password_hash, peran) VALUES ($1,$2,$3,$4) ON CONFLICT (username) DO NOTHING RETURNING id, username, nama, peran, aktif, created_at',
-      [username, nama, await bcrypt.hash(req.body.password, 10), PERAN.includes(req.body.peran) ? req.body.peran : 'admin']
+      'INSERT INTO mj_admin (username, nama, password_hash, peran, jabatan) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (username) DO NOTHING RETURNING id, username, nama, peran, jabatan, aktif, created_at',
+      [
+        username,
+        nama,
+        await bcrypt.hash(req.body.password, 10),
+        PERAN.includes(req.body.peran) ? req.body.peran : 'admin',
+        typeof req.body.jabatan === 'string' ? req.body.jabatan.replace(/\s+/g, ' ').trim().slice(0, 30) || null : null,
+      ]
     );
     if (!rows.length) return res.status(409).json({ error: `Username ${username} udah dipakai` });
     await catatLog(req, 'admin.tambah', { username, nama });
