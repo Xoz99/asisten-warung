@@ -3,6 +3,7 @@ import { catatLog, query, pool } from './db.js';
 import { pastikanTabelOps } from './ops.routes.js';
 import { query as queryWp, pastikanTabelSales } from './produk/warung-pintar/db.js';
 import { rekeningPerSales } from './tim.routes.js';
+import { URL_MAKALIN, emailAktif, kirimEmail, susunEmail } from './utils/email.js';
 
 // Bagi hasil (komisi) Sales Partner - PRD v0.2 + keputusan pemilik (Sep 2026):
 //   order pertama per toko      30%
@@ -62,7 +63,8 @@ function pastikanTabel() {
       await query('ALTER TABLE mj_komisi_periode ADD COLUMN IF NOT EXISTS rekening_tujuan TEXT');
       // Pemberitahuan ke sales: kapan dia lihat, dan konfirmasi balik (masuk / belum masuk).
       await query(`ALTER TABLE mj_komisi_periode ADD COLUMN IF NOT EXISTS dilihat_sales_at TIMESTAMPTZ,
-        ADD COLUMN IF NOT EXISTS konfirmasi_sales TEXT, ADD COLUMN IF NOT EXISTS konfirmasi_at TIMESTAMPTZ, ADD COLUMN IF NOT EXISTS konfirmasi_catatan TEXT`);
+        ADD COLUMN IF NOT EXISTS konfirmasi_sales TEXT, ADD COLUMN IF NOT EXISTS konfirmasi_at TIMESTAMPTZ, ADD COLUMN IF NOT EXISTS konfirmasi_catatan TEXT,
+        ADD COLUMN IF NOT EXISTS email_status TEXT, ADD COLUMN IF NOT EXISTS email_at TIMESTAMPTZ`);
     })().catch((e) => {
       siap = null;
       throw e;
@@ -179,6 +181,7 @@ router.get('/komisi', async (req, res, next) => {
       sekarang: periodeSekarang(),
       ditutup: tutup[0] || null,
       bisaDitutup: !tutup.length && periode < periodeSekarang(),
+      emailAktif: emailAktif(),
       jadwalCair: jadwalCair(periode),
       rate: RATE,
       ambangTokoBaru: AMBANG_TOKO_BARU,
@@ -296,11 +299,35 @@ router.post('/komisi/cairkan', async (req, res, next) => {
       c.release();
     }
     await catatLog(req, 'komisi.cairkan', { periode, sales: r.sales_kode, neto: Number(r.neto) });
+    // Email ke sales dikirim di belakang (SMTP bisa lambat); hasilnya kecatat di baris itu buat admin.
+    emailCair({ r, rek, tanggal, metode, catatan, rekeningTujuan }).catch(() => {});
     res.json({ ok: true });
   } catch (e) {
     next(e);
   }
 });
+
+const rupiahTeks = (n) => 'Rp' + Math.round(Number(n) || 0).toLocaleString('id-ID');
+const tanggalTeks = (t) => new Date(t + 'T00:00:00+07:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' });
+const bulanTeks = (p) => new Date(p + '-01T00:00:00+07:00').toLocaleDateString('id-ID', { month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' });
+
+async function emailCair({ r, rek, tanggal, metode, catatan, rekeningTujuan }) {
+  const tunai = !rekeningTujuan;
+  const { teks, html } = susunEmail({
+    sapaan: `Halo ${rek?.nama || r.sales_nama || ''},`,
+    paragraf: [
+      `Bagi hasil ${bulanTeks(r.periode)} sebesar ${rupiahTeks(r.neto)} udah ${tunai ? `dibayar (${metode})` : 'ditransfer'} tanggal ${tanggalTeks(tanggal)}${rekeningTujuan ? ` ke ${rekeningTujuan.replace(/\d(?=\d{4})/g, '•')}` : ''}.`,
+      `Rinciannya: komisi ${rupiahTeks(r.bruto)} dipotong pajak ${Math.round(RATE.pajak * 100)}% (${rupiahTeks(r.pajak)}).`,
+      ...(catatan ? [`Catatan admin: ${catatan}`] : []),
+      tunai ? 'Kalau udah kamu terima, konfirmasi di Makalin ya.' : 'Cek mutasi rekeningmu, terus konfirmasi di Makalin: udah masuk atau belum.',
+    ],
+    tombol: { label: 'Konfirmasi di Makalin', url: `${URL_MAKALIN()}/#/penghasilan` },
+  });
+  const h = await kirimEmail({ ke: rek?.email, judul: `Bagi hasil ${bulanTeks(r.periode)} ${tunai ? 'udah dibayar' : 'udah ditransfer'}: ${rupiahTeks(r.neto)}`, teks, html });
+  await query('UPDATE mj_komisi_periode SET email_status=$2, email_at=now() WHERE id=$1', [r.id, h.terkirim ? `terkirim ke ${rek.email}` : h.alasan]);
+  return h;
+}
+export { emailCair as _emailCairUji };
 
 // ---------------- Sales: penghasilan sendiri ----------------
 // Sales ngabarin balik: bagi hasil udah masuk ke rekeningnya, atau belum (admin dapet notifikasi dari catatan aktivitas).

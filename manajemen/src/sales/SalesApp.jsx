@@ -1011,7 +1011,7 @@ function FormDataDiri({ api, profil, setPesan, onSelesai }) {
         <input id="sl-hp" value={isi.no_hp} onChange={ubah('no_hp')} inputMode="tel" />
       </div>
       <div className="field">
-        <label htmlFor="sl-email">Email</label>
+        <label htmlFor="sl-email">Email (buat kabar pencairan bagi hasil)</label>
         <input id="sl-email" type="email" value={isi.email} onChange={ubah('email')} autoCapitalize="none" />
       </div>
       <div className="field">

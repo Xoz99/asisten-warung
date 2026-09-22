@@ -10,6 +10,7 @@ import { pastikanTabelKaryawan } from './karyawan.routes.js';
 import { bacaFoto } from './lapangan.routes.js';
 import { POLA_KODE_SALES, pastikanTabelSales, query as queryWp, rapikanKodeSales } from './produk/warung-pintar/db.js';
 import { normalisasiNoHp } from './utils/noHp.js';
+import { URL_MAKALIN, kirimEmail, susunEmail } from './utils/email.js';
 
 // Tim sales: satu sales = akun Makalin (peran sales) + kode referral Warung Pintar + data karyawan tipe kemitraan.
 // Dibikin sekali jalan dari sini. Data karyawan nyimpen foto profil & rekening pencairan bagi hasil.
@@ -388,6 +389,7 @@ router.patch('/saya/profil', async (req, res, next) => {
       c.release();
     }
     if (profil.no_hp !== undefined && req.admin.wp_sales_id) await queryWp('UPDATE sales SET no_hp=$2 WHERE id=$1', [req.admin.wp_sales_id, profil.no_hp]).catch(() => {});
+    if (rekeningBerubah) emailRekeningDiganti(req.admin).catch(() => {});
     await catatLog(req, 'tim.profil.ubah', { username: req.admin.username, diubah: Object.keys(profil).join(', '), ...(rekeningBerubah ? { rekening: 'diganti, nunggu dicek admin' } : {}) });
     res.json({ ok: true, rekeningBerubah });
   } catch (e) {
@@ -425,12 +427,29 @@ router.get('/saya/foto', async (req, res, next) => {
   }
 });
 
+// Jaga-jaga akun dibajak: tiap rekening pencairan diganti dari HP, pemilik akun dikabarin lewat email.
+async function emailRekeningDiganti(akun) {
+  const { rows } = await query('SELECT email, bank, rekening, atas_nama FROM mj_karyawan WHERE admin_id=$1', [akun.id]);
+  const k = rows[0];
+  if (!k?.email) return;
+  const { teks, html } = susunEmail({
+    sapaan: `Halo ${akun.nama},`,
+    paragraf: [
+      `Rekening pencairan bagi hasil di akun Makalin kamu (@${akun.username}) baru aja diganti jadi ${k.bank || '-'} •••• ${String(k.rekening || '').slice(-4)} a.n. ${k.atas_nama || '-'}.`,
+      'Rekening baru ini dicek admin dulu sebelum dipakai buat transfer.',
+      'Kalau bukan kamu yang ganti, segera ganti password akunmu dan kabarin admin.',
+    ],
+    tombol: { label: 'Buka akun Makalin', url: `${URL_MAKALIN()}/#/akun` },
+  });
+  await kirimEmail({ ke: k.email, judul: 'Rekening pencairan kamu diganti', teks, html });
+}
+
 // Rekening tujuan per kode sales (dipakai halaman Bagi hasil).
 export async function rekeningPerSales(wpIds) {
   if (!wpIds.length) return {};
   await pastikanTabel();
   const { rows } = await query(
-    `SELECT DISTINCT ON (a.wp_sales_id) a.wp_sales_id, a.id AS admin_id, k.bank, k.rekening, k.atas_nama, k.rekening_dicek_at, k.rekening_dicek_oleh, k.rekening_diubah_at, k.rekening_diubah_oleh, (k.foto IS NOT NULL) AS ada_foto
+    `SELECT DISTINCT ON (a.wp_sales_id) a.wp_sales_id, a.id AS admin_id, a.nama, k.email, k.bank, k.rekening, k.atas_nama, k.rekening_dicek_at, k.rekening_dicek_oleh, k.rekening_diubah_at, k.rekening_diubah_oleh, (k.foto IS NOT NULL) AS ada_foto
      FROM mj_admin a LEFT JOIN mj_karyawan k ON k.admin_id = a.id
      WHERE a.wp_sales_id = ANY($1::uuid[]) ORDER BY a.wp_sales_id, a.aktif DESC, a.created_at`,
     [wpIds]

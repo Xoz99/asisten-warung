@@ -130,6 +130,8 @@ function KartuSales({ s, versiFoto, onUbah, onCek }) {
         {s.no_hp ? `WA ${tampilHp(s.no_hp)}` : 'No. HP belum diisi'}
         {s.lokasi ? ` · ${s.lokasi}` : ''}
         <br />
+        {s.email || 'Email belum diisi (nggak dapet email pencairan)'}
+        <br />
         Terakhir masuk {waktu(s.terakhir_masuk)}
       </div>
       <div className={'adm-tim-rek' + (st.id === 'kosong' ? ' kosong' : '')}>

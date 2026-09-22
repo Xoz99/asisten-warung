@@ -132,6 +132,7 @@ export default function BagiHasil({ api }) {
                           {tgl(s.dicairkan_tanggal)} · {s.metode}
                         </div>
                         {s.rekening_tujuan && <div className="adm-redup adm-mono">{s.rekening_tujuan}</div>}
+                        {s.email_status && <div className="adm-redup">Email: {s.email_status}</div>}
                         {s.konfirmasi_sales === 'masuk' ? (
                           <div className="adm-chip hijau" style={{ marginTop: 4 }}>
                             Diterima sales · {tgl(s.konfirmasi_at)}
@@ -195,6 +196,7 @@ export default function BagiHasil({ api }) {
           periode={p}
           s={cair}
           jadwal={data.jadwalCair}
+          emailAktif={data.emailAktif}
           onTutup={() => setCair(null)}
           onSelesai={() => {
             setCair(null);
@@ -280,7 +282,7 @@ function Rincian({ api, periode, s, onTutup }) {
   );
 }
 
-function Cairkan({ api, periode, s, jadwal, onTutup, onSelesai }) {
+function Cairkan({ api, periode, s, jadwal, emailAktif, onTutup, onSelesai }) {
   const hariIni = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
   const [rek, setRek] = useState(s.rekening);
   const st = statusRekening(rek);
@@ -384,6 +386,10 @@ function Cairkan({ api, periode, s, jadwal, onTutup, onSelesai }) {
         <p className="adm-redup">
           Otomatis dicatat sebagai pengeluaran kategori "komisi" di Keuangan sebesar {rupiah(s.neto)}
           {!tunai && st.id === 'siap' ? `, lengkap dengan rekening tujuannya` : ''}.
+        </p>
+        <p className="adm-redup">
+          {s.sales_nama} dapet pemberitahuan di app Makalin
+          {!emailAktif ? ' (email belum disetel di server, jadi cuma di app).' : rek?.email ? ` dan email ke ${rek.email}.` : '. Dia belum ngisi email, jadi nggak dikirim email.'}
         </p>
         {tahan && isi.metode.trim() && <p className="adm-error">Transfer ditahan: rekening {st.id === 'kosong' ? 'belum lengkap' : 'belum dicek'}. Tulis "Tunai" kalau dibayar cash.</p>}
         {error && <p className="adm-error">{error}</p>}
