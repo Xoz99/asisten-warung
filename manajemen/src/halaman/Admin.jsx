@@ -53,6 +53,7 @@ export const NAMA_AKSI = {
   'hr.karyawan.tambah': 'nambah karyawan',
   'hr.karyawan.ubah': 'ubah data karyawan',
   'hr.karyawan.status': 'ubah status karyawan',
+  'hr.karyawan.foto': 'ganti foto karyawan',
   'hr.kehadiran.simpan': 'nyatet kehadiran',
   'hr.cuti.ajukan': 'nyatet pengajuan cuti',
   'hr.cuti.putus': 'mutusin pengajuan cuti',

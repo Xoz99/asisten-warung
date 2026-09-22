@@ -359,6 +359,48 @@ router.get('/tim-sales/:id/foto', async (req, res, next) => {
 });
 
 // ---------------- Sales: profil sendiri ----------------
+// ---------------- Admin: foto profil karyawan (tab Karyawan) ----------------
+async function karyawanAda(id) {
+  if (!POLA_UUID.test(id)) throw salah('Karyawan tidak ditemukan', 404);
+  await pastikanTabel();
+  const { rows } = await query('SELECT id, nama FROM mj_karyawan WHERE id=$1', [id]);
+  if (!rows.length) throw salah('Karyawan tidak ditemukan', 404);
+  return rows[0];
+}
+router.get('/karyawan/:id/foto', async (req, res, next) => {
+  try {
+    adminSaja(req);
+    await kirimFoto(res, (await karyawanAda(req.params.id)).id);
+  } catch (e) {
+    next(e);
+  }
+});
+router.put('/karyawan/:id/foto', async (req, res, next) => {
+  try {
+    adminSaja(req);
+    const k = await karyawanAda(req.params.id);
+    const f = fotoDariBody(req.body);
+    if (!f) throw salah('Foto wajib dipilih');
+    await gantiFoto(k.id, f);
+    await catatLog(req, 'hr.karyawan.foto', { nama: k.nama, foto: 'diganti' });
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+router.delete('/karyawan/:id/foto', async (req, res, next) => {
+  try {
+    adminSaja(req);
+    const k = await karyawanAda(req.params.id);
+    const { rows } = await query('UPDATE mj_karyawan k SET foto=NULL FROM (SELECT foto AS foto0 FROM mj_karyawan WHERE id=$1) lama WHERE k.id=$1 RETURNING lama.foto0', [k.id]);
+    buangFile(rows[0]?.foto0);
+    await catatLog(req, 'hr.karyawan.foto', { nama: k.nama, foto: 'dihapus' });
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
 // ---------------- Admin: profil sendiri ----------------
 async function profilAdmin(id) {
   const { rows } = await query('SELECT id, username, nama, peran, jabatan, email, no_hp, (foto IS NOT NULL) AS ada_foto, terakhir_masuk, created_at FROM mj_admin WHERE id=$1', [id]);

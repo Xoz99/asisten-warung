@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { bulanLabel, rupiah, tampilHp, tgl } from '../lib/format.js';
 import { Gagal, Kosong, Memuat, Modal, Tabs, useData } from '../komponen/Ui.jsx';
+import FotoProfil from '../komponen/FotoProfil.jsx';
+import { keWebp } from '../lib/gambar.js';
 
 // HR Karyawan: data kepegawaian, kehadiran harian, cuti & izin, payroll bulanan, struktur organisasi.
 const TABS = [
@@ -308,9 +310,7 @@ function Daftar({ api, versi, onBuka, onTambah, onBerubah, setPesan }) {
           {daftar.map((k) => (
             <button key={k.id} className="adm-kartu adm-angka-item adm-saring" onClick={() => onBuka(k.id)}>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                <span className="adm-inisial" aria-hidden="true">
-                  {k.nama[0]?.toUpperCase()}
-                </span>
+                <FotoProfil src={`/api/karyawan/${k.id}/foto`} ada={Boolean(k.foto)} versi={k.foto} nama={k.nama} ukuran={44} className="kotak" />
                 <div style={{ minWidth: 0 }}>
                   <b style={{ fontSize: 17 }}>{k.nama}</b>
                   <div className="adm-redup">{k.jabatan || 'Jabatan belum diisi'}</div>
@@ -375,8 +375,13 @@ function Daftar({ api, versi, onBuka, onTambah, onBerubah, setPesan }) {
                     {k.nik}
                   </td>
                   <td>
-                    <b>{k.nama}</b>
-                    <div className="adm-redup">{k.email || tampilHp(k.no_hp)}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <FotoProfil src={`/api/karyawan/${k.id}/foto`} ada={Boolean(k.foto)} versi={k.foto} nama={k.nama} ukuran={36} />
+                      <div style={{ minWidth: 0 }}>
+                        <b>{k.nama}</b>
+                        <div className="adm-redup">{k.email || tampilHp(k.no_hp)}</div>
+                      </div>
+                    </div>
                   </td>
                   <td>{k.jabatan || '-'}</td>
                   <td>{k.departemen || '-'}</td>
@@ -589,9 +594,7 @@ function Detail({ api, id, onTutup, onEdit, onBerubah }) {
         ) : (
           <>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <span className="adm-inisial" style={{ width: 56, height: 56, fontSize: 24 }} aria-hidden="true">
-                {k.nama[0]?.toUpperCase()}
-              </span>
+              <FotoKaryawan api={api} k={k} onBerubah={onBerubah} />
               <div>
                 <h3 style={{ fontSize: 22, margin: 0 }}>{k.nama}</h3>
                 <div className="adm-redup">{[k.jabatan, k.departemen].filter(Boolean).join(' · ') || 'Jabatan belum diisi'}</div>
@@ -1315,9 +1318,7 @@ function Struktur({ api, versi, onBuka }) {
     return (
       <li key={k.id}>
         <button className="adm-kartu adm-saring" onClick={() => onBuka(k.id)} style={{ display: 'inline-flex', gap: 10, alignItems: 'center', padding: '8px 12px', textAlign: 'left', margin: '4px 0' }}>
-          <span className="adm-inisial" aria-hidden="true">
-            {k.nama[0]?.toUpperCase()}
-          </span>
+          <FotoProfil src={`/api/karyawan/${k.id}/foto`} ada={Boolean(k.foto)} versi={k.foto} nama={k.nama} ukuran={36} className="kotak" />
           <span>
             <b>{k.nama}</b>
             <span className="adm-redup" style={{ display: 'block' }}>
@@ -1348,5 +1349,61 @@ function Struktur({ api, versi, onBuka }) {
         </>
       )}
     </>
+  );
+}
+
+// Foto profil karyawan di laci detail: klik foto buat ganti, tombol kecil buat hapus. Sales Partner pakai foto yang sama
+// dengan akunnya (bisa juga diganti sendiri dari HP).
+function FotoKaryawan({ api, k, onBerubah }) {
+  const [ada, setAda] = useState(Boolean(k.foto));
+  const [versi, setVersi] = useState(0);
+  const [sibuk, setSibuk] = useState(false);
+  const [err, setErr] = useState('');
+  const jalan = async (fn) => {
+    setSibuk(true);
+    setErr('');
+    try {
+      await fn();
+      setVersi((v) => v + 1);
+      onBerubah?.();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setSibuk(false);
+    }
+  };
+  return (
+    <div className="kr-foto">
+      <label className="kr-foto-ganti" aria-label={`Ganti foto ${k.nama}`} title="Ganti foto">
+        <FotoProfil src={`/api/karyawan/${k.id}/foto`} ada={ada} nama={k.nama} ukuran={72} versi={versi} />
+        <span>{sibuk ? '…' : ada ? 'Ganti' : '+ Foto'}</span>
+        <input
+          type="file"
+          accept="image/*"
+          hidden
+          disabled={sibuk}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = '';
+            if (f)
+              jalan(async () => {
+                await api('PUT', `/karyawan/${k.id}/foto`, { foto: await keWebp(f, 512, 0.85) });
+                setAda(true);
+              });
+          }}
+        />
+      </label>
+      {ada && (
+        <button
+          type="button"
+          className="kr-foto-hapus"
+          disabled={sibuk}
+          onClick={() => window.confirm(`Hapus foto ${k.nama}?`) && jalan(async () => (await api('DELETE', `/karyawan/${k.id}/foto`), setAda(false)))}
+        >
+          Hapus foto
+        </button>
+      )}
+      {err && <small className="adm-error" style={{ margin: 0 }}>{err}</small>}
+    </div>
   );
 }
