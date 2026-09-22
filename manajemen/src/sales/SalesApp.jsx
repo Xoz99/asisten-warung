@@ -943,6 +943,13 @@ function Akun({ api, admin, onKeluar, profil, versiFoto, setPesan, onBerubah }) 
   const [sibukFoto, setSibukFoto] = useState(false);
   const ubah = (k) => (e) => setIsi((x) => ({ ...x, [k]: e.target.value }));
   const rek = statusRekening(profil);
+  // Satu bagian kebuka dalam satu waktu. Rekening kosong = langsung dibuka biar keisi.
+  const [buka, setBuka] = useState(null);
+  const [udahAwal, setUdahAwal] = useState(false);
+  if (profil && !udahAwal) {
+    setUdahAwal(true);
+    if (rek.id === 'kosong') setBuka('rekening');
+  }
   return (
     <>
       <section className="sl-kartu sl-profil">
@@ -985,11 +992,31 @@ function Akun({ api, admin, onKeluar, profil, versiFoto, setPesan, onBerubah }) 
             : 'Rekening barumu lagi dicek admin. Sampai dicek, transfer bagi hasil ditahan dulu.'}
         </div>
       )}
-      {profil && <FormRekening api={api} profil={profil} setPesan={setPesan} onSelesai={() => onBerubah(false)} />}
-      {profil && <FormDataDiri api={api} profil={profil} setPesan={setPesan} onSelesai={() => onBerubah(false)} />}
+      {profil && (
+        <Lipat
+          judul="Rekening pencairan"
+          ringkas={rek.id === 'kosong' ? 'Belum diisi' : `${profil.bank} ${samarRekening(profil.rekening)} · a.n. ${profil.atas_nama}`}
+          status={rek.id === 'siap' ? ['berhasil', 'Udah dicek'] : rek.id === 'cek' ? ['pikir', 'Lagi dicek'] : ['ditolak', 'Belum diisi']}
+          terbuka={buka === 'rekening'}
+          onToggle={() => setBuka((x) => (x === 'rekening' ? null : 'rekening'))}
+        >
+          <FormRekening api={api} profil={profil} setPesan={setPesan} onSelesai={() => (onBerubah(false), setBuka(null))} />
+        </Lipat>
+      )}
+      {profil && (
+        <Lipat
+          judul="Data diri"
+          ringkas={ringkasDataDiri(profil)}
+          terbuka={buka === 'data'}
+          onToggle={() => setBuka((x) => (x === 'data' ? null : 'data'))}
+        >
+          <FormDataDiri api={api} profil={profil} setPesan={setPesan} onSelesai={() => (onBerubah(false), setBuka(null))} />
+        </Lipat>
+      )}
 
+      <Lipat judul="Ganti password" ringkas="Buat masuk ke Makalin" terbuka={buka === 'password'} onToggle={() => setBuka((x) => (x === 'password' ? null : 'password'))}>
       <form
-        className="sl-kartu"
+        className="sl-lipat-form"
         onSubmit={async (e) => {
           e.preventDefault();
           setError('');
@@ -1003,7 +1030,6 @@ function Akun({ api, admin, onKeluar, profil, versiFoto, setPesan, onBerubah }) 
           }
         }}
       >
-        <h2 style={{ margin: '0 0 4px', fontSize: 18 }}>Ganti password</h2>
         <div className="field">
           <label htmlFor="sl-pw-lama">Password lama</label>
           <input id="sl-pw-lama" type="password" value={isi.passwordLama} onChange={ubah('passwordLama')} autoComplete="current-password" />
@@ -1017,11 +1043,38 @@ function Akun({ api, admin, onKeluar, profil, versiFoto, setPesan, onBerubah }) 
           {sibuk ? 'Menyimpan…' : 'Ganti password'}
         </button>
       </form>
+      </Lipat>
       <button className="sl-tombol keluar" onClick={() => onKeluar()}>
         Keluar
       </button>
     </>
   );
+}
+
+// Bagian yang bisa dibuka-tutup (animasi tinggi lewat grid-template-rows). Isi yang ketutup di-`inert` biar nggak
+// kena Tab / pembaca layar.
+function Lipat({ judul, ringkas, status, terbuka, onToggle, children }) {
+  const id = 'lipat-' + judul.toLowerCase().replace(/\W+/g, '-');
+  return (
+    <section className={'sl-kartu sl-lipat' + (terbuka ? ' buka' : '')}>
+      <button type="button" className="sl-lipat-kepala" aria-expanded={terbuka} aria-controls={id} onClick={onToggle}>
+        <span className="sl-lipat-teks">
+          <b>{judul}</b>
+          <span className="sl-redup">{ringkas}</span>
+        </span>
+        {status && <span className={`sl-hasil ${status[0]}`}>{status[1]}</span>}
+        <span className="sl-lipat-panah" aria-hidden="true" />
+      </button>
+      <div className="sl-lipat-isi" id={id} inert={!terbuka}>
+        <div className="sl-lipat-dalam">{children}</div>
+      </div>
+    </section>
+  );
+}
+function ringkasDataDiri(p) {
+  const kurang = [!p.no_hp && 'no. HP', !p.email && 'email', !p.nik_ktp && 'NIK'].filter(Boolean);
+  const isi = [tampilNoHp(p.no_hp), p.lokasi].filter(Boolean).join(' · ');
+  return kurang.length ? `Belum diisi: ${kurang.join(', ')}` : isi || 'Lengkap';
 }
 
 const tampilNoHp = (hp) => (hp ? (hp.startsWith('62') ? '0' + hp.slice(2) : hp) : '');
@@ -1035,7 +1088,7 @@ function FormRekening({ api, profil, setPesan, onSelesai }) {
   const gantiRek = ['bank', 'rekening', 'atas_nama'].some((k) => (isi[k] || '').replace(k === 'rekening' ? /[\s.-]/g : /^$/, '').trim() !== (profil[k] || ''));
   return (
     <form
-      className="sl-kartu"
+      className="sl-lipat-form"
       onSubmit={async (e) => {
         e.preventDefault();
         setError('');
@@ -1051,7 +1104,6 @@ function FormRekening({ api, profil, setPesan, onSelesai }) {
         }
       }}
     >
-      <h2 style={{ margin: '0 0 4px', fontSize: 18 }}>Rekening pencairan</h2>
       <span className="sl-redup">Bagi hasil ditransfer ke sini tiap tanggal 5. Nama pemilik harus sama dengan KTP kamu.</span>
       <div className="field">
         <label htmlFor="sl-bank">Bank / e-wallet</label>
@@ -1097,7 +1149,7 @@ function FormDataDiri({ api, profil, setPesan, onSelesai }) {
   const ubah = (k) => (e) => setIsi((x) => ({ ...x, [k]: e.target.value }));
   return (
     <form
-      className="sl-kartu"
+      className="sl-lipat-form"
       onSubmit={async (e) => {
         e.preventDefault();
         setError('');
@@ -1113,7 +1165,6 @@ function FormDataDiri({ api, profil, setPesan, onSelesai }) {
         }
       }}
     >
-      <h2 style={{ margin: '0 0 4px', fontSize: 18 }}>Data diri</h2>
       <div className="field">
         <label htmlFor="sl-hp">No. HP / WA</label>
         <input id="sl-hp" value={isi.no_hp} onChange={ubah('no_hp')} inputMode="tel" />
