@@ -935,46 +935,157 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 .rk-pratinjau-lipat summary{cursor:pointer;font-weight:700;font-size:12px}
 .rk-pratinjau-lipat .rk-pratinjau{margin-top:6px}
 
-/* AI workspace */
-.ai-chat { max-width: 1060px; margin: 0 auto; }
-.ai-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.ai-heading h1 { margin: 8px 0; }
-.ai-heading p, .ai-info, .ai-composer small { color: #434655; }
-.ai-chat button { padding: 10px 15px; border: 2px solid #1b1b1b; background: white; color: #1b1b1b; font: inherit; cursor: pointer; }
-.ai-chat button:disabled { opacity: .5; cursor: default; }
-.ai-chat button:focus-visible, .ai-chat textarea:focus-visible { outline: 3px solid #2151da; outline-offset: 3px; }
-.ai-info { padding: 12px; background: #eeeeee; font-size: 13px; }
-.ai-messages { min-height: 320px; max-height: 58vh; overflow-y: auto; border: 2px solid #1b1b1b; padding: 20px; background: #fff; }
-.ai-welcome { padding: 24px 0; }
-.ai-suggestions, .ai-actions { display: flex; flex-wrap: wrap; gap: 10px; }
-.ai-message { padding: 16px; margin-bottom: 16px; background: #f3f3f3; overflow-wrap: anywhere; }
-.ai-message.user { background: #e9efff; margin-left: 12%; }
-.ai-message > b { display: block; margin-bottom: 8px; font-size: 12px; }
-.ai-message div { white-space: pre-wrap; line-height: 1.65; }
-.ai-action { border: 2px solid #1b1b1b; border-left: 8px solid #fed01b; padding: 16px; margin: 16px 0; overflow-wrap: anywhere; }
-.ai-action pre { overflow: auto; max-height: 240px; background: #f3f3f3; padding: 12px; }
-.ai-actions button:first-child, .ai-composer button { background: #0037b0; color: white; }
-.ai-composer { margin-top: 16px; }
-.ai-composer label { display: block; font-weight: 700; margin-bottom: 8px; }
-.ai-composer textarea { box-sizing: border-box; width: 100%; resize: vertical; border: 2px solid #1b1b1b; padding: 12px; font: inherit; }
-.ai-composer > div { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 10px; }
-@media (max-width: 600px) { .ai-heading { align-items: flex-start; } .ai-messages { padding: 10px; } .ai-composer > div { align-items: flex-end; } }
-.ai-message .ai-teks{white-space:normal}
-.ai-teks p{margin:0 0 8px}
-.ai-teks p:last-child{margin-bottom:0}
-.ai-teks ul,.ai-teks ol{margin:0 0 8px;padding-left:22px}
-.ai-teks li{margin:2px 0}
+/* AI workspace: riwayat (kiri) + panel chat (kanan) */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+.ai-chat{display:grid;grid-template-columns:280px minmax(0,1fr);height:calc(100dvh - 166px);min-height:520px;background:var(--putih);border:var(--garis);box-shadow:var(--bayang);position:relative;overflow:hidden}
+.ai-chat button{font:inherit;cursor:pointer}
+.ai-chat button:disabled{opacity:.45;cursor:default}
+.ai-mini{padding:3px 8px;border:var(--garis-tipis);background:var(--putih);font-size:11px!important;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--tinta)}
+.ai-mini:hover:not(:disabled){background:var(--kuning)}
+.ai-mini.bahaya{background:var(--merah);color:var(--putih)}
 
+/* riwayat */
+.ai-samping{display:flex;flex-direction:column;gap:10px;padding:14px;border-right:var(--garis);background:var(--kertas);min-height:0}
+.ai-baru{padding:11px 12px;border:var(--garis);background:var(--kuning);font-weight:700;text-transform:uppercase;letter-spacing:.05em;box-shadow:3px 3px 0 var(--hitam);transition:transform .08s,box-shadow .08s}
+.ai-baru:hover:not(:disabled){transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--hitam)}
+.ai-baru:active:not(:disabled){transform:translate(2px,2px);box-shadow:1px 1px 0 var(--hitam)}
+.ai-cari{width:100%;padding:9px 10px;border:var(--garis-tipis);background:var(--putih);font-size:13px}
+.ai-riwayat{flex:1;overflow-y:auto;min-height:0;margin:0 -6px;padding:0 6px}
+.ai-riwayat-grup{margin-bottom:10px}
+.ai-grup-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--redup);margin:8px 2px 4px}
+.ai-riwayat-item{position:relative;display:flex;align-items:stretch;border:2px solid transparent;margin-bottom:2px}
+.ai-riwayat-item:hover{border-color:var(--hitam);background:var(--putih)}
+.ai-riwayat-item.aktif{border-color:var(--hitam);background:var(--putih);box-shadow:3px 3px 0 var(--hitam)}
+.ai-riwayat-item.aktif::before{content:'';position:absolute;left:-2px;top:-2px;bottom:-2px;width:5px;background:var(--biru)}
+.ai-riwayat-buka{flex:1;min-width:0;text-align:left;background:none;border:0;padding:8px 10px;display:flex;flex-direction:column;gap:2px;color:var(--tinta)}
+.ai-riwayat-buka b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ai-riwayat-buka small{font-size:11px;color:var(--redup)}
+.ai-riwayat-aksi{display:none;align-items:center;gap:4px;padding-right:6px}
+.ai-riwayat-item:hover .ai-riwayat-aksi,.ai-riwayat-item:focus-within .ai-riwayat-aksi,.ai-riwayat-aksi.tampil{display:flex}
+.ai-riwayat-item.edit{gap:6px;padding:6px;border-color:var(--hitam);background:var(--putih)}
+.ai-riwayat-item.edit input{flex:1;min-width:0;border:var(--garis-tipis);padding:5px 7px;font-size:13px}
+.ai-kosong{font-size:13px;color:var(--redup);padding:8px 2px}
+.ai-kosong.tengah{text-align:center;padding:40px 0}
+.ai-samping-kaki{font-size:11px;color:var(--redup);margin:0;border-top:var(--garis-tipis);padding-top:8px}
+
+/* panel chat */
+.ai-panel{display:flex;flex-direction:column;min-width:0;min-height:0}
+.ai-kepala{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:var(--garis);background:var(--putih)}
+.ai-kepala-judul{flex:1;min-width:0}
+.ai-kepala-judul .adm-mono{font-size:10px;letter-spacing:.1em;color:var(--redup);font-weight:700}
+.ai-kepala h1{font-size:18px;text-transform:none;letter-spacing:-.01em;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ai-kepala-status{display:flex;align-items:center;gap:8px;flex:none;font-size:12px;font-weight:700}
+.ai-titik{width:10px;height:10px;border:2px solid var(--hitam);background:var(--merah);flex:none}
+.ai-titik.on{background:var(--hijau)}
+.ai-model{font-family:ui-monospace,Menlo,monospace;font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ai-sisa{border:var(--garis-tipis);padding:2px 8px;background:var(--kertas)}
+.ai-sisa.tipis{background:var(--oranye)}
+.ai-tombol-riwayat{display:none;padding:8px 10px;border:var(--garis-tipis);background:var(--kuning);font-weight:700;font-size:12px!important;text-transform:uppercase;flex:none}
+
+.ai-pesan{flex:1;overflow-y:auto;min-height:0;padding:22px 22px 10px;background:var(--kertas);background-image:radial-gradient(rgba(0,0,0,.08) 1px,transparent 1px);background-size:20px 20px;display:flex;flex-direction:column;gap:16px}
+.ai-sambutan{margin:auto;max-width:620px;text-align:center;padding:20px 0}
+.ai-logo{width:56px;height:56px;margin:0 auto 14px;display:grid;place-items:center;background:var(--biru);color:var(--putih);border:var(--garis);box-shadow:var(--bayang);font-weight:700;font-size:18px}
+.ai-sambutan h2{font-size:24px;letter-spacing:-.02em;margin:0 0 8px}
+.ai-sambutan>p{color:var(--redup);margin:0 auto 20px;max-width:480px}
+.ai-saran{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;text-align:left}
+.ai-saran button{display:flex;flex-direction:column;gap:3px;padding:12px 14px;border:var(--garis-tipis);background:var(--putih);color:var(--tinta);box-shadow:3px 3px 0 var(--hitam);transition:transform .08s,box-shadow .08s}
+.ai-saran button:hover:not(:disabled){transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--hitam);background:#FFFBEA}
+.ai-saran b{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--biru)}
+.ai-saran span{font-size:14px;font-weight:500}
+
+.ai-bubble-baris{display:flex;gap:10px;align-items:flex-start;max-width:860px;width:100%;margin:0 auto}
+.ai-bubble-baris.user{justify-content:flex-end}
+.ai-avatar{width:32px;height:32px;flex:none;display:grid;place-items:center;background:var(--biru);color:var(--putih);border:var(--garis-tipis);font-weight:700;font-size:11px}
+.ai-bubble{min-width:0;max-width:min(720px,100%);border:var(--garis-tipis);background:var(--putih);padding:12px 14px 8px;box-shadow:3px 3px 0 var(--hitam);overflow-wrap:anywhere}
+.ai-bubble-baris.user .ai-bubble{background:var(--kuning);max-width:min(560px,85%)}
+.ai-bubble-baris.assistant .ai-bubble{flex:0 1 auto}
+.ai-teks-user{margin:0;white-space:pre-wrap;line-height:1.55}
+.ai-bubble-kaki{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;font-size:11px;color:var(--redup);font-weight:700}
+.ai-bubble-baris.user .ai-bubble-kaki{color:#5b4a00}
+
+.ai-teks{line-height:1.65;font-size:14.5px}
+.ai-teks p{margin:0 0 10px}
+.ai-teks>:last-child{margin-bottom:0}
 .ai-teks strong{font-weight:700}
-.ai-teks code{font-family:ui-monospace,Menlo,monospace;font-size:.9em;background:rgba(0,0,0,.07);padding:1px 5px;border-radius:3px;overflow-wrap:anywhere}
-.ai-teks .ai-judul{font-weight:700;font-size:15px;margin:10px 0 6px}
-.ai-lampiran-daftar{display:flex;flex-direction:column;gap:8px;margin-top:12px}
-.ai-lampiran{display:flex;align-items:center;gap:12px;background:#fff;border:2px solid #1b1b1b;padding:10px;min-width:0}
-.ai-lampiran img{width:64px;height:64px;object-fit:cover;border:2px solid #1b1b1b;flex:none}
-.ai-lampiran-ikon{width:52px;height:52px;display:grid;place-items:center;border:2px solid #1b1b1b;background:#FACC15;font-family:ui-monospace,Menlo,monospace;font-size:10px;font-weight:700;flex:none}
+.ai-teks a{color:var(--biru);font-weight:700;text-underline-offset:2px;overflow-wrap:anywhere}
+.ai-teks code{font-family:ui-monospace,Menlo,monospace;font-size:.88em;background:#F1F0E8;border:1px solid #d6d3c4;padding:0 4px}
+.ai-teks .ai-judul{font-weight:700;margin:14px 0 6px;letter-spacing:-.01em}
+.ai-teks .ai-judul:first-child{margin-top:0}
+.ai-judul-1{font-size:18px}.ai-judul-2{font-size:16px}.ai-judul-3{font-size:14.5px;text-transform:uppercase;letter-spacing:.04em!important}
+.ai-daftar{margin:0 0 10px;display:flex;flex-direction:column;gap:4px}
+.ai-butir{display:flex;gap:8px;padding-left:calc(var(--tingkat,0) * 20px)}
+.ai-penanda{flex:none;min-width:14px;font-weight:700;color:var(--biru);font-size:12px;line-height:1.65rem}
+.ai-daftar.ul .ai-penanda{font-size:8px;line-height:1.65rem}
+.ai-daftar.ol .ai-penanda{font-size:13px;min-width:20px;line-height:inherit}
+.ai-teks blockquote{margin:0 0 10px;padding:6px 12px;border-left:5px solid var(--kuning);background:#FFFBEA}
+.ai-kode{margin:0 0 10px;padding:12px;background:var(--tinta);color:#F4F4F0;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.5;overflow-x:auto;white-space:pre;border:var(--garis-tipis)}
+.ai-kode code{background:none;border:0;padding:0;color:inherit}
+.ai-teks hr{border:0;border-top:var(--garis-tipis);margin:12px 0}
+.ai-tabel-bungkus{margin:0 0 10px;overflow-x:auto;border:var(--garis-tipis)}
+.ai-tabel{border-collapse:collapse;width:100%;font-size:13px}
+.ai-tabel th{background:var(--kertas);text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:var(--garis-tipis)}
+.ai-tabel th,.ai-tabel td{padding:7px 10px;vertical-align:top;white-space:nowrap}
+.ai-tabel td{border-top:1px solid #e3e1d6;white-space:normal;min-width:80px}
+.ai-tabel tbody tr:nth-child(even){background:#FCFCF8}
+
+.ai-mengetik{display:flex;align-items:center;gap:5px;padding:12px 14px}
+.ai-mengetik span{width:8px;height:8px;background:var(--hitam);animation:ai-loncat 1s infinite ease-in-out}
+.ai-mengetik span:nth-child(2){animation-delay:.15s}.ai-mengetik span:nth-child(3){animation-delay:.3s}
+.ai-mengetik em{font-style:normal;font-size:12px;font-weight:700;color:var(--redup);margin-left:6px}
+@keyframes ai-loncat{0%,80%,100%{transform:translateY(0);opacity:.4}40%{transform:translateY(-5px);opacity:1}}
+@media (prefers-reduced-motion:reduce){.ai-mengetik span{animation:none}}
+
+.ai-tindakan{max-width:720px;width:100%;margin:0 auto;border:var(--garis);border-left:10px solid var(--kuning);background:var(--putih);padding:14px 16px;box-shadow:var(--bayang);overflow-wrap:anywhere}
+.ai-tindakan-label{margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--merah)}
+.ai-tindakan-ringkas{margin:0 0 6px;font-weight:700;font-size:15px}
+.ai-tindakan details{margin:8px 0}
+.ai-tindakan summary{cursor:pointer;font-weight:700;font-size:12px}
+.ai-tindakan pre{overflow:auto;max-height:220px;background:var(--kertas);border:var(--garis-tipis);padding:10px;font-size:12px;margin:6px 0 0}
+.ai-tindakan-tombol{display:flex;gap:8px;margin-top:10px}
+.ai-tindakan-tombol button{padding:9px 16px;border:var(--garis-tipis);background:var(--putih);font-weight:700;color:var(--tinta)}
+.ai-tindakan-tombol button.utama{background:var(--biru);color:var(--putih);box-shadow:3px 3px 0 var(--hitam)}
+
+.ai-galat{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0;padding:8px 18px;background:#FEE2E2;border-top:var(--garis-tipis);color:#991B1B;font-weight:700;font-size:13px}
+.ai-tulis{display:flex;align-items:flex-end;gap:10px;padding:12px 18px 6px;border-top:var(--garis);background:var(--putih)}
+.ai-tulis textarea{flex:1;min-width:0;resize:none;border:var(--garis-tipis);padding:11px 12px;line-height:1.45;max-height:200px;background:var(--kertas)}
+.ai-tulis textarea:focus{background:var(--putih)}
+.ai-tulis button{flex:none;height:46px;padding:0 20px;border:var(--garis);background:var(--biru);color:var(--putih);font-weight:700;text-transform:uppercase;letter-spacing:.05em;box-shadow:3px 3px 0 var(--hitam)}
+.ai-tulis button:active:not(:disabled){transform:translate(2px,2px);box-shadow:1px 1px 0 var(--hitam)}
+.ai-catatan{margin:0;padding:0 18px 10px;font-size:11px;color:var(--redup);background:var(--putih)}
+
+/* lampiran file */
+.ai-lampiran-daftar{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.ai-lampiran{display:flex;align-items:center;gap:12px;background:var(--kertas);border:var(--garis-tipis);padding:8px;min-width:0}
+.ai-lampiran img{width:60px;height:60px;object-fit:cover;border:var(--garis-tipis);flex:none}
+.ai-lampiran-ikon{width:48px;height:48px;display:grid;place-items:center;border:var(--garis-tipis);background:var(--kuning);font-family:ui-monospace,Menlo,monospace;font-size:10px;font-weight:700;flex:none}
 .ai-lampiran-info{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
-.ai-lampiran-info b{overflow-wrap:anywhere;margin:0;font-size:14px}
-.ai-lampiran-info small{color:#555}
+.ai-lampiran-info b{overflow-wrap:anywhere;margin:0;font-size:13px}
+.ai-lampiran-info small{color:var(--redup);font-size:11px}
 .ai-lampiran-tombol{display:flex;gap:6px;flex:none}
-.ai-chat .ai-lampiran-tombol button{padding:6px 10px;font-size:13px}
-@media (max-width:520px){.ai-lampiran{flex-wrap:wrap}.ai-lampiran-tombol{width:100%}.ai-lampiran-tombol button{flex:1}}
+.ai-lampiran-tombol button{padding:6px 10px;border:var(--garis-tipis);background:var(--putih);font-size:12px;font-weight:700;color:var(--tinta)}
+.ai-lampiran-tombol button:hover{background:var(--kuning)}
+
+.ai-latar{display:none}
+@media (max-width:1100px){.ai-chat{grid-template-columns:240px minmax(0,1fr)}.ai-model{max-width:140px}}
+@media (max-width:900px){
+  .ai-chat{grid-template-columns:minmax(0,1fr);height:calc(100dvh - 142px);min-height:460px;box-shadow:none}
+  .ai-samping{position:absolute;inset:0 auto 0 0;width:min(300px,86%);z-index:4;transform:translateX(-105%);transition:transform .18s;box-shadow:6px 0 0 var(--hitam)}
+  .ai-samping.buka{transform:none}
+  .ai-latar{display:block;position:absolute;inset:0;background:rgba(0,0,0,.35);z-index:3}
+  .ai-tombol-riwayat{display:block}
+  .ai-riwayat-aksi{display:none}
+  .ai-riwayat-item.aktif .ai-riwayat-aksi{display:flex}
+}
+@media (max-width:600px){
+  .ai-kepala{padding:10px 12px;gap:8px;flex-wrap:wrap}
+  .ai-kepala-status{order:3;width:100%}
+  .ai-model{max-width:none;flex:1}
+  .ai-pesan{padding:14px 10px 8px}
+  .ai-avatar{display:none}
+  .ai-bubble-baris.user .ai-bubble{max-width:90%}
+  .ai-saran{grid-template-columns:minmax(0,1fr)}
+  .ai-tulis{padding:10px 10px 4px}
+  .ai-tulis button{padding:0 14px}
+  .ai-catatan{padding:0 10px 8px}
+  .ai-lampiran{flex-wrap:wrap}.ai-lampiran-tombol{width:100%}.ai-lampiran-tombol button{flex:1}
+}

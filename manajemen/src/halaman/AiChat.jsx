@@ -1,48 +1,118 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { bacaSesi, bukaFile } from '../lib/api.js';
 
-// Tampilan jawaban AI: **tebal**, daftar (- / * / 1.), dan baris baru. Tanpa HTML mentah dari model.
-function Tebal({ teks }) {
-  return teks.split(/(\*\*[^*]+\*\*|`[^`]+`|\*[^*\s][^*]*\*|_[^_\s][^_]*_)/g).map((b, i) =>
-    b.startsWith('**') && b.endsWith('**') && b.length > 4 ? (
-      <strong key={i}>{b.slice(2, -2)}</strong>
-    ) : b.startsWith('`') && b.endsWith('`') && b.length > 2 ? (
-      <code key={i}>{b.slice(1, -1)}</code>
-    ) : (b.startsWith('*') && b.endsWith('*')) || (b.startsWith('_') && b.endsWith('_')) ? (
-      b.length > 2 ? <em key={i}>{b.slice(1, -1)}</em> : b
-    ) : (
-      b
-    )
-  );
+// Tampilan jawaban AI (markdown sederhana): judul, tebal/miring/kode, tautan http(s), daftar (bertingkat), kutipan,
+// tabel, dan blok kode. Semua dirender jadi elemen React - HTML mentah dari model nggak pernah dipakai.
+const POLA_INLINE = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\(https?:\/\/[^\s)]+\)|https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"]|\*[^*\s][^*]*\*|_[^_\s][^_]*_)/g;
+function Inline({ teks }) {
+  return String(teks).split(POLA_INLINE).map((b, i) => {
+    if (!b) return null;
+    if (b.startsWith('**') && b.endsWith('**') && b.length > 4) return <strong key={i}>{b.slice(2, -2)}</strong>;
+    if (b.startsWith('`') && b.endsWith('`') && b.length > 2) return <code key={i}>{b.slice(1, -1)}</code>;
+    const t = b.match(/^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/);
+    if (t) return <a key={i} href={t[2]} target="_blank" rel="noopener noreferrer">{t[1]}</a>;
+    if (/^https?:\/\//.test(b)) return <a key={i} href={b} target="_blank" rel="noopener noreferrer">{b}</a>;
+    if (((b.startsWith('*') && b.endsWith('*')) || (b.startsWith('_') && b.endsWith('_'))) && b.length > 2) return <em key={i}>{b.slice(1, -1)}</em>;
+    return b;
+  });
 }
-function TeksAi({ teks }) {
+const selTabel = (baris) => baris.trim().replace(/^\||\|$/g, '').split('|').map((x) => x.trim());
+function susunBlok(teks) {
+  const baris = String(teks || '').replace(/\r/g, '').split('\n');
   const blok = [];
-  for (const baris of String(teks || '').split('\n')) {
-    const h = baris.match(/^\s*#{1,6}\s+(.*)$/);
-    if (h) {
-      blok.push({ jenis: 'h', isi: [h[1]] });
+  for (let i = 0; i < baris.length; i++) {
+    const b = baris[i];
+    const pagar = b.match(/^\s*```\s*([\w-]*)/);
+    if (pagar) {
+      const isi = [];
+      while (++i < baris.length && !/^\s*```/.test(baris[i])) isi.push(baris[i]);
+      blok.push({ jenis: 'kode', bahasa: pagar[1], isi: isi.join('\n') });
       continue;
     }
-    if (/^\s*(-{3,}|\*{3,})\s*$/.test(baris)) continue;
-    const m = baris.match(/^\s*(?:[-*•]|(\d+)[.)])\s+(.*)$/);
+    if (/^\s*\|.*\|\s*$/.test(b) && /^\s*\|?[\s:|-]+\|?\s*$/.test(baris[i + 1] || '') && (baris[i + 1] || '').includes('-')) {
+      const kepala = selTabel(b);
+      const isi = [];
+      i++;
+      while (i + 1 < baris.length && /^\s*\|.*\|\s*$/.test(baris[i + 1])) isi.push(selTabel(baris[++i]));
+      blok.push({ jenis: 'tabel', kepala, isi });
+      continue;
+    }
+    const h = b.match(/^\s*(#{1,6})\s+(.*)$/);
+    if (h) {
+      blok.push({ jenis: 'h', level: h[1].length, isi: h[2].replace(/\s*#+\s*$/, '') });
+      continue;
+    }
+    if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(b)) {
+      blok.push({ jenis: 'garis' });
+      continue;
+    }
+    const q = b.match(/^\s*>\s?(.*)$/);
     const akhir = blok[blok.length - 1];
+    if (q) {
+      if (akhir?.jenis === 'kutip') akhir.isi.push(q[1]);
+      else blok.push({ jenis: 'kutip', isi: [q[1]] });
+      continue;
+    }
+    const m = b.match(/^(\s*)(?:[-*•+]|(\d+)[.)])\s+(.*)$/);
     if (m) {
-      const jenis = m[1] ? 'ol' : 'ul';
-      if (akhir?.jenis === jenis) akhir.isi.push(m[2]);
-      else blok.push({ jenis, isi: [m[2]] });
-    } else blok.push({ jenis: 'p', isi: [baris] });
+      const jenis = m[2] ? 'ol' : 'ul';
+      const item = { teks: m[3], tingkat: Math.min(3, Math.floor(m[1].replace(/\t/g, '  ').length / 2)), nomor: m[2] };
+      if (akhir && (akhir.jenis === jenis || (item.tingkat > 0 && (akhir.jenis === 'ul' || akhir.jenis === 'ol')))) akhir.isi.push(item);
+      else blok.push({ jenis, isi: [item] });
+      continue;
+    }
+    if (!b.trim()) {
+      if (akhir && akhir.jenis !== 'kosong') blok.push({ jenis: 'kosong' });
+      continue;
+    }
+    // Baris lanjutan item daftar (menjorok) digabung ke item terakhir.
+    if (/^\s{2,}\S/.test(b) && (akhir?.jenis === 'ul' || akhir?.jenis === 'ol')) {
+      akhir.isi[akhir.isi.length - 1].teks += ' ' + b.trim();
+      continue;
+    }
+    if (akhir?.jenis === 'p') akhir.isi.push(b);
+    else blok.push({ jenis: 'p', isi: [b] });
   }
-  return blok.map((b, i) =>
-    b.jenis === 'h' ? (
-      <p key={i} className="ai-judul"><Tebal teks={b.isi[0]} /></p>
-    ) : b.jenis === 'p' ? (
-      b.isi[0].trim() ? <p key={i}><Tebal teks={b.isi[0]} /></p> : null
-    ) : b.jenis === 'ul' ? (
-      <ul key={i}>{b.isi.map((x, j) => <li key={j}><Tebal teks={x} /></li>)}</ul>
-    ) : (
-      <ol key={i}>{b.isi.map((x, j) => <li key={j}><Tebal teks={x} /></li>)}</ol>
-    )
-  );
+  return blok;
+}
+function TeksAi({ teks }) {
+  return susunBlok(teks).map((b, i) => {
+    switch (b.jenis) {
+      case 'h':
+        return <p key={i} className={`ai-judul ai-judul-${Math.min(b.level, 3)}`}><Inline teks={b.isi} /></p>;
+      case 'p':
+        return <p key={i}>{b.isi.map((x, j) => <span key={j}>{j > 0 && <br />}<Inline teks={x} /></span>)}</p>;
+      case 'ul':
+      case 'ol':
+        return (
+          <div key={i} className={`ai-daftar ${b.jenis}`}>
+            {b.isi.map((x, j) => (
+              <div key={j} className="ai-butir" style={{ '--tingkat': x.tingkat }}>
+                <span className="ai-penanda" aria-hidden="true">{b.jenis === 'ol' && x.tingkat === 0 ? `${x.nomor || j + 1}.` : x.tingkat ? '◦' : '■'}</span>
+                <span><Inline teks={x.teks} /></span>
+              </div>
+            ))}
+          </div>
+        );
+      case 'kutip':
+        return <blockquote key={i}>{b.isi.map((x, j) => <span key={j}>{j > 0 && <br />}<Inline teks={x} /></span>)}</blockquote>;
+      case 'kode':
+        return <pre key={i} className="ai-kode"><code>{b.isi}</code></pre>;
+      case 'tabel':
+        return (
+          <div key={i} className="ai-tabel-bungkus">
+            <table className="ai-tabel">
+              <thead><tr>{b.kepala.map((x, j) => <th key={j}><Inline teks={x} /></th>)}</tr></thead>
+              <tbody>{b.isi.map((r, j) => <tr key={j}>{b.kepala.map((_, k) => <td key={k}><Inline teks={r[k] ?? ''} /></td>)}</tr>)}</tbody>
+            </table>
+          </div>
+        );
+      case 'garis':
+        return <hr key={i} />;
+      default:
+        return null;
+    }
+  });
 }
 
 // Lampiran file dari AI: dibuka/diunduh langsung dari server pakai sesi login (file Artifact lewat link sementara).
@@ -111,53 +181,316 @@ function Lampiran({ api, l, onError }) {
   );
 }
 
+const jamTeks = (t) => (t ? new Date(t).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '');
+function waktuRelatif(t) {
+  const d = new Date(t);
+  const hariIni = new Date();
+  const selisih = Math.floor((new Date(hariIni.toDateString()) - new Date(d.toDateString())) / 86400000);
+  if (selisih <= 0) return jamTeks(t);
+  if (selisih === 1) return 'Kemarin';
+  if (selisih < 7) return d.toLocaleDateString('id-ID', { weekday: 'long' });
+  return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: d.getFullYear() === hariIni.getFullYear() ? undefined : 'numeric' });
+}
+function grupWaktu(t) {
+  const selisih = Math.floor((new Date(new Date().toDateString()) - new Date(new Date(t).toDateString())) / 86400000);
+  return selisih <= 0 ? 'Hari ini' : selisih === 1 ? 'Kemarin' : selisih < 7 ? '7 hari terakhir' : selisih < 30 ? '30 hari terakhir' : 'Lebih lama';
+}
+
+function Salin({ teks }) {
+  const [ok, setOk] = useState(false);
+  return (
+    <button
+      type="button"
+      className="ai-mini"
+      onClick={() => navigator.clipboard?.writeText(teks).then(() => { setOk(true); setTimeout(() => setOk(false), 1500); }, () => {})}
+    >
+      {ok ? 'Tersalin' : 'Salin'}
+    </button>
+  );
+}
+
+function ItemRiwayat({ c, aktif, onBuka, onGanti, onHapus, kunci }) {
+  const [edit, setEdit] = useState(false);
+  const [judul, setJudul] = useState(c.judul);
+  const [yakin, setYakin] = useState(false);
+  if (edit)
+    return (
+      <form
+        className="ai-riwayat-item edit"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (judul.trim() && judul.trim() !== c.judul) await onGanti(c.id, judul.trim());
+          setEdit(false);
+        }}
+      >
+        <input autoFocus value={judul} maxLength={80} onChange={(e) => setJudul(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && (setJudul(c.judul), setEdit(false))} aria-label="Nama chat" />
+        <button type="submit" className="ai-mini">Simpan</button>
+      </form>
+    );
+  return (
+    <div className={`ai-riwayat-item${aktif ? ' aktif' : ''}`}>
+      <button type="button" className="ai-riwayat-buka" onClick={() => onBuka(c.id)} disabled={kunci} aria-current={aktif ? 'true' : undefined}>
+        <b>{c.judul}</b>
+        <small>{waktuRelatif(c.diubah)} · {c.jumlah} pesan</small>
+      </button>
+      {yakin ? (
+        <span className="ai-riwayat-aksi tampil">
+          <button type="button" className="ai-mini bahaya" onClick={() => onHapus(c.id)} disabled={kunci}>Hapus</button>
+          <button type="button" className="ai-mini" onClick={() => setYakin(false)}>Batal</button>
+        </span>
+      ) : (
+        <span className="ai-riwayat-aksi">
+          <button type="button" className="ai-mini" onClick={() => { setJudul(c.judul); setEdit(true); }} aria-label={`Ganti nama ${c.judul}`}>Ubah</button>
+          <button type="button" className="ai-mini" onClick={() => setYakin(true)} aria-label={`Hapus ${c.judul}`} disabled={kunci}>Hapus</button>
+        </span>
+      )}
+    </div>
+  );
+}
+
+const SARAN = [
+  ['Ringkas bisnis', 'Ringkas kondisi bisnis dari dashboard'],
+  ['Follow-up leads', 'Tampilkan leads yang perlu follow-up'],
+  ['Rekrutmen', 'Siapa aja kandidat rekrutmen yang perlu aksi aku?'],
+  ['Kirim file', 'Kirimin CV kandidat terbaru'],
+];
+
 export default function AiChat({ api }) {
   const [status, setStatus] = useState(null);
+  const [riwayat, setRiwayat] = useState([]);
+  const [cari, setCari] = useState('');
+  const [laci, setLaci] = useState(false);
   const [messages, setMessages] = useState([]);
   const [sessionId, setSessionId] = useState(null);
+  const [judul, setJudul] = useState('');
   const [pending, setPending] = useState(null);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  const [memuat, setMemuat] = useState(false);
   const [error, setError] = useState('');
-  const end = useRef(null);
+  const kotak = useRef(null);
+  const teks = useRef(null);
   const lock = useRef(false);
   const [versiStatus, setVersiStatus] = useState(0);
-  useEffect(() => { let active = true; api('GET', '/ai/status').then(r => active && setStatus(r)).catch(e => active && setError(e.message)); return () => { active = false; }; }, [api, versiStatus]);
-  useEffect(() => { end.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, [messages, pending, busy]);
-  async function send(e) {
-    e.preventDefault();
-    if (lock.current || pending || !input.trim()) return;
-    const text = input.trim();
+
+  useEffect(() => {
+    let active = true;
+    api('GET', '/ai/status').then((r) => active && setStatus(r)).catch((e) => active && setError(e.message));
+    return () => { active = false; };
+  }, [api, versiStatus]);
+  const muatRiwayat = useCallback(
+    (q = '') => api('GET', `/ai/riwayat${q ? `?q=${encodeURIComponent(q)}` : ''}`).then(setRiwayat).catch(() => {}),
+    [api]
+  );
+  useEffect(() => {
+    const t = setTimeout(() => muatRiwayat(cari.trim()), cari ? 250 : 0);
+    return () => clearTimeout(t);
+  }, [cari, muatRiwayat]);
+  useEffect(() => {
+    const el = kotak.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [messages, pending, busy]);
+  useEffect(() => {
+    const el = teks.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+  }, [input]);
+
+  function chatBaru() {
+    if (lock.current) return;
+    setMessages([]); setSessionId(null); setJudul(''); setPending(null); setError(''); setLaci(false);
+    teks.current?.focus();
+  }
+  async function bukaChat(id) {
+    if (lock.current) return;
+    setLaci(false);
+    if (id === sessionId) return;
+    setMemuat(true); setError(''); setPending(null);
+    try {
+      const r = await api('GET', `/ai/riwayat/${id}`);
+      setSessionId(r.id); setJudul(r.judul);
+      setMessages(r.pesan.map((m) => ({ role: m.peran === 'user' ? 'user' : 'assistant', text: m.isi || '', lampiran: m.lampiran || [], waktu: m.created_at })));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setMemuat(false);
+    }
+  }
+  async function gantiNama(id, j) {
+    try {
+      await api('PATCH', `/ai/riwayat/${id}`, { judul: j });
+      if (id === sessionId) setJudul(j);
+      muatRiwayat(cari.trim());
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+  async function hapus(id) {
+    try {
+      await api('DELETE', `/ai/riwayat/${id}`);
+      if (id === sessionId) chatBaru();
+      setRiwayat((x) => x.filter((c) => c.id !== id));
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function kirim(text) {
+    if (lock.current || pending || !text.trim()) return;
+    text = text.trim();
     lock.current = true; setBusy(true); setError(''); setInput('');
-    setMessages(m => [...m, { role: 'user', text }]);
+    setMessages((m) => [...m, { role: 'user', text, waktu: new Date().toISOString() }]);
     try {
       const r = await api('POST', '/ai/chat', { sessionId, message: text });
+      if (!sessionId) setJudul(text.replace(/\s+/g, ' ').slice(0, 60));
       setSessionId(r.sessionId); setPending(r.pending || null);
-      setMessages(m => [...m, { role: 'assistant', text: r.message, lampiran: r.lampiran || [] }]);
-    } catch (e) { setError(e.message); setInput(text); }
-    finally { lock.current = false; setBusy(false); setVersiStatus(v => v + 1); }
+      setMessages((m) => [...m, { role: 'assistant', text: r.message, lampiran: r.lampiran || [], waktu: new Date().toISOString() }]);
+    } catch (e) {
+      setError(e.message); setInput(text);
+      setMessages((m) => (m[m.length - 1]?.text === text ? m.slice(0, -1) : m));
+    } finally {
+      lock.current = false; setBusy(false); setVersiStatus((v) => v + 1); muatRiwayat(cari.trim());
+    }
   }
   async function decide(approve) {
     if (lock.current) return;
     lock.current = true; setBusy(true); setError('');
     try {
       const r = await api('POST', '/ai/action', { sessionId, actionId: pending.id, approve });
-      setPending(null); setMessages(m => [...m, { role: 'assistant', text: r.message }]);
-    } catch (e) { setError(e.message); if ([404, 409].includes(e.status)) setPending(null); }
-    finally { lock.current = false; setBusy(false); }
+      setPending(null);
+      setMessages((m) => [...m, { role: 'assistant', text: r.message, waktu: new Date().toISOString() }]);
+    } catch (e) {
+      setError(e.message);
+      if ([404, 409].includes(e.status)) setPending(null);
+    } finally {
+      lock.current = false; setBusy(false); muatRiwayat(cari.trim());
+    }
   }
-  return <section className="ai-chat">
-    <div className="ai-heading"><div><span className="adm-mono">ASISTEN WORKSPACE</span><h1>AI Chat</h1><p>Baca data, cek kondisi bisnis, dan jalankan pekerjaan dari satu percakapan.</p></div>
-      <button type="button" disabled={busy || Boolean(pending)} onClick={() => { setMessages([]); setSessionId(null); setError(''); }}>Chat baru</button></div>
-    <p className="ai-info">{status ? status.aktif ? `Terhubung · ${status.model}${status.cadangan?.length ? ` (+${status.cadangan.length} cadangan)` : ''} · Akses mengikuti akunmu${status.jatah?.batasPesan > 0 ? ` · Sisa hari ini ${Math.max(0, status.jatah.batasPesan - status.jatah.pesan)}/${status.jatah.batasPesan} pesan` : ''}` : 'AI belum aktif. Isi OPENROUTER_API_KEY di konfigurasi server.' : 'Memeriksa koneksi…'}</p>
-    <div className="ai-messages" role="log" aria-label="Percakapan AI" aria-live="polite" aria-busy={busy}>
-      {!messages.length && <div className="ai-welcome"><h2>Mau dibantu apa?</h2><p>Data yang dibutuhkan untuk menjawab dikirim ke OpenRouter. Perubahan data ditampilkan untuk ditinjau sebelum dijalankan.</p>
-        <div className="ai-suggestions">{['Ringkas kondisi bisnis dari dashboard', 'Tampilkan leads yang perlu follow-up', 'Siapa aja kandidat rekrutmen yang perlu aksi aku?', 'Kirimin CV kandidat terbaru'].map(t => <button key={t} onClick={() => setInput(t)}>{t}</button>)}</div></div>}
-      {messages.map((m, i) => <article className={`ai-message ${m.role}`} key={i}><b>{m.role === 'user' ? 'Kamu' : 'Makalin AI'}</b><div className={m.role === 'user' ? '' : 'ai-teks'}>{m.role === 'user' ? m.text : <TeksAi teks={m.text} />}</div>{m.lampiran?.length > 0 && <div className="ai-lampiran-daftar">{m.lampiran.map(l => <Lampiran key={l.path} api={api} l={l} onError={setError} />)}</div>}</article>)}
-      {pending && <div className="ai-action"><h3>Tinjau tindakan</h3><p>{pending.ringkasan}</p><p className="adm-mono">{pending.method} {pending.path}</p><pre>{JSON.stringify(pending.body, null, 2)}</pre><p>Jalankan hanya jika target dan isi perubahan sudah sesuai.</p><div className="ai-actions"><button disabled={busy} onClick={() => decide(true)}>Jalankan tindakan</button><button disabled={busy} onClick={() => decide(false)}>Batalkan</button></div></div>}
-      {busy && <p role="status">AI sedang memproses…</p>}<div ref={end} />
-    </div>
-    {error && <p className="mk-error" role="alert">{error}</p>}
-    <form className="ai-composer" onSubmit={send}><label htmlFor="ai-message">Pesan untuk AI</label><textarea id="ai-message" maxLength={6000} rows={3} value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }} disabled={busy || Boolean(pending) || !status?.aktif} placeholder="Contoh: cari lead Warung Bu Siti dan catat hasil follow-up…" /><div><small>Enter kirim · Shift+Enter baris baru · percakapan hilang setelah 30 menit nggak aktif.</small><button type="submit" disabled={busy || Boolean(pending) || !status?.aktif || !input.trim()}>Kirim</button></div></form>
-  </section>;
+
+  const sisa = status?.jatah?.batasPesan > 0 ? Math.max(0, status.jatah.batasPesan - status.jatah.pesan) : null;
+  const kunci = busy || memuat;
+  const grup = [];
+  for (const c of riwayat) {
+    const g = grupWaktu(c.diubah);
+    if (grup[grup.length - 1]?.g !== g) grup.push({ g, isi: [] });
+    grup[grup.length - 1].isi.push(c);
+  }
+
+  return (
+    <section className="ai-chat">
+      {laci && <div className="ai-latar" onClick={() => setLaci(false)} aria-hidden="true" />}
+      <aside className={`ai-samping${laci ? ' buka' : ''}`} aria-label="Riwayat chat">
+        <button type="button" className="ai-baru" onClick={chatBaru} disabled={kunci}>+ Chat baru</button>
+        <input className="ai-cari" type="search" value={cari} onChange={(e) => setCari(e.target.value)} placeholder="Cari riwayat…" aria-label="Cari riwayat chat" />
+        <div className="ai-riwayat">
+          {!riwayat.length && <p className="ai-kosong">{cari ? 'Nggak ada chat yang cocok.' : 'Belum ada riwayat. Chat yang kamu mulai bakal tersimpan di sini.'}</p>}
+          {grup.map((g) => (
+            <div key={g.g} className="ai-riwayat-grup">
+              <p className="ai-grup-label">{g.g}</p>
+              {g.isi.map((c) => (
+                <ItemRiwayat key={c.id + c.judul} c={c} aktif={c.id === sessionId} onBuka={bukaChat} onGanti={gantiNama} onHapus={hapus} kunci={kunci} />
+              ))}
+            </div>
+          ))}
+        </div>
+        <p className="ai-samping-kaki">Riwayat cuma kelihatan buat akunmu · disimpan 180 hari</p>
+      </aside>
+
+      <div className="ai-panel">
+        <header className="ai-kepala">
+          <button type="button" className="ai-tombol-riwayat" onClick={() => setLaci(true)} aria-label="Buka riwayat chat">Riwayat</button>
+          <div className="ai-kepala-judul">
+            <span className="adm-mono">MAKALIN AI</span>
+            <h1>{judul || 'Chat baru'}</h1>
+          </div>
+          <div className="ai-kepala-status">
+            <span className={`ai-titik${status?.aktif ? ' on' : ''}`} aria-hidden="true" />
+            <span className="ai-model" title={status?.cadangan?.length ? `Cadangan: ${status.cadangan.join(', ')}` : undefined}>
+              {status ? (status.aktif ? `${status.model.replace(/:free$/, '')}${status.cadangan?.length ? ` +${status.cadangan.length}` : ''}` : 'AI belum aktif') : 'Memeriksa…'}
+            </span>
+            {sisa !== null && <span className={`ai-sisa${sisa <= 5 ? ' tipis' : ''}`}>{sisa}/{status.jatah.batasPesan} pesan</span>}
+          </div>
+        </header>
+
+        <div className="ai-pesan" ref={kotak} role="log" aria-label="Percakapan AI" aria-live="polite" aria-busy={busy || memuat}>
+          {memuat ? (
+            <p className="ai-kosong tengah">Memuat percakapan…</p>
+          ) : !messages.length ? (
+            <div className="ai-sambutan">
+              <div className="ai-logo" aria-hidden="true">AI</div>
+              <h2>Mau dibantu apa hari ini?</h2>
+              <p>Tanya data leads, rekrutmen, karyawan, bagi hasil, atau minta file. Perubahan data selalu ditampilkan dulu buat kamu setujui.</p>
+              <div className="ai-saran">
+                {SARAN.map(([j, t]) => (
+                  <button key={t} type="button" onClick={() => kirim(t)} disabled={kunci || !status?.aktif}>
+                    <b>{j}</b>
+                    <span>{t}</span>
+                  </button>
+                ))}
+              </div>
+              {status && !status.aktif && <p className="adm-error">AI belum aktif. Isi OPENROUTER_API_KEY di konfigurasi server.</p>}
+            </div>
+          ) : (
+            messages.map((m, i) => (
+              <article className={`ai-bubble-baris ${m.role}`} key={i}>
+                {m.role !== 'user' && <div className="ai-avatar" aria-hidden="true">AI</div>}
+                <div className="ai-bubble">
+                  <div className="ai-bubble-isi">{m.role === 'user' ? <p className="ai-teks-user">{m.text}</p> : <div className="ai-teks"><TeksAi teks={m.text} /></div>}</div>
+                  {m.lampiran?.length > 0 && (
+                    <div className="ai-lampiran-daftar">{m.lampiran.map((l) => <Lampiran key={l.path} api={api} l={l} onError={setError} />)}</div>
+                  )}
+                  <div className="ai-bubble-kaki">
+                    <span>{m.role === 'user' ? 'Kamu' : 'Makalin AI'}{m.waktu ? ` · ${jamTeks(m.waktu)}` : ''}</span>
+                    {m.role !== 'user' && m.text && <Salin teks={m.text} />}
+                  </div>
+                </div>
+              </article>
+            ))
+          )}
+          {pending && (
+            <div className="ai-tindakan">
+              <p className="ai-tindakan-label">PERLU PERSETUJUAN</p>
+              <p className="ai-tindakan-ringkas">{pending.ringkasan}</p>
+              <p className="adm-mono">{pending.method} {pending.path}</p>
+              {pending.body && Object.keys(pending.body).length > 0 && (
+                <details>
+                  <summary>Lihat isi perubahan</summary>
+                  <pre>{JSON.stringify(pending.body, null, 2)}</pre>
+                </details>
+              )}
+              <div className="ai-tindakan-tombol">
+                <button type="button" className="utama" disabled={busy} onClick={() => decide(true)}>Jalankan</button>
+                <button type="button" disabled={busy} onClick={() => decide(false)}>Batalkan</button>
+              </div>
+            </div>
+          )}
+          {busy && (
+            <div className="ai-bubble-baris assistant" role="status">
+              <div className="ai-avatar" aria-hidden="true">AI</div>
+              <div className="ai-bubble ai-mengetik"><span /><span /><span /><em>Lagi mikir…</em></div>
+            </div>
+          )}
+        </div>
+
+        {error && <p className="ai-galat" role="alert">{error}<button type="button" className="ai-mini" onClick={() => setError('')}>Tutup</button></p>}
+        <form className="ai-tulis" onSubmit={(e) => { e.preventDefault(); kirim(input); }}>
+          <label htmlFor="ai-message" className="sr-only">Pesan untuk AI</label>
+          <textarea
+            id="ai-message"
+            ref={teks}
+            maxLength={6000}
+            rows={1}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }}
+            disabled={kunci || Boolean(pending) || !status?.aktif}
+            placeholder={pending ? 'Setujui atau batalkan tindakan dulu…' : 'Tanya soal data Makalin…'}
+          />
+          <button type="submit" disabled={kunci || Boolean(pending) || !status?.aktif || !input.trim()} aria-label="Kirim">Kirim</button>
+        </form>
+        <p className="ai-catatan">Enter kirim · Shift+Enter baris baru · data yang diperlukan dikirim ke OpenRouter (data pribadi disaring)</p>
+      </div>
+    </section>
+  );
 }
