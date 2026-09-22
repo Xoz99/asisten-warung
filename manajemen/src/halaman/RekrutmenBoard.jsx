@@ -748,19 +748,46 @@ function Meter({ judul, n, catatan, lewat }) {
   );
 }
 
-const PERTANYAAN_PRODUK = [
-  'Jelasin fitur utama aplikasinya dalam 1 menit, anggap aku pemilik warung.',
-  'Pemilik warung bilang "saya udah pakai buku catatan". Kamu jawab apa?',
-  'Kalau 1 warung langganan bulanan, bagi hasil kamu berapa dan kapan cair?',
-];
-function LangkahInterview({ l, alur, kirim }) {
-  const [nilai, setNilai] = useState({});
-  const [alasan, setAlasan] = useState('');
+// Lembar interview: disusun otomatis (pertanyaan product + pertanyaan gali dari analisis), lalu bisa diubah admin mana aja.
+// Tiap perubahan (nilai, teks, tambah/hapus) kesimpen otomatis ke server, jadi admin/dirut lain lihat lembar yang sama.
+function lembarAwal(alur) {
+  if (alur.lembar?.soal?.length) return alur.lembar.soal;
   const a = alur.analisis;
   const gali = [...a.items.filter((i) => i.gali).map((i) => i.gali), ...(a.wajib.find((w) => w.catatan) ? ['Kamu pilih skema lain. Skema seperti apa yang kamu mau?'] : [])];
-  const soal = [...PERTANYAAN_PRODUK.map((q) => ['produk', q]), ...gali.map((q) => ['gali', q])];
-  const dinilai = Object.values(nilai);
-  const rata = dinilai.length ? (dinilai.reduce((x, y) => x + y, 0) / dinilai.length).toFixed(1) : '–';
+  return [...(alur.pertanyaanProduk || []).map((q) => ({ jenis: 'produk', q, nilai: null })), ...gali.map((q) => ({ jenis: 'gali', q, nilai: null }))];
+}
+const NAMA_JENIS = { produk: 'Product', gali: 'Gali', tambahan: 'Tambahan' };
+function LangkahInterview({ api, l, alur, kirim }) {
+  const [soal, setSoal] = useState(() => lembarAwal(alur));
+  const [simpan, setSimpan] = useState(alur.lembar ? { oleh: alur.lembar.diubah_oleh, at: alur.lembar.diubah_at } : null);
+  const [status, setStatus] = useState(''); // '' | 'nyimpen' | 'gagal'
+  const [edit, setEdit] = useState(null); // index yang lagi diedit
+  const [teksEdit, setTeksEdit] = useState('');
+  const [baru, setBaru] = useState('');
+  const [alasan, setAlasan] = useState('');
+  const kotor = useRef(false);
+  useEffect(() => {
+    if (!kotor.current) return;
+    setStatus('nyimpen');
+    const t = setTimeout(async () => {
+      try {
+        const r = await api('PUT', `/rekrutmen/lamaran/${l.id}/lembar-interview`, { soal });
+        setSimpan({ oleh: r.diubah_oleh, at: r.diubah_at });
+        setStatus('');
+      } catch {
+        setStatus('gagal');
+      }
+    }, 700);
+    return () => clearTimeout(t);
+  }, [api, l.id, soal]);
+  const ubah = (fn) => {
+    kotor.current = true;
+    setSoal(fn);
+  };
+  const beriNilai = (i, n) => ubah((x) => x.map((s, k) => (k === i ? { ...s, nilai: s.nilai === n ? null : n } : s)));
+  const dinilai = soal.filter((s) => s.nilai);
+  const rata = dinilai.length ? (dinilai.reduce((x, s) => x + s.nilai, 0) / dinilai.length).toFixed(1) : '–';
+  const nilai = Object.fromEntries(dinilai.map((s) => [s.q, s.nilai]));
   return (
     <>
       {!alur.jadwal ? (
@@ -786,17 +813,48 @@ function LangkahInterview({ l, alur, kirim }) {
           </div>
         </div>
       )}
-      <p className="adm-label" style={{ fontSize: 10, margin: '12px 0 6px' }}>
-        Lembar interview (otomatis dari analisis) · nilai 1-5
-      </p>
+      <div className="rk-lembar-kepala">
+        <span className="adm-label" style={{ fontSize: 10 }}>
+          Lembar interview · nilai 1-5
+        </span>
+        <span className={'rk-simpan' + (status === 'gagal' ? ' gagal' : '')} role="status">
+          {status === 'nyimpen' ? 'Nyimpen…' : status === 'gagal' ? 'Gagal nyimpen - coba ubah lagi' : simpan ? `Tersimpan · ${simpan.oleh}, ${waktu(simpan.at)}` : 'Otomatis dari analisis'}
+        </span>
+      </div>
       <div className="rk-soal">
-        {soal.map(([jenis, q]) => (
-          <div key={q}>
-            <span className={`rk-tag ${jenis}`}>{jenis === 'produk' ? 'Product' : 'Gali'}</span>
-            {q}
+        {soal.map((s, i) => (
+          <div key={i}>
+            <div className="rk-soal-atas">
+              <span className={`rk-tag ${s.jenis}`}>{NAMA_JENIS[s.jenis] || 'Tambahan'}</span>
+              {edit === i ? (
+                <form
+                  className="rk-soal-edit"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const q = teksEdit.trim();
+                    if (q) ubah((x) => x.map((y, k) => (k === i ? { ...y, q } : y)));
+                    setEdit(null);
+                  }}
+                >
+                  <textarea value={teksEdit} onChange={(e) => setTeksEdit(e.target.value)} rows={2} maxLength={300} autoFocus aria-label="Teks pertanyaan" />
+                  <span>
+                    <button className="btn kecil utama" type="submit">Simpan</button>
+                    <button className="btn kecil" type="button" onClick={() => setEdit(null)}>Batal</button>
+                  </span>
+                </form>
+              ) : (
+                <span className="rk-soal-teks">{s.q}</span>
+              )}
+              {edit !== i && (
+                <span className="rk-soal-aksi">
+                  <button type="button" onClick={() => (setEdit(i), setTeksEdit(s.q))} aria-label="Ubah pertanyaan" title="Ubah pertanyaan">Ubah</button>
+                  <button type="button" onClick={() => window.confirm('Hapus pertanyaan ini dari lembar?') && ubah((x) => x.filter((_, k) => k !== i))} aria-label="Hapus pertanyaan" title="Hapus pertanyaan">×</button>
+                </span>
+              )}
+            </div>
             <span className="rk-nilai" role="group" aria-label="Nilai">
               {[1, 2, 3, 4, 5].map((n) => (
-                <button key={n} aria-pressed={nilai[q] === n} onClick={() => setNilai((x) => ({ ...x, [q]: n }))}>
+                <button key={n} type="button" aria-pressed={s.nilai === n} onClick={() => beriNilai(i, n)}>
                   {n}
                 </button>
               ))}
@@ -804,8 +862,23 @@ function LangkahInterview({ l, alur, kirim }) {
           </div>
         ))}
       </div>
+      <form
+        className="rk-soal-tambah"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const q = baru.trim();
+          if (!q || soal.length >= 20) return;
+          ubah((x) => [...x, { jenis: 'tambahan', q, nilai: null }]);
+          setBaru('');
+        }}
+      >
+        <input className="adm-input" value={baru} onChange={(e) => setBaru(e.target.value)} maxLength={300} placeholder="Tambah pertanyaan sendiri…" aria-label="Pertanyaan tambahan" />
+        <button className="btn kecil" type="submit" disabled={!baru.trim() || soal.length >= 20}>
+          + Tambah
+        </button>
+      </form>
       <p className="adm-redup" style={{ fontSize: 13 }}>
-        Rata-rata <b>{rata}</b> dari {dinilai.length}/{soal.length} pertanyaan dinilai
+        Rata-rata <b>{rata}</b> dari {dinilai.length}/{soal.length} pertanyaan dinilai · klik nilai yang sama buat ngosongin
       </p>
       <input className="adm-input" value={alasan} onChange={(e) => setAlasan(e.target.value)} placeholder="Alasan keputusan (wajib)" aria-label="Alasan keputusan interview" />
       <div className="adm-tombol">
@@ -1045,6 +1118,7 @@ export function KuisMateri({ api }) {
           </ol>
         </section>
       </div>
+      <PertanyaanInterview api={api} />
       <TemplateWa api={api} onBerubah={muat} />
       {edit?.jenis === 'materi' && <FormMateri api={api} awal={edit.awal} onTutup={() => setEdit(null)} onSelesai={() => (setEdit(null), muat())} />}
       {edit?.jenis === 'soal' && <FormSoal api={api} awal={edit.awal} onTutup={() => setEdit(null)} onSelesai={() => (setEdit(null), muat())} />}
@@ -1053,6 +1127,56 @@ export function KuisMateri({ api }) {
 }
 
 // ---- Template pesan WA (bisa diedit semua admin) ----
+// Pertanyaan product bawaan di lembar interview (pertanyaan gali tetap otomatis dari analisis lamaran).
+function PertanyaanInterview({ api }) {
+  const [data, setData] = useState(null);
+  const [isi, setIsi] = useState('');
+  const [pesan, setPesan] = useState('');
+  const [sibuk, setSibuk] = useState(false);
+  const muat = useCallback(() => api('GET', '/rekrutmen/pertanyaan-interview').then((d) => (setData(d), setIsi(d.pertanyaan.join('\n')))), [api]);
+  useEffect(() => {
+    muat().catch((e) => setPesan('Gagal: ' + e.message));
+  }, [muat]);
+  const jalan = async (fn, ok) => {
+    setSibuk(true);
+    setPesan('');
+    try {
+      await fn();
+      await muat();
+      setPesan(ok);
+    } catch (e) {
+      setPesan('Gagal: ' + e.message);
+    } finally {
+      setSibuk(false);
+    }
+  };
+  const daftar = isi.split('\n').map((x) => x.trim()).filter(Boolean);
+  const berubah = data && daftar.join('\n') !== data.pertanyaan.join('\n');
+  return (
+    <section className="adm-kartu" style={{ marginTop: 20 }}>
+      <div className="adm-kartu-kepala" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+        <h2 style={{ margin: 0 }}>Pertanyaan interview (product)</h2>
+        {data?.diubah && <span className="adm-redup">Diubah {data.diubah_oleh}, {waktu(data.diubah_at)}</span>}
+      </div>
+      <p className="adm-redup" style={{ marginTop: 0 }}>
+        Satu pertanyaan per baris (maks 10). Masuk otomatis ke lembar interview kandidat baru, ditambah pertanyaan gali dari analisis lamarannya. Lembar yang udah pernah diisi nggak ikut berubah.
+      </p>
+      <textarea className="adm-input" rows={Math.max(4, daftar.length + 1)} value={isi} onChange={(e) => setIsi(e.target.value)} aria-label="Pertanyaan interview product" style={{ width: '100%', resize: 'vertical' }} />
+      {pesan && <p className={pesan.startsWith('Gagal') ? 'adm-error' : 'adm-ok'}>{pesan}</p>}
+      <div className="adm-tombol">
+        <button className="btn utama kecil" disabled={sibuk || !berubah || !daftar.length} onClick={() => jalan(() => api('PUT', '/rekrutmen/pertanyaan-interview', { pertanyaan: daftar }), 'Pertanyaan interview disimpan.')}>
+          Simpan
+        </button>
+        {data?.diubah && (
+          <button className="btn kecil" disabled={sibuk} onClick={() => window.confirm('Balikin ke pertanyaan bawaan?') && jalan(() => api('DELETE', '/rekrutmen/pertanyaan-interview'), 'Balik ke pertanyaan bawaan.')}>
+            Pakai bawaan
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function TemplateWa({ api, onBerubah }) {
   const { data, error, muat } = useData(api, '/rekrutmen/template');
   if (error) return <Gagal apa="template WA" pesan={error} onUlang={muat} />;

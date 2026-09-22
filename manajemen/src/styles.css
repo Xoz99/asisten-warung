@@ -903,6 +903,21 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 .rk-tag.produk{background:var(--biru);color:#fff;border-color:var(--biru)}
 .rk-tag.gali{background:var(--kuning)}
 .rk-nilai{display:flex;gap:4px;margin-top:6px}
+.rk-lembar-kepala{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin:12px 0 6px}
+.rk-simpan{font-size:11px;font-weight:700;color:var(--redup)}
+.rk-simpan.gagal{color:var(--merah)}
+.rk-soal-atas{display:flex;align-items:flex-start;gap:6px}
+.rk-soal-atas .rk-tag{flex:none;margin-top:2px}
+.rk-soal-teks{flex:1;min-width:0}
+.rk-soal-aksi{display:flex;gap:4px;flex:none;opacity:.55}
+.rk-soal>div:hover .rk-soal-aksi,.rk-soal-aksi:focus-within{opacity:1}
+.rk-soal-aksi button{border:1.5px solid var(--hitam);background:var(--putih);font-size:10px;font-weight:700;text-transform:uppercase;padding:1px 6px;cursor:pointer;line-height:1.5}
+.rk-soal-aksi button:hover{background:var(--kuning)}
+.rk-soal-edit{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0}
+.rk-soal-edit textarea{width:100%;border:var(--garis-tipis);padding:6px 8px;font:inherit;font-size:13.5px;resize:vertical}
+.rk-soal-edit span{display:flex;gap:6px}
+.rk-soal-tambah{display:flex;gap:6px;margin-top:8px}
+.rk-soal-tambah .adm-input{flex:1;min-width:0}
 .rk-nilai button{width:34px;height:32px;border:var(--garis-tipis);background:var(--putih);font-weight:700;cursor:pointer}
 .rk-nilai button[aria-pressed="true"]{background:var(--hitam);color:var(--putih)}
 .rk-seksi{border:var(--garis-tipis)}

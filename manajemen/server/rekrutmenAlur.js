@@ -41,6 +41,8 @@ function pastikan() {
       await query(`ALTER TABLE mj_lamaran ADD COLUMN IF NOT EXISTS materi_dikirim_at TIMESTAMPTZ, ADD COLUMN IF NOT EXISTS apk_at TIMESTAMPTZ,
         ADD COLUMN IF NOT EXISTS jadwal_link_at TIMESTAMPTZ, ADD COLUMN IF NOT EXISTS trial_mulai TIMESTAMPTZ,
         ADD COLUMN IF NOT EXISTS wp_sales_id UUID, ADD COLUMN IF NOT EXISTS trial_kode TEXT`);
+      // Lembar interview per kandidat (pertanyaan + nilai 1-5), disimpan bareng biar semua admin lihat & bisa ubah.
+      await query('ALTER TABLE mj_lamaran ADD COLUMN IF NOT EXISTS lembar_interview JSONB');
       await query(`CREATE TABLE IF NOT EXISTS mj_rek_token (
         token TEXT PRIMARY KEY, lamaran_id UUID NOT NULL REFERENCES mj_lamaran(id) ON DELETE CASCADE,
         jenis TEXT NOT NULL, aktif BOOLEAN NOT NULL DEFAULT true, dipakai_at TIMESTAMPTZ, created_at TIMESTAMPTZ DEFAULT now()
@@ -363,6 +365,18 @@ export const TEMPLATE = {
     isi: 'Halo {nama}, selamat kamu lulus interview. Trial lapangan mulai sekarang:\n• Kode sales kamu: {kode}\n• Link daftar buat warung: {link_referral}\n\nTarget: 3 warung daftar dalam 24 jam, lalu 3 warung bayar langganan dalam 6 hari. Semua kehitung otomatis kalau warungnya daftar pakai link atau kode kamu.',
   },
 };
+// Pertanyaan product di lembar interview. Bisa diganti admin (Rekrutmen -> Pengaturan), disimpan di mj_rek_template
+// dengan kunci 'interview_produk' (satu pertanyaan per baris).
+export const PERTANYAAN_PRODUK = [
+  'Jelasin fitur utama aplikasinya dalam 1 menit, anggap aku pemilik warung.',
+  'Pemilik warung bilang "saya udah pakai buku catatan". Kamu jawab apa?',
+  'Kalau 1 warung langganan bulanan, bagi hasil kamu berapa dan kapan cair?',
+];
+async function pertanyaanProduk() {
+  const t = await templateAktif();
+  const isi = t.interview_produk ? t.interview_produk.split('\n').map((x) => x.trim()).filter(Boolean) : [];
+  return isi.length ? isi : PERTANYAAN_PRODUK;
+}
 let cacheTemplate = null;
 async function templateAktif() {
   if (!cacheTemplate || Date.now() - cacheTemplate.at > 30000) {
@@ -435,6 +449,8 @@ router.get('/rekrutmen/lamaran/:id/alur', async (req, res, next) => {
       analisis: analisis(l),
       keadaan: keadaan(l, x),
       ...x,
+      lembar: l.lembar_interview || null,
+      pertanyaanProduk: await pertanyaanProduk(),
       link: { kuis: t.kuis ? linkKuis(t.kuis) : null, jadwal: t.jadwal ? linkJadwal(t.jadwal) : null, referral: l.trial_kode ? `${URL_WARUNG()}/?ref=${l.trial_kode}` : null },
       wa: {
         sapa: await pesan('sapa', { nama: depan(l.nama) }),
@@ -628,6 +644,63 @@ router.post('/rekrutmen/lamaran/:id/interview-hasil', async (req, res, next) => 
     }
     await catatLog(req, 'rekrutmen.attempt', { nama: pre[0].nama, tahap: 'interview', hasil });
     res.json({ ok: true, trial: sales ? { kode: sales.kode, teks: await teksTrial(pre[0].nama, sales.kode), hp: pre[0].no_hp } : null });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Lembar interview: simpan pertanyaan + nilai (draf bersama). Boleh diubah admin mana aja selama kandidat di Interview.
+router.put('/rekrutmen/lamaran/:id/lembar-interview', async (req, res, next) => {
+  try {
+    if (!POLA_UUID.test(req.params.id)) throw salah('Lamaran tidak ditemukan', 404);
+    const daftar = Array.isArray(req.body.soal) ? req.body.soal.slice(0, 20) : null;
+    if (!daftar) throw salah('Lembar interview nggak valid');
+    const soal = daftar
+      .map((x) => ({
+        jenis: ['produk', 'gali', 'tambahan'].includes(x?.jenis) ? x.jenis : 'tambahan',
+        q: teks(x?.q, 300),
+        nilai: Number.isInteger(x?.nilai) && x.nilai >= 1 && x.nilai <= 5 ? x.nilai : null,
+      }))
+      .filter((x) => x.q);
+    const lembar = { soal, diubah_oleh: req.admin.nama, diubah_at: new Date().toISOString() };
+    const { rows } = await query("UPDATE mj_lamaran SET lembar_interview=$2 WHERE id=$1 AND status='interview' RETURNING id", [req.params.id, JSON.stringify(lembar)]);
+    if (!rows.length) throw salah('Kandidat nggak lagi di tahap Interview', 409);
+    res.json(lembar);
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ---- Pertanyaan product bawaan di lembar interview ----
+router.get('/rekrutmen/pertanyaan-interview', async (req, res, next) => {
+  try {
+    const { rows } = await query("SELECT diubah_oleh, diubah_at FROM mj_rek_template WHERE kunci='interview_produk'");
+    res.json({ pertanyaan: await pertanyaanProduk(), bawaan: PERTANYAAN_PRODUK, diubah: !!rows.length, diubah_oleh: rows[0]?.diubah_oleh || null, diubah_at: rows[0]?.diubah_at || null });
+  } catch (e) {
+    next(e);
+  }
+});
+router.put('/rekrutmen/pertanyaan-interview', async (req, res, next) => {
+  try {
+    const daftar = (Array.isArray(req.body.pertanyaan) ? req.body.pertanyaan : []).map((x) => teks(x, 300)).filter(Boolean).slice(0, 10);
+    if (!daftar.length) throw salah('Minimal 1 pertanyaan');
+    await query(
+      "INSERT INTO mj_rek_template (kunci, isi, diubah_oleh, diubah_at) VALUES ('interview_produk',$1,$2,now()) ON CONFLICT (kunci) DO UPDATE SET isi=EXCLUDED.isi, diubah_oleh=EXCLUDED.diubah_oleh, diubah_at=now()",
+      [daftar.join('\n'), req.admin.nama]
+    );
+    cacheTemplate = null;
+    await catatLog(req, 'rekrutmen.template.ubah', { template: 'Pertanyaan interview (product)' });
+    res.json({ ok: true, pertanyaan: daftar });
+  } catch (e) {
+    next(e);
+  }
+});
+router.delete('/rekrutmen/pertanyaan-interview', async (req, res, next) => {
+  try {
+    await query("DELETE FROM mj_rek_template WHERE kunci='interview_produk'");
+    cacheTemplate = null;
+    await catatLog(req, 'rekrutmen.template.ubah', { template: 'Pertanyaan interview (product)', jadi: 'bawaan' });
+    res.json({ ok: true, pertanyaan: PERTANYAAN_PRODUK });
   } catch (e) {
     next(e);
   }
