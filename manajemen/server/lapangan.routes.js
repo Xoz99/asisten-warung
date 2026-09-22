@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { catatLog, query, pool } from './db.js';
 import { query as queryWp, pastikanTabelSales } from './produk/warung-pintar/db.js';
 import { pastikanTabelOps } from './ops.routes.js';
+import { sinkronWarungKeCrm } from './crmSinkron.js';
 import { normalisasiNoHp } from './utils/noHp.js';
 import { FAKTA_BUKU_BENAR, FAKTA_LAMA_SALAH, KAMUS, PENANDA_KAMUS } from './kamusKeberatan.js';
 
@@ -221,6 +222,7 @@ const LABEL_HASIL = { berhasil: 'Berhasil (daftar / trial)', tertarik: 'Tertarik
 
 router.get('/lapangan/crm-toko', async (req, res, next) => {
   try {
+    await sinkronWarungKeCrm();
     const { rows } = await query(
       `SELECT id, perusahaan AS nama, pic_nama, telepon, tahap FROM mj_lead WHERE pemilik_id=$1 ORDER BY updated_at DESC LIMIT 500`,
       [req.admin.id]
@@ -557,6 +559,7 @@ router.get('/lapangan/link', async (req, res, next) => {
 // NOT VERIFIED (NV-03): waktu bayar = waktu pembayaran dicatat lunas (updated_at), belum dari field Midtrans.
 router.get('/lapangan/toko', async (req, res, next) => {
   try {
+    sinkronWarungKeCrm(); // di belakang - halaman Toko nggak perlu nunggu
     let akun = req.admin;
     if (req.admin.peran !== 'sales') {
       if (!POLA_UUID.test(req.query.akun || '')) return res.json({ terhubung: false, pilihAkun: true });

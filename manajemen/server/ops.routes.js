@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { catatLog, query } from './db.js';
+import { sinkronWarungKeCrm } from './crmSinkron.js';
 import { pastikanTabelSales, pool as poolWp } from './produk/warung-pintar/db.js';
 
 // Makalin Ops tahap 1: dashboard gabungan, CRM leads manual, keuangan (Midtrans + catatan manual), notifikasi.
@@ -206,8 +207,17 @@ const URUTAN_LEAD = {
 };
 const RENTANG_NILAI = { kecil: [0, 10e6], sedang: [10e6, 100e6], besar: [100e6, null] };
 
+// Kartu yang dibikin otomatis dari toko (warung_id) dan dihapus admin jangan dibikin ulang sama sinkron.
+async function abaikanKartuOtomatis(ids) {
+  await query(
+    `INSERT INTO mj_crm_abaikan (warung_id) SELECT warung_id FROM mj_lead WHERE id = ANY($1::uuid[]) AND warung_id IS NOT NULL ON CONFLICT DO NOTHING`,
+    [ids]
+  ).catch(() => {}); // tabelnya dibikin sinkron; kalau belum ada, berarti belum ada kartu otomatis
+}
+
 router.get('/leads', async (req, res, next) => {
   try {
+    await sinkronWarungKeCrm(); // toko yang baru daftar lewat link/QR sales jadi kartu dulu
     const f = req.query;
     const tahap = TAHAP_CRM.includes(f.tahap) ? f.tahap : null;
     const status = ['jalan', 'menang', 'gagal', 'semua'].includes(f.status) ? f.status : 'jalan';
@@ -274,6 +284,7 @@ router.post('/leads/massal', async (req, res, next) => {
       if (!POLA_UUID.test(nilai || '')) return res.status(400).json({ error: 'Pilih admin yang ditugaskan' });
       n = (await query('UPDATE mj_lead SET pemilik_id=$2, updated_at=now() WHERE id = ANY($1)', [ids, nilai])).rowCount;
     } else if (aksi === 'hapus') {
+      await abaikanKartuOtomatis(ids);
       n = (await query('DELETE FROM mj_lead WHERE id = ANY($1)', [ids])).rowCount;
     } else {
       return res.status(400).json({ error: 'Aksi nggak dikenal' });
@@ -366,6 +377,7 @@ router.patch('/leads/:id', async (req, res, next) => {
 router.delete('/leads/:id', async (req, res, next) => {
   try {
     if (!POLA_UUID.test(req.params.id)) return res.status(404).json({ error: 'Lead tidak ditemukan' });
+    await abaikanKartuOtomatis([req.params.id]);
     const { rows } = await query('DELETE FROM mj_lead WHERE id=$1 RETURNING perusahaan', [req.params.id]);
     if (!rows.length) return res.status(404).json({ error: 'Lead tidak ditemukan' });
     await catatLog(req, 'ops.lead.hapus', { perusahaan: rows[0].perusahaan });
