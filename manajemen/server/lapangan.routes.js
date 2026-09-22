@@ -351,7 +351,7 @@ function bersihkanLog(b) {
 }
 
 // Foto bukti dikirim base64 (sudah dikecilin di HP). Jenis file dicek dari isi, bukan dari nama.
-function bacaFoto(d) {
+export function bacaFoto(d) {
   const m = /^data:([\w/+.-]+);base64,(.+)$/.exec(typeof d?.data === 'string' ? d.data : '');
   if (!m) throw salah('Foto nggak kebaca');
   const buf = Buffer.from(m[2], 'base64');

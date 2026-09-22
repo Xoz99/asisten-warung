@@ -4,6 +4,7 @@ import { Gagal, Konfirmasi, Kosong, Memuat, Modal, Tabs, useData } from '../komp
 import { bacaSesi } from '../lib/api.js';
 import { keWebp } from '../lib/gambar.js';
 import QRCode from 'qrcode';
+import TimSales from './TimSales.jsx';
 
 // Sales Lapangan: bank keberatan pelanggan + log kunjungan sales + insight. Akun peran sales cuma lihat punyanya sendiri.
 const tabsUntuk = (sales) => [
@@ -11,6 +12,7 @@ const tabsUntuk = (sales) => [
   { id: 'toko', nama: sales ? 'Toko saya' : 'Toko per sales' },
   { id: 'bank', nama: 'Bank keberatan' },
   { id: 'insight', nama: 'Insight' },
+  ...(sales ? [] : [{ id: 'tim', nama: 'Tim sales' }]),
 ];
 export const STATUS_TOKO = {
   langganan: { nama: 'Langganan aktif', warna: 'hijau' },
@@ -68,6 +70,7 @@ export default function Lapangan({ api, admin, tab }) {
       {aktif === 'toko' && <Toko api={api} sales={sales} />}
       {aktif === 'bank' && <Bank api={api} sales={sales} setPesan={setPesan} onPakai={(k) => setForm({ awal: { keberatan_id: k.id } })} />}
       {aktif === 'insight' && <Insight api={api} sales={sales} versi={versi} />}
+      {aktif === 'tim' && <TimSales api={api} />}
 
       {form && (
         <FormLog

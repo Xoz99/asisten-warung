@@ -34,6 +34,10 @@ export const NAMA_AKSI = {
   'admin.ubah_peran': 'ganti peran akun',
   'komisi.tutup': 'nutup bulan bagi hasil',
   'komisi.cairkan': 'nyairin bagi hasil sales',
+  'tim.sales.tambah': 'nambah sales (akun + kode + data karyawan)',
+  'tim.sales.ubah': 'ubah profil sales',
+  'tim.sales.cek_rekening': 'ngecek rekening sales',
+  'tim.profil.ubah': 'ubah profil sendiri (sales)',
   'admin.hubung_sales': 'nyambungin akun ke kode sales',
   'lapangan.keberatan.tambah': 'nambah keberatan di bank',
   'lapangan.keberatan.ubah': 'ubah keberatan di bank',
@@ -132,6 +136,9 @@ export default function Admin({ api, admin }) {
           <h2>Akun</h2>
           <p className="adm-redup" style={{ marginTop: 0 }}>
             Admin bisa buka semua halaman. Sales cuma bisa buka Sales Lapangan &amp; profilnya sendiri.
+          </p>
+          <p className="adm-redup" style={{ marginTop: 0 }}>
+            Mau nambah sales? Pakai <a href="#/lapangan/tim">Sales Lapangan → Tim sales</a> biar akun, kode referral, data karyawan, dan rekening pencairannya kebikin sekalian.
           </p>
           {!daftar ? (
             <p className="adm-sub">Memuat…</p>

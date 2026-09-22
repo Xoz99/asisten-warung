@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { bulanLabel, rupiah, tgl, waktu } from '../lib/format.js';
 import { Gagal, Konfirmasi, Kosong, Memuat, Modal, useData } from '../komponen/Ui.jsx';
+import { EWALLET, statusRekening } from '../lib/bank.js';
 
 // Bagi hasil Sales Partner (admin): estimasi bulan berjalan, tutup bulan (angka dikunci), cairkan tiap tanggal 5.
 // Aturan hitungnya di server/komisi.routes.js.
@@ -110,6 +111,11 @@ export default function BagiHasil({ api }) {
                     <b>{s.sales_nama || '-'}</b>
                     <div className="adm-mono adm-redup">{s.sales_kode}</div>
                     {s.susulan > 0 && <div className="adm-chip oranye">{s.susulan} pembayaran susulan</div>}
+                    {s.status !== 'dicairkan' && statusRekening(s.rekening).id !== 'siap' && (
+                      <div className={`adm-chip ${statusRekening(s.rekening).warna}`} style={{ marginTop: 4 }}>
+                        {statusRekening(s.rekening).nama}
+                      </div>
+                    )}
                   </td>
                   <td className="kanan p-num">{s.toko_baru}</td>
                   <td className="kanan p-num">{persen(s.rate_perpanjangan)}</td>
@@ -125,6 +131,7 @@ export default function BagiHasil({ api }) {
                         <div className="adm-redup">
                           {tgl(s.dicairkan_tanggal)} · {s.metode}
                         </div>
+                        {s.rekening_tujuan && <div className="adm-redup adm-mono">{s.rekening_tujuan}</div>}
                       </>
                     ) : s.status === 'ditutup' ? (
                       <span className="adm-chip kuning">Siap dicairkan</span>
@@ -261,16 +268,80 @@ function Rincian({ api, periode, s, onTutup }) {
 
 function Cairkan({ api, periode, s, jadwal, onTutup, onSelesai }) {
   const hariIni = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
-  const [isi, setIsi] = useState({ tanggal: hariIni < jadwal ? jadwal : hariIni, metode: '', catatan: '' });
+  const [rek, setRek] = useState(s.rekening);
+  const st = statusRekening(rek);
+  const metodeAwal = st.id === 'siap' ? (EWALLET.includes(rek.bank) ? rek.bank : `Transfer ${rek.bank}`) : '';
+  const [isi, setIsi] = useState({ tanggal: hariIni < jadwal ? jadwal : hariIni, metode: metodeAwal, catatan: '' });
   const [error, setError] = useState('');
   const [sibuk, setSibuk] = useState(false);
+  const [tersalin, setTersalin] = useState(false);
   const ubah = (k) => (e) => setIsi((x) => ({ ...x, [k]: e.target.value }));
   useEffect(() => setError(''), [isi]);
+  const tunai = /tunai|cash/i.test(isi.metode);
+  const tahan = !tunai && st.id !== 'siap';
   return (
     <Modal judul={`Cairkan bagi hasil ${s.sales_nama}`} onTutup={onTutup}>
       <p style={{ marginTop: 0 }}>
         {bulanLabel(periode, true)}: komisi {rupiah(s.bruto)} dikurangi pajak {rupiah(s.pajak)} = <b>{rupiah(s.neto)}</b>
       </p>
+      <div className={'adm-tim-rek' + (st.id === 'kosong' ? ' kosong' : '')} style={{ marginBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+          <span className="adm-label">Transfer ke</span>
+          <span className={`adm-chip ${st.warna}`}>{st.nama}</span>
+        </div>
+        {st.id === 'kosong' ? (
+          <span>
+            {rek ? `Kurang: ${rek.kurang.join(', ')}. ` : 'Kode sales ini belum nyambung ke akun sales. '}
+            Lengkapi di <a href="#/lapangan/tim">Sales Lapangan → Tim sales</a>, atau cairkan tunai.
+          </span>
+        ) : (
+          <>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <b className="adm-mono" style={{ fontSize: 18 }}>
+                {rek.bank} {rek.rekening}
+              </b>
+              <button
+                type="button"
+                className="btn kecil"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(rek.rekening);
+                    setTersalin(true);
+                  } catch {
+                    setTersalin(false);
+                  }
+                }}
+              >
+                {tersalin ? 'Tersalin ✓' : 'Salin nomor'}
+              </button>
+            </div>
+            <span>a.n. {rek.atas_nama}</span>
+            {st.id === 'cek' && (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 4 }}>
+                <span className="adm-redup" style={{ fontSize: 13 }}>
+                  Baru diganti {rek.rekening_diubah_oleh === 'sales sendiri' ? 'sama salesnya' : 'oleh ' + (rek.rekening_diubah_oleh || '-')} {waktu(rek.rekening_diubah_at)}. Cocokin nama pemiliknya di m-banking dulu.
+                </span>
+                <button
+                  type="button"
+                  className="btn kecil aksen"
+                  onClick={async () => {
+                    try {
+                      await api('POST', `/tim-sales/${rek.admin_id}/cek-rekening`);
+                      const baru = { ...rek, rekening_dicek_at: new Date().toISOString(), siap_cair: true };
+                      setRek(baru);
+                      setIsi((x) => ({ ...x, metode: x.metode || (EWALLET.includes(baru.bank) ? baru.bank : `Transfer ${baru.bank}`) }));
+                    } catch (err) {
+                      setError(err.message);
+                    }
+                  }}
+                >
+                  Rekening udah dicek
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
       <form
         onSubmit={async (e) => {
           e.preventDefault();
@@ -296,13 +367,17 @@ function Cairkan({ api, periode, s, jadwal, onTutup, onSelesai }) {
           <label htmlFor="c-catatan">Catatan (opsional)</label>
           <input id="c-catatan" value={isi.catatan} onChange={ubah('catatan')} placeholder="No. referensi transfer" maxLength={300} />
         </div>
-        <p className="adm-redup">Otomatis dicatat sebagai pengeluaran kategori "komisi" di Keuangan sebesar {rupiah(s.neto)}.</p>
+        <p className="adm-redup">
+          Otomatis dicatat sebagai pengeluaran kategori "komisi" di Keuangan sebesar {rupiah(s.neto)}
+          {!tunai && st.id === 'siap' ? `, lengkap dengan rekening tujuannya` : ''}.
+        </p>
+        {tahan && isi.metode.trim() && <p className="adm-error">Transfer ditahan: rekening {st.id === 'kosong' ? 'belum lengkap' : 'belum dicek'}. Tulis "Tunai" kalau dibayar cash.</p>}
         {error && <p className="adm-error">{error}</p>}
         <div className="adm-tombol" style={{ justifyContent: 'flex-end' }}>
           <button type="button" className="btn" onClick={onTutup}>
             Batal
           </button>
-          <button type="submit" className="btn utama" disabled={sibuk || !isi.metode.trim()}>
+          <button type="submit" className="btn utama" disabled={sibuk || !isi.metode.trim() || tahan}>
             {sibuk ? 'Menyimpan…' : 'Tandai dicairkan'}
           </button>
         </div>

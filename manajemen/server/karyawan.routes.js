@@ -20,6 +20,7 @@ export const JENIS_CUTI = ['cuti_tahunan', 'sakit', 'izin', 'cuti_menikah', 'cut
 const HADIR_DARI_CUTI = { cuti_tahunan: 'cuti', sakit: 'sakit', izin: 'izin', cuti_menikah: 'cuti', cuti_melahirkan: 'cuti', lainnya: 'izin' };
 
 let siap = null;
+export const pastikanTabelKaryawan = () => pastikanTabel();
 function pastikanTabel() {
   if (!siap) {
     siap = (async () => {
@@ -66,6 +67,13 @@ function pastikanTabel() {
         created_at TIMESTAMPTZ DEFAULT now(),
         UNIQUE (periode, karyawan_id)
       )`);
+      // Sales Partner: data karyawan nyambung ke akun Makalin (admin_id) - tempat foto profil & rekening pencairan
+      // bagi hasil. Rekening yang diubah sales sendiri harus dicek admin dulu sebelum bisa dipakai nyairin.
+      await query(`ALTER TABLE mj_karyawan ADD COLUMN IF NOT EXISTS admin_id UUID, ADD COLUMN IF NOT EXISTS atas_nama TEXT,
+        ADD COLUMN IF NOT EXISTS nik_ktp TEXT, ADD COLUMN IF NOT EXISTS alamat TEXT, ADD COLUMN IF NOT EXISTS foto TEXT,
+        ADD COLUMN IF NOT EXISTS rekening_diubah_at TIMESTAMPTZ, ADD COLUMN IF NOT EXISTS rekening_diubah_oleh TEXT,
+        ADD COLUMN IF NOT EXISTS rekening_dicek_at TIMESTAMPTZ, ADD COLUMN IF NOT EXISTS rekening_dicek_oleh TEXT`);
+      await query('CREATE UNIQUE INDEX IF NOT EXISTS idx_mj_karyawan_admin ON mj_karyawan (admin_id) WHERE admin_id IS NOT NULL');
     })().catch((e) => {
       siap = null;
       throw e;
@@ -194,6 +202,7 @@ function bersihkan(b, sebagian = false) {
   isi('lokasi', 60);
   isi('bank', 40);
   isi('rekening', 40);
+  isi('atas_nama', 100);
   isi('npwp', 30);
   isi('bpjs_kesehatan', 30);
   isi('catatan', 500);
@@ -228,6 +237,9 @@ router.post('/karyawan', async (req, res, next) => {
       `INSERT INTO mj_karyawan (${kolom.join(', ')}, orang_id) VALUES (${kolom.map((_, i) => `$${i + 1}`).join(', ')}, $${kolom.length + 1}) RETURNING id, nama, 'MKL-' || lpad(nomor::text, 3, '0') AS nik`,
       [...kolom.map((k) => x[k]), orangId]
     );
+    if (x.rekening) {
+      await query(`UPDATE mj_karyawan SET rekening_diubah_at=now(), rekening_diubah_oleh=$2, rekening_dicek_at=now(), rekening_dicek_oleh=$2 WHERE id=$1`, [rows[0].id, req.admin.nama]);
+    }
     await catatLog(req, 'hr.karyawan.tambah', { nik: rows[0].nik, nama: rows[0].nama, ...(orangId ? { dari: 'rekrutmen' } : {}) });
     res.status(201).json(rows[0]);
   } catch (e) {
@@ -253,9 +265,22 @@ router.patch('/karyawan/:id', async (req, res, next) => {
     }
     const kolom = Object.keys(x);
     if (!kolom.length) throw salah('Nggak ada yang diubah');
+    // Rekening yang diganti admin di sini dianggap udah dicek admin itu (dipakai buat nyairin bagi hasil sales).
+    const param = [req.params.id, ...kolom.map((k) => x[k])];
+    let tandaRekening = '';
+    if (['bank', 'rekening', 'atas_nama'].some((k) => k in x)) {
+      param.push(req.admin.nama);
+      const oleh = `$${param.length}`;
+      const baru = ['bank', 'rekening', 'atas_nama'].map((k) => (k in x ? `$${kolom.indexOf(k) + 2}::text` : k)).join(', ');
+      const beda = `(bank, rekening, atas_nama) IS DISTINCT FROM (${baru})`;
+      tandaRekening = `, rekening_diubah_at = CASE WHEN ${beda} THEN now() ELSE rekening_diubah_at END,
+        rekening_diubah_oleh = CASE WHEN ${beda} THEN ${oleh} ELSE rekening_diubah_oleh END,
+        rekening_dicek_at = CASE WHEN ${beda} THEN now() ELSE rekening_dicek_at END,
+        rekening_dicek_oleh = CASE WHEN ${beda} THEN ${oleh} ELSE rekening_dicek_oleh END`;
+    }
     const { rows } = await query(
-      `UPDATE mj_karyawan SET ${kolom.map((k, i) => `${k}=$${i + 2}`).join(', ')} WHERE id=$1 RETURNING nama, 'MKL-' || lpad(nomor::text, 3, '0') AS nik`,
-      [req.params.id, ...kolom.map((k) => x[k])]
+      `UPDATE mj_karyawan SET ${kolom.map((k, i) => `${k}=$${i + 2}`).join(', ')}${tandaRekening} WHERE id=$1 RETURNING nama, 'MKL-' || lpad(nomor::text, 3, '0') AS nik`,
+      param
     );
     if (!rows.length) throw salah('Karyawan tidak ditemukan', 404);
     await catatLog(req, req.body.status ? 'hr.karyawan.status' : 'hr.karyawan.ubah', { nik: rows[0].nik, nama: rows[0].nama, ...(req.body.status ? { status: req.body.status } : { diubah: kolom.join(', ') }) });

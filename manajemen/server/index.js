@@ -12,6 +12,7 @@ import karyawanRoutes from './karyawan.routes.js';
 import artifactRoutes, { berkasRouter as artifactBerkas } from './artifact.routes.js';
 import lapanganRoutes from './lapangan.routes.js';
 import komisiRoutes from './komisi.routes.js';
+import timRoutes from './tim.routes.js';
 import { PRODUK } from './produk/index.js';
 
 // Server aplikasi manajemen Konsulin: API /api/* (wajib login admin, lihat auth.js) + nyajiin hasil build tampilannya (dist/).
@@ -28,6 +29,8 @@ app.use((req, res, next) => {
 app.use('/api/publik/daftar', express.json({ limit: '9mb' }));
 // Log Sales Lapangan bawa sampai 3 foto bukti (base64, udah dikecilin di HP).
 app.use('/api/lapangan', express.json({ limit: '13mb' }));
+// Foto profil sales (udah dikecilin di HP, maks 1 MB -> base64 ~1,4 MB).
+app.use(['/api/tim-sales', '/api/saya/foto'], express.json({ limit: '2mb' }));
 app.use(express.json({ limit: '100kb' }));
 
 app.get('/health', (req, res) => res.json({ ok: true }));
@@ -45,6 +48,7 @@ app.use('/api', karyawanRoutes);
 app.use('/api', artifactRoutes);
 app.use('/api', lapanganRoutes);
 app.use('/api', komisiRoutes);
+app.use('/api', timRoutes);
 app.get('/api/produk', (req, res) => {
   res.json(PRODUK.filter((p) => p.aktif).map(({ id, nama, url }) => ({ id, nama, url })));
 });

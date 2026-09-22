@@ -108,7 +108,7 @@ authRouter.post('/masuk', masukLimiter, async (req, res, next) => {
 });
 
 // Semua /api selain /api/auth/* wajib login.
-const RUTE_SALES = /^\/(lapangan(\/|$)|saya(\/(password|aktivitas))?$)/;
+const RUTE_SALES = /^\/(lapangan(\/|$)|saya(\/(password|aktivitas|profil|foto))?$)/;
 
 export async function requireAdmin(req, res, next) {
   try {

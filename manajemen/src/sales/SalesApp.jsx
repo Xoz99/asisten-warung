@@ -3,6 +3,9 @@ import QRCode from 'qrcode';
 import { bulanLabel, rupiah, tgl, waktu } from '../lib/format.js';
 import { Gagal, Kosong, Memuat, Modal, useData } from '../komponen/Ui.jsx';
 import { Detail, FormLog, HASIL, STATUS_TOKO, daftarKelompok, saringKamus, sisaHari } from '../halaman/Lapangan.jsx';
+import FotoProfil from '../komponen/FotoProfil.jsx';
+import { keWebp } from '../lib/gambar.js';
+import { DAFTAR_BANK, EWALLET, samarRekening, statusRekening } from '../lib/bank.js';
 
 // Tampilan khusus akun peran sales: app HP buat di lapangan, beda dari panel admin. Nggak ada sidebar; menu di bawah
 // (Beranda, Toko, Catat, Riwayat, Contekan) biar gampang dipencet satu tangan. Datanya dari API /lapangan/* yang sama,
@@ -39,6 +42,9 @@ export default function SalesApp({ api, admin, onKeluar }) {
   const [versi, setVersi] = useState(0);
   const [pesan, setPesan] = useState('');
   const segarkan = useCallback(() => setVersi((v) => v + 1), []);
+  // Profil (foto & rekening pencairan) dipakai di pojok atas, Akun, dan Penghasilan.
+  const { data: profil, muat: muatProfil } = useData(api, '/saya/profil');
+  const [versiFoto, setVersiFoto] = useState(0);
 
   useEffect(() => {
     const ganti = () => {
@@ -55,7 +61,7 @@ export default function SalesApp({ api, admin, onKeluar }) {
   }, [pesan]);
 
   const catat = (awal = {}) => setForm({ awal });
-  const props = { api, admin, versi, onBuka: setDipilih, onCatat: catat };
+  const props = { api, admin, versi, profil, onBuka: setDipilih, onCatat: catat };
 
   return (
     <div className="sl-app">
@@ -69,7 +75,7 @@ export default function SalesApp({ api, admin, onKeluar }) {
           </span>
         </a>
         <a href="#/akun" className={'sl-avatar' + (halaman === 'akun' ? ' on' : '')} aria-label={`Akun ${admin.nama}`}>
-          {admin.nama?.[0]?.toUpperCase()}
+          <FotoProfil src="/api/saya/foto" ada={profil?.ada_foto} nama={admin.nama} ukuran={40} versi={versiFoto} />
         </a>
       </header>
 
@@ -78,8 +84,21 @@ export default function SalesApp({ api, admin, onKeluar }) {
         {halaman === 'toko' && <Toko api={api} />}
         {halaman === 'riwayat' && <Riwayat {...props} />}
         {halaman === 'contekan' && <Contekan api={api} onCatat={catat} />}
-        {halaman === 'akun' && <Akun api={api} admin={admin} onKeluar={onKeluar} />}
-        {halaman === 'penghasilan' && <Penghasilan api={api} />}
+        {halaman === 'akun' && (
+          <Akun
+            api={api}
+            admin={admin}
+            onKeluar={onKeluar}
+            profil={profil}
+            versiFoto={versiFoto}
+            setPesan={setPesan}
+            onBerubah={(foto) => {
+              muatProfil();
+              if (foto) setVersiFoto((v) => v + 1);
+            }}
+          />
+        )}
+        {halaman === 'penghasilan' && <Penghasilan api={api} profil={profil} />}
       </main>
 
       {pesan && (
@@ -133,7 +152,7 @@ export default function SalesApp({ api, admin, onKeluar }) {
 }
 
 // ---------------- Beranda ----------------
-function Beranda({ api, admin, versi, onBuka, onCatat }) {
+function Beranda({ api, admin, versi, profil, onBuka, onCatat }) {
   const { data: log, error, muat } = useData(api, `/lapangan/log?v=${versi}`);
   const { data: toko } = useData(api, `/lapangan/toko?v=${versi}`);
   const hari = hariIniWib();
@@ -174,7 +193,7 @@ function Beranda({ api, admin, versi, onBuka, onCatat }) {
         <Ikon nama="catat" />
       </button>
 
-      <KartuPenghasilan api={api} versi={versi} />
+      <KartuPenghasilan api={api} versi={versi} profil={profil} />
 
       {toko?.terhubung && tokoMauHabis(toko.toko).length > 0 && (
         <a href="#/toko" className="sl-kartu sl-mau-habis-ringkas">
@@ -553,22 +572,57 @@ function Contekan({ api, onCatat }) {
 const JENIS_KOMISI = { pertama: 'Order pertama', perpanjangan: 'Perpanjangan', permanen: 'Permanen' };
 const persen = (r) => `${Math.round(r * 100)}%`;
 
-function KartuPenghasilan({ api, versi }) {
+function KartuPenghasilan({ api, versi, profil }) {
   const { data } = useData(api, `/lapangan/komisi?v=${versi}`);
   if (!data?.terhubung) return null;
+  const rek = statusRekening(profil);
   return (
-    <a href="#/penghasilan" className="sl-kartu sl-penghasilan-ringkas">
-      <span className="sl-label">Bagi hasil {bulanLabel(data.bulanIni.periode, true)} (estimasi)</span>
-      <b className="p-num">{rupiah(data.bulanIni.neto)}</b>
-      <span className="sl-redup">
-        {data.bulanIni.baris.length} pembayaran · dicairkan {tgl(data.bulanIni.jadwalCair)}
-      </span>
-      <span className="sl-wa">Lihat rincian</span>
+    <>
+      <a href="#/penghasilan" className="sl-kartu sl-penghasilan-ringkas">
+        <span className="sl-label">Bagi hasil {bulanLabel(data.bulanIni.periode, true)} (estimasi)</span>
+        <b className="p-num">{rupiah(data.bulanIni.neto)}</b>
+        <span className="sl-redup">
+          {data.bulanIni.baris.length} pembayaran · dicairkan {tgl(data.bulanIni.jadwalCair)}
+        </span>
+        <span className="sl-wa">Lihat rincian</span>
+      </a>
+      {profil && rek.id === 'kosong' && (
+        <a href="#/akun" className="sl-kartu sl-peringatan sl-rek-ingat">
+          <b>Rekening pencairan belum diisi</b>
+          <span className="sl-redup">Isi dulu di Akun biar bagi hasilmu bisa ditransfer tanggal 5.</span>
+        </a>
+      )}
+    </>
+  );
+}
+
+// Rekening tujuan transfer bagi hasil (dipakai di Penghasilan).
+function KartuRekening({ profil }) {
+  if (!profil) return null;
+  const rek = statusRekening(profil);
+  return (
+    <a href="#/akun" className={'sl-kartu sl-rek' + (rek.id === 'siap' ? '' : ' sl-peringatan')}>
+      <span className="sl-label">Dicairkan ke</span>
+      {rek.id === 'kosong' ? (
+        <>
+          <b>Rekening belum diisi</b>
+          <span className="sl-redup">Ketuk buat ngisi. Tanpa rekening, bagi hasil nggak bisa ditransfer.</span>
+        </>
+      ) : (
+        <>
+          <b>
+            {profil.bank} {samarRekening(profil.rekening)}
+          </b>
+          <span className="sl-redup">
+            a.n. {profil.atas_nama} · {rek.id === 'siap' ? 'udah dicek admin' : 'lagi dicek admin, transfer ditahan sampai beres'}
+          </span>
+        </>
+      )}
     </a>
   );
 }
 
-function Penghasilan({ api }) {
+function Penghasilan({ api, profil }) {
   const { data, error, muat } = useData(api, '/lapangan/komisi');
   if (error) return <Gagal apa="penghasilan" pesan={error} onUlang={muat} />;
   if (!data) return <Memuat apa="penghasilan" />;
@@ -585,6 +639,9 @@ function Penghasilan({ api }) {
           Komisi {rupiah(b.bruto)} dikurangi pajak {persen(data.rate.pajak)} ({rupiah(b.pajak)}). Masih estimasi, dikunci admin awal bulan depan, dicairkan {tgl(b.jadwalCair)}.
         </span>
       </section>
+      <div style={{ marginTop: 12 }}>
+        <KartuRekening profil={profil} />
+      </div>
 
       <section className="sl-kartu" style={{ marginTop: 12 }}>
         <div className="sl-baris">
@@ -646,7 +703,9 @@ function Penghasilan({ api }) {
               <div>
                 <b>{bulanLabel(r.periode, true)}</b>
                 <span className="sl-redup">
-                  {r.dicairkan_tanggal ? `Dicairkan ${tgl(r.dicairkan_tanggal)}${r.metode ? ` · ${r.metode}` : ''}` : `Dikunci, dicairkan ${tgl(r.jadwalCair)}`}
+                  {r.dicairkan_tanggal
+                    ? `Dicairkan ${tgl(r.dicairkan_tanggal)}${r.rekening_tujuan ? ` ke ${r.rekening_tujuan.replace(/\d(?=\d{4})/g, '•')}` : r.metode ? ` · ${r.metode}` : ''}`
+                    : `Dikunci, dicairkan ${tgl(r.jadwalCair)}`}
                 </span>
               </div>
               <span style={{ textAlign: 'right' }}>
@@ -677,24 +736,59 @@ function Penghasilan({ api }) {
 }
 
 // ---------------- Akun ----------------
-function Akun({ api, admin, onKeluar }) {
+function Akun({ api, admin, onKeluar, profil, versiFoto, setPesan, onBerubah }) {
   const { data: link } = useData(api, '/lapangan/link');
   const [isi, setIsi] = useState({ passwordLama: '', passwordBaru: '' });
   const [error, setError] = useState('');
   const [sibuk, setSibuk] = useState(false);
+  const [sibukFoto, setSibukFoto] = useState(false);
   const ubah = (k) => (e) => setIsi((x) => ({ ...x, [k]: e.target.value }));
+  const rek = statusRekening(profil);
   return (
     <>
       <section className="sl-kartu sl-profil">
-        <span className="sl-avatar besar" aria-hidden="true">
-          {admin.nama?.[0]?.toUpperCase()}
-        </span>
+        <label className="sl-foto-ganti" aria-label="Ganti foto profil">
+          <FotoProfil src="/api/saya/foto" ada={profil?.ada_foto} nama={admin.nama} ukuran={72} versi={versiFoto} />
+          <span>{sibukFoto ? '…' : 'Ganti'}</span>
+          <input
+            type="file"
+            accept="image/*"
+            hidden
+            disabled={sibukFoto}
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              e.target.value = '';
+              if (!f) return;
+              setSibukFoto(true);
+              try {
+                await api('PUT', '/saya/foto', { foto: await keWebp(f, 512, 0.85) });
+                setPesan('Foto profil diganti.');
+                onBerubah(true);
+              } catch (err) {
+                setPesan('Foto gagal diganti: ' + err.message);
+              } finally {
+                setSibukFoto(false);
+              }
+            }}
+          />
+        </label>
         <div>
           <b>{admin.nama}</b>
           <span className="sl-redup">@{admin.username} · sales</span>
           {link?.terhubung && <span className="sl-redup">Kode sales {link.sales.kode}</span>}
         </div>
       </section>
+
+      {profil && rek.id !== 'siap' && (
+        <div className="sl-kartu sl-peringatan">
+          {rek.id === 'kosong'
+            ? 'Rekening pencairan belum lengkap. Isi di bawah biar bagi hasilmu bisa ditransfer tiap tanggal 5.'
+            : 'Rekening barumu lagi dicek admin. Sampai dicek, transfer bagi hasil ditahan dulu.'}
+        </div>
+      )}
+      {profil && <FormRekening api={api} profil={profil} setPesan={setPesan} onSelesai={() => onBerubah(false)} />}
+      {profil && <FormDataDiri api={api} profil={profil} setPesan={setPesan} onSelesai={() => onBerubah(false)} />}
+
       <form
         className="sl-kartu"
         onSubmit={async (e) => {
@@ -728,5 +822,127 @@ function Akun({ api, admin, onKeluar }) {
         Keluar
       </button>
     </>
+  );
+}
+
+const tampilNoHp = (hp) => (hp ? (hp.startsWith('62') ? '0' + hp.slice(2) : hp) : '');
+
+function FormRekening({ api, profil, setPesan, onSelesai }) {
+  const [isi, setIsi] = useState({ bank: profil.bank || '', rekening: profil.rekening || '', atas_nama: profil.atas_nama || '', npwp: profil.npwp || '' });
+  const [error, setError] = useState('');
+  const [sibuk, setSibuk] = useState(false);
+  const ubah = (k) => (e) => setIsi((x) => ({ ...x, [k]: e.target.value }));
+  const ewallet = EWALLET.includes(isi.bank);
+  const gantiRek = ['bank', 'rekening', 'atas_nama'].some((k) => (isi[k] || '').replace(k === 'rekening' ? /[\s.-]/g : /^$/, '').trim() !== (profil[k] || ''));
+  return (
+    <form
+      className="sl-kartu"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setError('');
+        setSibuk(true);
+        try {
+          const h = await api('PATCH', '/saya/profil', isi);
+          setPesan(h.rekeningBerubah ? 'Rekening disimpan. Nunggu dicek admin dulu ya.' : 'Disimpan.');
+          onSelesai();
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setSibuk(false);
+        }
+      }}
+    >
+      <h2 style={{ margin: '0 0 4px', fontSize: 18 }}>Rekening pencairan</h2>
+      <span className="sl-redup">Bagi hasil ditransfer ke sini tiap tanggal 5. Nama pemilik harus sama dengan KTP kamu.</span>
+      <div className="field">
+        <label htmlFor="sl-bank">Bank / e-wallet</label>
+        <input id="sl-bank" value={isi.bank} onChange={ubah('bank')} list="sl-daftar-bank" placeholder="BCA" required />
+        <datalist id="sl-daftar-bank">
+          {DAFTAR_BANK.map((b) => (
+            <option key={b} value={b} />
+          ))}
+        </datalist>
+      </div>
+      <div className="field">
+        <label htmlFor="sl-rek">{ewallet ? `Nomor ${isi.bank}` : 'Nomor rekening'}</label>
+        <input id="sl-rek" value={isi.rekening} onChange={ubah('rekening')} inputMode="numeric" maxLength={30} required />
+      </div>
+      <div className="field">
+        <label htmlFor="sl-an">Atas nama</label>
+        <input id="sl-an" value={isi.atas_nama} onChange={ubah('atas_nama')} maxLength={100} required />
+      </div>
+      <div className="field">
+        <label htmlFor="sl-npwp">NPWP (kalau ada)</label>
+        <input id="sl-npwp" value={isi.npwp} onChange={ubah('npwp')} inputMode="numeric" maxLength={25} />
+      </div>
+      {gantiRek && profil.rekening && <p className="sl-redup" style={{ marginTop: 10 }}>Rekening yang diganti perlu dicek admin lagi sebelum bisa ditransfer.</p>}
+      {error && <p className="adm-error">{error}</p>}
+      <button className="sl-tombol" type="submit" disabled={sibuk} style={{ marginTop: 14 }}>
+        {sibuk ? 'Menyimpan…' : 'Simpan rekening'}
+      </button>
+    </form>
+  );
+}
+
+function FormDataDiri({ api, profil, setPesan, onSelesai }) {
+  const [isi, setIsi] = useState({
+    no_hp: tampilNoHp(profil.no_hp),
+    email: profil.email || '',
+    nik_ktp: profil.nik_ktp || '',
+    tanggal_lahir: profil.tanggal_lahir || '',
+    lokasi: profil.lokasi || '',
+    alamat: profil.alamat || '',
+  });
+  const [error, setError] = useState('');
+  const [sibuk, setSibuk] = useState(false);
+  const ubah = (k) => (e) => setIsi((x) => ({ ...x, [k]: e.target.value }));
+  return (
+    <form
+      className="sl-kartu"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setError('');
+        setSibuk(true);
+        try {
+          await api('PATCH', '/saya/profil', isi);
+          setPesan('Data diri disimpan.');
+          onSelesai();
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setSibuk(false);
+        }
+      }}
+    >
+      <h2 style={{ margin: '0 0 4px', fontSize: 18 }}>Data diri</h2>
+      <div className="field">
+        <label htmlFor="sl-hp">No. HP / WA</label>
+        <input id="sl-hp" value={isi.no_hp} onChange={ubah('no_hp')} inputMode="tel" />
+      </div>
+      <div className="field">
+        <label htmlFor="sl-email">Email</label>
+        <input id="sl-email" type="email" value={isi.email} onChange={ubah('email')} autoCapitalize="none" />
+      </div>
+      <div className="field">
+        <label htmlFor="sl-nik">NIK KTP</label>
+        <input id="sl-nik" value={isi.nik_ktp} onChange={ubah('nik_ktp')} inputMode="numeric" maxLength={20} placeholder="16 angka" />
+      </div>
+      <div className="field">
+        <label htmlFor="sl-lahir">Tanggal lahir</label>
+        <input id="sl-lahir" type="date" value={isi.tanggal_lahir} onChange={ubah('tanggal_lahir')} />
+      </div>
+      <div className="field">
+        <label htmlFor="sl-kota">Kota / area</label>
+        <input id="sl-kota" value={isi.lokasi} onChange={ubah('lokasi')} maxLength={60} />
+      </div>
+      <div className="field">
+        <label htmlFor="sl-alamat">Alamat</label>
+        <textarea id="sl-alamat" value={isi.alamat} onChange={ubah('alamat')} rows={2} maxLength={300} />
+      </div>
+      {error && <p className="adm-error">{error}</p>}
+      <button className="sl-tombol" type="submit" disabled={sibuk} style={{ marginTop: 14 }}>
+        {sibuk ? 'Menyimpan…' : 'Simpan data diri'}
+      </button>
+    </form>
   );
 }

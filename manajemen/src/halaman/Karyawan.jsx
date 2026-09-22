@@ -419,7 +419,7 @@ function ChipHadir({ k }) {
 function FormKaryawan({ api, awal, onTutup, onSelesai }) {
   const edit = Boolean(awal.id);
   const [isi, setIsi] = useState(() => {
-    const kosong = { nama: '', email: '', no_hp: '', jabatan: '', departemen: '', grade: '', tipe: 'tetap', lokasi: '', tanggal_masuk: hariIniWib(), kontrak_selesai: '', tanggal_lahir: '', atasan_id: '', gaji_pokok: '', tunjangan_transport: '', tunjangan_makan: '', jatah_cuti: 12, bank: '', rekening: '', npwp: '', bpjs_kesehatan: '', catatan: '' };
+    const kosong = { nama: '', email: '', no_hp: '', jabatan: '', departemen: '', grade: '', tipe: 'tetap', lokasi: '', tanggal_masuk: hariIniWib(), kontrak_selesai: '', tanggal_lahir: '', atasan_id: '', gaji_pokok: '', tunjangan_transport: '', tunjangan_makan: '', jatah_cuti: 12, bank: '', rekening: '', atas_nama: '', npwp: '', bpjs_kesehatan: '', catatan: '' };
     const x = { ...kosong };
     for (const k of Object.keys(kosong)) if (awal[k] != null) x[k] = k === 'no_hp' ? tampilHp(awal[k]) : awal[k];
     return x;
@@ -514,6 +514,7 @@ function FormKaryawan({ api, awal, onTutup, onSelesai }) {
           {field('jatah_cuti', 'Jatah cuti tahunan (hari)', { inputMode: 'numeric', type: 'number', min: 0, max: 60 })}
           {field('bank', 'Bank', { placeholder: 'BCA' })}
           {field('rekening', 'No. rekening', { inputMode: 'numeric' })}
+          {field('atas_nama', 'Atas nama rekening')}
           {field('npwp', 'NPWP')}
           {field('bpjs_kesehatan', 'No. BPJS Kesehatan')}
         </div>

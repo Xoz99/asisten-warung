@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { catatLog, query, pool } from './db.js';
 import { pastikanTabelOps } from './ops.routes.js';
 import { query as queryWp, pastikanTabelSales } from './produk/warung-pintar/db.js';
+import { rekeningPerSales } from './tim.routes.js';
 
 // Bagi hasil (komisi) Sales Partner - PRD v0.2 + keputusan pemilik (Sep 2026):
 //   order pertama per toko      30%
@@ -57,6 +58,8 @@ function pastikanTabel() {
         susulan BOOLEAN NOT NULL DEFAULT false
       )`);
       await query('CREATE INDEX IF NOT EXISTS idx_mj_komisi_periode ON mj_komisi (periode, wp_sales_id)');
+      // Salinan rekening tujuan waktu dicairin (rekening di profil sales bisa ganti belakangan).
+      await query('ALTER TABLE mj_komisi_periode ADD COLUMN IF NOT EXISTS rekening_tujuan TEXT');
     })().catch((e) => {
       siap = null;
       throw e;
@@ -161,6 +164,8 @@ router.get('/komisi', async (req, res, next) => {
         .map(({ baris, ...s }) => ({ ...s, jumlah_bayar: baris.length, susulan: baris.filter((b) => b.susulan).length, status: 'estimasi' }))
         .sort((a, b) => b.neto - a.neto);
     }
+    const rekening = await rekeningPerSales(sales.map((x) => x.wp_sales_id));
+    sales = sales.map((x) => ({ ...x, rekening: rekening[x.wp_sales_id] || null }));
     const { rows: riwayat } = await query(
       `SELECT t.periode, t.ditutup_at, count(p.id)::int AS sales, COALESCE(SUM(p.neto),0)::float AS neto,
               count(p.id) FILTER (WHERE p.dicairkan_at IS NULL)::int AS belum_cair
@@ -254,6 +259,15 @@ router.post('/komisi/cairkan', async (req, res, next) => {
     const metode = teks(req.body.metode, 60);
     if (!metode) throw salah('Metode pencairan wajib diisi (misal: transfer BCA)');
     const catatan = teks(req.body.catatan, 300) || null;
+    // Transfer cuma ke rekening yang udah dicek admin. Tunai boleh tanpa rekening.
+    const tunai = /tunai|cash/i.test(metode);
+    const rek = (await rekeningPerSales([req.body.sales]))[req.body.sales];
+    if (!tunai) {
+      if (!rek) throw salah('Kode sales ini belum nyambung ke akun sales, jadi rekeningnya belum ada. Sambungin dulu di Sales Lapangan → Tim sales.');
+      if (rek.kurang.length) throw salah(`Rekening sales ini belum lengkap (${rek.kurang.join(', ')}). Isi dulu di Sales Lapangan → Tim sales.`);
+      if (!rek.rekening_dicek_at) throw salah('Rekening sales ini baru diganti dan belum dicek admin. Cek dulu sebelum transfer.');
+    }
+    const rekeningTujuan = !tunai && rek ? `${rek.bank} ${rek.rekening} a.n. ${rek.atas_nama}` : null;
     const c = await pool.connect();
     let r;
     try {
@@ -265,11 +279,11 @@ router.post('/komisi/cairkan', async (req, res, next) => {
       const { rows: t } = await c.query(
         `INSERT INTO mj_transaksi (jenis, tanggal, kategori, deskripsi, pihak, jumlah, metode, admin_nama)
          VALUES ('keluar',$1,'komisi',$2,$3,$4,$5,$6) RETURNING id`,
-        [tanggal, `Bagi hasil ${periode} (sudah potong pajak ${Math.round(RATE.pajak * 100)}%)`, `${r.sales_nama || ''} (${r.sales_kode || ''})`.trim(), r.neto, metode, req.admin.nama]
+        [tanggal, `Bagi hasil ${periode} (sudah potong pajak ${Math.round(RATE.pajak * 100)}%)${rekeningTujuan ? ` ke ${rekeningTujuan}` : ''}`, `${r.sales_nama || ''} (${r.sales_kode || ''})`.trim(), r.neto, metode, req.admin.nama]
       );
       await c.query(
-        'UPDATE mj_komisi_periode SET dicairkan_tanggal=$2, dicairkan_at=now(), dicairkan_oleh=$3, metode=$4, catatan=$5, transaksi_id=$6 WHERE id=$1',
-        [r.id, tanggal, req.admin.nama, metode, catatan, t[0].id]
+        'UPDATE mj_komisi_periode SET dicairkan_tanggal=$2, dicairkan_at=now(), dicairkan_oleh=$3, metode=$4, catatan=$5, transaksi_id=$6, rekening_tujuan=$7 WHERE id=$1',
+        [r.id, tanggal, req.admin.nama, metode, catatan, t[0].id, rekeningTujuan]
       );
       await c.query('COMMIT');
     } catch (e) {
@@ -293,7 +307,7 @@ router.get('/lapangan/komisi', async (req, res, next) => {
     const periode = periodeSekarang();
     const [est] = await estimasi(periode, S);
     const { rows: riwayat } = await query(
-      `SELECT periode, toko_baru, rate_perpanjangan, bruto, pajak, neto, dicairkan_tanggal::text AS dicairkan_tanggal, metode
+      `SELECT periode, toko_baru, rate_perpanjangan, bruto, pajak, neto, dicairkan_tanggal::text AS dicairkan_tanggal, metode, rekening_tujuan
        FROM mj_komisi_periode WHERE wp_sales_id=$1 ORDER BY periode DESC LIMIT 12`,
       [S]
     );
