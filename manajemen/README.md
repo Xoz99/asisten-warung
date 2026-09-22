@@ -66,11 +66,13 @@ langsung mutus sesinya.
 
 ## AI Chat
 
-Menu **AI Chat** tersedia untuk akun admin. Atur `OPENROUTER_API_KEY` dan
-`OPENROUTER_MODEL` di `.env` server, lalu restart proses server. Key tidak memakai
-prefix `VITE_` dan tidak masuk bundle browser. Pilih model yang mendukung tools dan
-diizinkan aturan akun OpenRouter; `openrouter/free` dapat dipakai untuk akun yang
-hanya mengizinkan model gratis. Model gratis mengikuti kuota/ketersediaan provider.
+Menu **AI Chat** tersedia untuk akun admin. Atur `OPENROUTER_API_KEY` di `.env`
+server, lalu restart proses server. Key tidak memakai prefix `VITE_` dan tidak masuk
+bundle browser. Tanpa `OPENROUTER_MODEL`/`OPENROUTER_MODELS`, server pakai 3 model
+gratis yang mendukung tools sebagai cadangan berurutan (lihat `MODEL_BAWAAN` di
+`server/ai.routes.js`); model yang diblokir guardrail/kebijakan data akun OpenRouter
+nggak bisa dipakai. Model gratis mengikuti kuota/ketersediaan provider dan jawabannya
+bisa salah, jadi tetap cek sebelum menyetujui perubahan.
 Integrasi mengikuti https://openrouter.ai/docs/guides/features/tool-calling.
 
 Agent mencari API melalui katalog `server/ai-catalog.json`, membaca data lewat
@@ -89,7 +91,10 @@ khusus panel admin. Tambahkan kontrak parameter ke katalog ketika API berubah.
 Percakapan disimpan sementara di memori server selama 30 menit tidak aktif,
 hilang ketika server restart atau pengguna meninggalkan halaman. Untuk banyak
 instance server perlu shared session storage atau sticky session. Data yang dibaca
-agent dikirim ke OpenRouter, dengan field kredensial disaring. Chat dibatasi
-20 permintaan/menit per IP, 8 langkah alat per pesan, dan 6.000 karakter per pesan.
+agent dikirim ke OpenRouter: kredensial, rekening, NIK, NPWP, dan alamat dibuang;
+nomor HP & email disamarkan. Rekening/bank/NIK/NPWP nggak bisa diubah lewat AI.
+Chat dibatasi 20 permintaan/menit per akun, 8 langkah alat per pesan, 6.000 karakter
+per pesan, dan jatah harian (reset 00.00 WIB): `AI_PESAN_HARIAN` pesan per admin
+(default 50) serta `AI_TOKEN_HARIAN` total token semua admin (0 = tanpa batas).
 
 Verifikasi: `node --test test/ai.test.js`, `npm run build`, `npm run lint`.
