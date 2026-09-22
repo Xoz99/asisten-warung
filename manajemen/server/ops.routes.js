@@ -581,8 +581,18 @@ router.post('/notifikasi/baca', async (req, res, next) => {
 // Aktivitas milik admin yang lagi login (halaman Profile).
 router.get('/saya/aktivitas', async (req, res, next) => {
   try {
-    const { rows } = await query('SELECT id, aksi, detail, created_at FROM mj_log WHERE admin_id=$1 ORDER BY created_at DESC LIMIT 50', [req.admin.id]);
-    res.json(rows);
+    // ?halaman=N -> per halaman 10 {items,total,...}; tanpa parameter tetap 50 terakhir (dipakai tampilan lama).
+    if (req.query.halaman === undefined) {
+      const { rows } = await query('SELECT id, aksi, detail, created_at FROM mj_log WHERE admin_id=$1 ORDER BY created_at DESC LIMIT 50', [req.admin.id]);
+      return res.json(rows);
+    }
+    const perHalaman = 10;
+    const halaman = Math.max(1, Math.min(10000, Math.floor(Number(req.query.halaman) || 1)));
+    const [{ rows }, { rows: n }] = await Promise.all([
+      query('SELECT id, aksi, detail, created_at FROM mj_log WHERE admin_id=$1 ORDER BY created_at DESC, id DESC LIMIT $2 OFFSET $3', [req.admin.id, perHalaman, (halaman - 1) * perHalaman]),
+      query('SELECT count(*)::int AS n FROM mj_log WHERE admin_id=$1', [req.admin.id]),
+    ]);
+    res.json({ items: rows, total: n[0].n, halaman, perHalaman });
   } catch (e) {
     next(e);
   }

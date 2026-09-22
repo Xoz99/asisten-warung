@@ -30,6 +30,8 @@ function pastikanTabel() {
     siap = (async () => {
       await pastikanTabelKaryawan();
       await pastikanTabelSales();
+      // Profil akun admin (sales pakai data karyawan kemitraan).
+      await query('ALTER TABLE mj_admin ADD COLUMN IF NOT EXISTS email TEXT, ADD COLUMN IF NOT EXISTS no_hp TEXT, ADD COLUMN IF NOT EXISTS foto TEXT');
       fs.mkdirSync(DIR, { recursive: true });
     })().catch((e) => {
       siap = null;
@@ -357,13 +359,14 @@ router.get('/tim-sales/:id/foto', async (req, res, next) => {
 });
 
 // ---------------- Sales: profil sendiri ----------------
-const salesSaja = (req) => {
-  if (req.admin.peran !== 'sales') throw salah('Profil ini buat akun sales', 403);
-};
-
+// ---------------- Admin: profil sendiri ----------------
+async function profilAdmin(id) {
+  const { rows } = await query('SELECT id, username, nama, peran, email, no_hp, (foto IS NOT NULL) AS ada_foto, terakhir_masuk, created_at FROM mj_admin WHERE id=$1', [id]);
+  return rows[0];
+}
 router.get('/saya/profil', async (req, res, next) => {
   try {
-    salesSaja(req);
+    if (req.admin.peran !== 'sales') return res.json(await profilAdmin(req.admin.id));
     const { rows } = await query(`SELECT a.nama, a.username, ${KOLOM_PROFIL} FROM mj_admin a LEFT JOIN mj_karyawan k ON k.admin_id = a.id WHERE a.id=$1`, [req.admin.id]);
     res.json(lengkapi(rows[0]));
   } catch (e) {
@@ -373,7 +376,21 @@ router.get('/saya/profil', async (req, res, next) => {
 
 router.patch('/saya/profil', async (req, res, next) => {
   try {
-    salesSaja(req);
+    if (req.admin.peran !== 'sales') {
+      const b = req.body || {};
+      const ubah = {};
+      if (b.nama !== undefined) {
+        ubah.nama = teks(b.nama, 60);
+        if (!ubah.nama) throw salah('Nama wajib diisi');
+      }
+      const p = bersihkanProfil({ ...(b.email !== undefined ? { email: b.email } : {}), ...(b.no_hp !== undefined ? { no_hp: b.no_hp } : {}) });
+      Object.assign(ubah, p);
+      const kolom = Object.keys(ubah);
+      if (!kolom.length) throw salah('Nggak ada yang diubah');
+      await query(`UPDATE mj_admin SET ${kolom.map((k, i) => `${k}=$${i + 2}`).join(', ')} WHERE id=$1`, [req.admin.id, ...kolom.map((k) => ubah[k])]);
+      await catatLog(req, 'admin.profil.ubah', { username: req.admin.username, diubah: kolom.join(', ') });
+      return res.json(await profilAdmin(req.admin.id));
+    }
     const profil = bersihkanProfil(req.body || {});
     const c = await pool.connect();
     let rekeningBerubah;
@@ -399,9 +416,14 @@ router.patch('/saya/profil', async (req, res, next) => {
 
 router.put('/saya/foto', async (req, res, next) => {
   try {
-    salesSaja(req);
     const f = fotoDariBody(req.body);
     if (!f) throw salah('Foto wajib dipilih');
+    if (req.admin.peran !== 'sales') {
+      const nama = await simpanFileFoto(f.buf, f.ext);
+      const { rows } = await query('UPDATE mj_admin a SET foto=$2 FROM (SELECT foto AS foto0 FROM mj_admin WHERE id=$1) lama WHERE a.id=$1 RETURNING lama.foto0', [req.admin.id, nama]);
+      buangFile(rows[0]?.foto0);
+      return res.json({ ok: true });
+    }
     const c = await pool.connect();
     let karyawanId;
     try {
@@ -416,9 +438,29 @@ router.put('/saya/foto', async (req, res, next) => {
   }
 });
 
+router.delete('/saya/foto', async (req, res, next) => {
+  try {
+    adminSaja(req);
+    const { rows } = await query('UPDATE mj_admin a SET foto=NULL FROM (SELECT foto AS foto0 FROM mj_admin WHERE id=$1) lama WHERE a.id=$1 RETURNING lama.foto0', [req.admin.id]);
+    buangFile(rows[0]?.foto0);
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
 router.get('/saya/foto', async (req, res, next) => {
   try {
-    salesSaja(req);
+    if (req.admin.peran !== 'sales') {
+      const { rows } = await query('SELECT foto FROM mj_admin WHERE id=$1', [req.admin.id]);
+      const file = rows[0]?.foto && path.join(DIR, path.basename(rows[0].foto));
+      if (!file || !fs.existsSync(file)) throw salah('Belum ada foto', 404);
+      const ext = path.extname(file).slice(1);
+      res.setHeader('Content-Type', ext === 'png' ? 'image/png' : ext === 'jpg' ? 'image/jpeg' : 'image/webp');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Cache-Control', 'private, no-cache');
+      return res.sendFile(file);
+    }
     const { rows } = await query('SELECT id FROM mj_karyawan WHERE admin_id=$1', [req.admin.id]);
     if (!rows.length) throw salah('Belum ada foto', 404);
     await kirimFoto(res, rows[0].id);

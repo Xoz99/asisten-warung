@@ -611,6 +611,7 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 /* Foto profil (admin & sales) */
 .foto-profil{display:inline-grid;place-items:center;flex:none;border-radius:50%;overflow:hidden;background:var(--kuning);border:2px solid var(--hitam);font-weight:700;color:var(--tinta);line-height:1}
 .foto-profil img{width:100%;height:100%;object-fit:cover;display:block}
+.foto-profil.kotak{border-radius:0}
 
 /* Tim sales (admin) */
 .adm-tim-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
@@ -1088,4 +1089,49 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
   .ai-tulis button{padding:0 14px}
   .ai-catatan{padding:0 10px 8px}
   .ai-lampiran{flex-wrap:wrap}.ai-lampiran-tombol{width:100%}.ai-lampiran-tombol button{flex:1}
+}
+
+/* ---------- halaman Profile ---------- */
+.pf-hero{display:flex;align-items:center;gap:24px;flex-wrap:wrap;position:relative;padding:22px}
+.pf-foto{display:flex;flex-direction:column;align-items:center;gap:10px}
+.pf-foto .foto-profil{border-width:3px;box-shadow:var(--bayang)}
+.pf-foto-tombol{display:flex;gap:6px}
+.pf-foto-tombol label.btn{cursor:pointer}
+.pf-foto-tombol label.btn.mati{opacity:.5;cursor:default}
+.pf-identitas{flex:1;min-width:220px}
+.pf-nama{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pf-nama h2{margin:0;font-size:28px;letter-spacing:-.02em;line-height:1.1}
+.pf-identitas>.adm-redup{margin:4px 0 0;font-size:14px}
+.pf-info{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0 0}
+.pf-info div{border:var(--garis-tipis);padding:8px 10px;background:var(--kertas);min-width:0}
+.pf-info dt{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--redup)}
+.pf-info dd{margin:2px 0 0;font-weight:700;font-size:13px;overflow-wrap:anywhere}
+.pf-keluar{align-self:flex-start}
+.pf-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px;margin-top:20px;align-items:start}
+.pf-kiri{display:flex;flex-direction:column;gap:20px;min-width:0}
+.pf-field-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 14px}
+.pf-field-grid small{display:block;margin-top:4px;font-size:11px}
+.pf-keamanan{padding:0}
+.pf-lipat{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:16px 18px;background:none;border:0;text-align:left;cursor:pointer;color:var(--tinta)}
+.pf-lipat b{display:block;font-size:18px;letter-spacing:-.01em}
+.pf-lipat small{display:block;margin-top:2px}
+.pf-panah{font-size:18px;transition:transform .2s;width:32px;height:32px;display:grid;place-items:center;border:var(--garis-tipis);flex:none}
+.pf-panah.buka{transform:rotate(180deg);background:var(--kuning)}
+.pf-lipat-isi{display:grid;grid-template-rows:0fr;transition:grid-template-rows .25s ease}
+.pf-lipat-isi.buka{grid-template-rows:1fr}
+.pf-lipat-isi>div{overflow:hidden}
+.pf-lipat-isi form{padding:0 18px 18px;border-top:var(--garis-tipis)}
+.pf-cek{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;font-weight:700;cursor:pointer}
+.pf-akt-kepala{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:18px 18px 0}
+.pf-akt-kepala h2{margin:0;font-size:18px}
+@media (prefers-reduced-motion:reduce){.pf-lipat-isi,.pf-panah{transition:none}}
+@media (max-width:1100px){.pf-grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:640px){
+  .pf-hero{flex-direction:column;align-items:stretch;text-align:center;gap:16px}
+  .pf-foto{align-self:center}
+  .pf-nama{justify-content:center}
+  .pf-info{grid-template-columns:minmax(0,1fr);text-align:left}
+  .pf-keluar{align-self:stretch}
+  .pf-field-grid{grid-template-columns:minmax(0,1fr)}
+  .pf-field-grid .field:nth-child(2){margin-top:14px!important}
 }

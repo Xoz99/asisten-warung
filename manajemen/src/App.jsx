@@ -13,6 +13,7 @@ import Artifact from './halaman/Artifact.jsx';
 import Lapangan from './halaman/Lapangan.jsx';
 import SalesApp from './sales/SalesApp.jsx';
 import DaftarPublik from './halaman/DaftarPublik.jsx';
+import FotoProfil from './komponen/FotoProfil.jsx';
 
 // Makalin Ops: kerangka (sidebar + topbar), login per admin, dan navigasi lewat alamat (#/leads/crm dst) biar
 // halaman yang lagi dibuka tetap kebuka pas di-refresh & bisa dibagiin linknya.
@@ -30,6 +31,7 @@ export default function App() {
   const [rute, setRute] = useState(bacaRute);
   const [lacibuka, setLaciBuka] = useState(false);
   const [notifBaru, setNotifBaru] = useState(0);
+  const [foto, setFoto] = useState({ ada: false, versi: 0 });
 
   useEffect(() => {
     const ganti = () => {
@@ -62,6 +64,28 @@ export default function App() {
     },
     [token, keluar]
   );
+
+  // Foto profil admin buat kartu akun di menu samping & avatar di bar atas (HP).
+  useEffect(() => {
+    if (!token || sales) return;
+    let batal = false;
+    panggil(token, 'GET', '/saya/profil')
+      .then((p) => !batal && setFoto({ ada: Boolean(p.ada_foto), versi: Date.now() }))
+      .catch(() => {});
+    return () => {
+      batal = true;
+    };
+  }, [token, sales]);
+  // Profil diubah di halaman Profile: nama di sesi & foto ikut diperbarui tanpa perlu masuk ulang.
+  const onProfil = useCallback((p) => {
+    setFoto((f) => ({ ada: Boolean(p.ada_foto), versi: p.versiFoto || f.versi }));
+    setSesi((s) => {
+      if (!s || !p.nama || s.admin.nama === p.nama) return s;
+      const baru = { ...s, admin: { ...s.admin, nama: p.nama } };
+      simpanSesi(baru);
+      return baru;
+    });
+  }, []);
 
   useEffect(() => {
     if (!token || sales) return;
@@ -123,7 +147,7 @@ export default function App() {
 
   return (
     <div className="adm">
-      <Samping halaman={halaman} tab={tab} admin={sesi.admin} notifBaru={notifBaru} buka={lacibuka} />
+      <Samping halaman={halaman} tab={tab} admin={sesi.admin} foto={foto} notifBaru={notifBaru} buka={lacibuka} />
       {lacibuka && <div className="adm-latar" style={{ zIndex: 25, padding: 0 }} onClick={() => setLaciBuka(false)} aria-hidden="true" />}
       <div className="adm-utama">
         <header className="adm-topbar">
@@ -140,8 +164,8 @@ export default function App() {
             </svg>
             {notifBaru > 0 && <span className="adm-hitung">{notifBaru > 99 ? '99+' : notifBaru}</span>}
           </a>
-          <a className="adm-inisial" href="#/profile" aria-label={`Profile ${sesi.admin.nama}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-            {sesi.admin.nama?.[0]?.toUpperCase()}
+          <a href="#/profile" aria-label={`Profile ${sesi.admin.nama}`} style={{ textDecoration: 'none', color: 'inherit', display: 'flex' }}>
+            <FotoProfil src="/api/saya/foto" ada={foto.ada} versi={foto.versi} nama={sesi.admin.nama} ukuran={40} className="kotak" />
           </a>
         </header>
         <main className="adm-isi" id="isi">
@@ -155,7 +179,7 @@ export default function App() {
           {halaman === 'keuangan' && <Keuangan key={tab} {...props} />}
           {halaman === 'notifikasi' && <Notifikasi {...props} onDibaca={cekNotif} />}
           {halaman === 'pengaturan' && <Pengaturan key={tab} {...props} />}
-          {halaman === 'profile' && <Profile {...props} onKeluar={keluar} />}
+          {halaman === 'profile' && <Profile {...props} onKeluar={keluar} onProfil={onProfil} />}
         </main>
       </div>
     </div>
@@ -163,7 +187,7 @@ export default function App() {
 }
 
 // Menu yang belum dibangun ditulis "Segera" & nggak bisa diklik - bukan link ke halaman kosong (antislop R-24).
-function Samping({ halaman, admin, notifBaru, buka }) {
+function Samping({ halaman, admin, foto, notifBaru, buka }) {
   const link = (id, nama, ekstra) => (
     <a key={id} href={`#/${id}`} className={'adm-nav' + (halaman === id ? ' on' : '')} aria-current={halaman === id ? 'page' : undefined}>
       <span>{nama}</span>
@@ -208,9 +232,7 @@ function Samping({ halaman, admin, notifBaru, buka }) {
         </div>
       </nav>
       <a className="adm-akun" href="#/profile" style={{ textDecoration: 'none', color: 'inherit' }}>
-        <span className="adm-inisial" aria-hidden="true">
-          {admin.nama?.[0]?.toUpperCase()}
-        </span>
+        <FotoProfil src="/api/saya/foto" ada={foto.ada} versi={foto.versi} nama={admin.nama} ukuran={36} className="kotak" />
         <div>
           <b>{admin.nama}</b>
           <span className="adm-redup">@{admin.username}</span>

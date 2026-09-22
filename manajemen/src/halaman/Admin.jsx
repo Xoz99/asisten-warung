@@ -9,6 +9,7 @@ export const NAMA_AKSI = {
   'admin.nonaktifkan': 'nonaktifin admin',
   'admin.reset_password': 'reset password admin',
   'admin.ganti_password_sendiri': 'ganti password sendiri',
+  'admin.profil.ubah': 'ubah profil sendiri',
   'warung-pintar.sales.tambah': 'nambah sales',
   'warung-pintar.sales.ubah': 'ubah sales',
   'warung-pintar.warung.ganti_sales': 'ganti sales warung',
