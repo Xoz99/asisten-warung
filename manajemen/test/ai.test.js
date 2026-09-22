@@ -66,3 +66,34 @@ test('agent proposes writes, isolates owners, consumes actions once, and forward
     await new Promise(resolve => server.close(resolve));
   }
 });
+test('model dicoba per putaran: putaran 1 penuh (429) -> putaran 2 dipakai', async () => {
+  const app = express(); app.use(express.json());
+  app.use((req, res, next) => { req.admin = { id: 'putaran' }; next(); });
+  app.use(router);
+  app.use((err, req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const original = globalThis.fetch;
+  const lama = { key: process.env.OPENROUTER_API_KEY, model: process.env.OPENROUTER_MODEL, models: process.env.OPENROUTER_MODELS };
+  process.env.OPENROUTER_API_KEY = 'test'; process.env.OPENROUTER_MODEL = ''; process.env.OPENROUTER_MODELS = 'a,b,c,d,e';
+  const dikirim = [];
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).startsWith(origin)) return original(url, opts);
+    const body = JSON.parse(opts.body);
+    dikirim.push(body.models || [body.model]);
+    if (dikirim.length === 1) return Response.json({ error: { message: 'penuh' } }, { status: 429 });
+    return Response.json({ choices: [{ message: { role: 'assistant', content: 'halo dari putaran dua' } }] });
+  };
+  try {
+    const res = await fetch(origin + '/ai/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'halo' }) });
+    const data = await res.json();
+    assert.equal(res.status, 200);
+    assert.equal(data.message, 'halo dari putaran dua');
+    assert.deepEqual(dikirim, [['a', 'b', 'c'], ['d', 'e']]);
+  } finally {
+    globalThis.fetch = original;
+    for (const [k, v] of [['OPENROUTER_API_KEY', lama.key], ['OPENROUTER_MODEL', lama.model], ['OPENROUTER_MODELS', lama.models]]) if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    await new Promise(resolve => server.close(resolve));
+  }
+});
