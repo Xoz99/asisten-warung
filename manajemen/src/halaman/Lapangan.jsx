@@ -223,8 +223,7 @@ function Log({ api, sales, versi, onBuka, onCatat }) {
                   <th>Respon customer</th>
                   <th>Hasil</th>
                   <th>Catatan / insight</th>
-                  <th>Toko</th>
-                  <th>Lokasi (lat, long)</th>
+                  <th>Toko &amp; lokasi (lat, long)</th>
                   <th>Foto</th>
                 </tr>
               </thead>
@@ -244,15 +243,15 @@ function Log({ api, sales, versi, onBuka, onCatat }) {
                       <span className={`adm-chip ${HASIL[l.hasil]?.warna}`}>{HASIL[l.hasil]?.pendek}</span>
                     </td>
                     <td className="adm-lap-sel">{l.catatan || <span className="adm-redup">-</span>}</td>
-                    <td>{l.id_kunjungan || <span className="adm-redup">-</span>}</td>
-                    <td className="adm-mono" style={{ whiteSpace: 'nowrap', fontSize: 13 }}>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <b>{l.id_kunjungan || <span className="adm-redup">Toko nggak dicatat</span>}</b>
                       {l.lat != null ? (
-                        <>
+                        <div className="adm-mono" style={{ fontSize: 13 }}>
                           {koordinat(l.lat, l.lng)}
-                          {l.akurasi_m != null && <div className="adm-redup" style={l.akurasi_m > 100 ? { color: 'var(--merah)' } : undefined}>±{l.akurasi_m} m</div>}
-                        </>
+                          {l.akurasi_m != null && <span className="adm-redup" style={l.akurasi_m > 100 ? { color: 'var(--merah)' } : undefined}> ±{l.akurasi_m} m</span>}
+                        </div>
                       ) : (
-                        <span className="adm-redup">-</span>
+                        <div className="adm-redup" style={{ fontSize: 13 }}>tanpa GPS</div>
                       )}
                     </td>
                     <td style={{ whiteSpace: 'nowrap' }}>{l.foto.length ? `${l.foto.length} foto` : <span className="adm-redup">-</span>}</td>
@@ -385,6 +384,12 @@ export function Detail({ api, l, admin, onTutup, onUbah, onHapus }) {
           )}
           {l.lat != null ? (
             <p style={{ margin: '8px 0 0' }}>
+              {l.id_kunjungan && (
+                <>
+                  <b>{l.id_kunjungan}</b>
+                  <br />
+                </>
+              )}
               <span className="adm-mono">
                 <b>{koordinat(l.lat, l.lng)}</b>
               </span>
@@ -473,7 +478,7 @@ function ambilGps() {
   });
 }
 
-function LokasiGps({ gps, status, error, lama, onAmbil }) {
+function LokasiGps({ gps, status, error, lama, onAmbil, toko }) {
   const titik = gps || lama;
   return (
     <div className="adm-kartu" style={{ boxShadow: 'none', padding: 12, marginTop: 12 }} aria-live="polite">
@@ -487,7 +492,9 @@ function LokasiGps({ gps, status, error, lama, onAmbil }) {
       </div>
       {titik ? (
         <p style={{ margin: '6px 0 0' }}>
-          <b>{gps ? 'Lokasi terkunci' : 'Lokasi tersimpan'}: </b>
+          <b>{toko || (gps ? 'Lokasi terkunci' : 'Lokasi tersimpan')}</b>
+          <span className="adm-redup">{toko ? '' : ' (isi nama toko di atas)'}</span>
+          <br />
           <span className="adm-mono">{koordinat(titik.lat, titik.lng)}</span>
           {titik.akurasi != null && <span className={titik.akurasi > 100 ? '' : 'adm-redup'} style={titik.akurasi > 100 ? { color: 'var(--merah)' } : undefined}> · akurasi ±{Math.round(titik.akurasi)} m</span>}
         </p>
@@ -716,7 +723,7 @@ export function FormLog({ api, awal, wajibGps, onTutup, onSelesai }) {
           <label htmlFor="l-catatan">Catatan / insight</label>
           <textarea id="l-catatan" value={isi.catatan} onChange={ubah('catatan')} rows={2} maxLength={2000} placeholder="Yang bikin berhasil / gagal, pola yang kamu lihat" />
         </div>
-        <LokasiGps gps={gps} status={gpsStatus} error={gpsError} lama={lokasiLama} onAmbil={ambilLokasi} />
+        <LokasiGps gps={gps} status={gpsStatus} error={gpsError} lama={lokasiLama} onAmbil={ambilLokasi} toko={isi.id_kunjungan.trim()} />
 
         <div className="field">
           <span className="adm-label" style={{ fontSize: 11, display: 'block', marginBottom: 6 }}>

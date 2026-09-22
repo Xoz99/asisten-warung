@@ -85,6 +85,8 @@ function pastikanTabel() {
       // Tiap kunjungan nempel ke satu kartu CRM per toko (mj_lead di ops.routes.js).
       await pastikanTabelOps();
       await query('ALTER TABLE mj_lapangan_log ADD COLUMN IF NOT EXISTS lead_id UUID');
+      // Titik toko di kartu CRM: diambil dari GPS kunjungan pertama yang punya lokasi.
+      await query('ALTER TABLE mj_lead ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION, ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION');
       const { rows } = await query('SELECT count(*)::int AS n FROM mj_keberatan');
       if (!rows[0].n) {
         for (const b of BANK_AWAL) await query('INSERT INTO mj_keberatan (kategori, ucapan, fakta) VALUES ($1,$2,$3)', [b.kategori, b.ucapan, b.fakta]);
@@ -214,8 +216,8 @@ async function tautkanKeCrm(c, req, log, b) {
   const catat = async (jenis, isi) => c.query('INSERT INTO mj_lead_aktivitas (lead_id, admin_nama, jenis, isi) VALUES ($1,$2,$3,$4)', [lead.id, req.admin.nama, jenis, isi]);
   if (!lead) {
     const { rows } = await c.query(
-      `INSERT INTO mj_lead (perusahaan, pic_nama, telepon, sumber, tahap, pemilik_id) VALUES ($1,$2,$3,'Kunjungan lapangan',$4,$5) RETURNING *`,
-      [toko, pemilik, hp, tahapHasil, req.admin.id]
+      `INSERT INTO mj_lead (perusahaan, pic_nama, telepon, sumber, tahap, pemilik_id, lat, lng) VALUES ($1,$2,$3,'Kunjungan lapangan',$4,$5,$6,$7) RETURNING *`,
+      [toko, pemilik, hp, tahapHasil, req.admin.id, log.lat ?? null, log.lng ?? null]
     );
     lead = rows[0];
     await catat('tahap', `Kartu dibuat dari kunjungan lapangan, tahap ${NAMA_TAHAP[tahapHasil]}`);
@@ -224,8 +226,9 @@ async function tautkanKeCrm(c, req, log, b) {
     const boleh = !['konversi', 'repeat_order'].includes(lead.tahap) && !(lead.tahap === 'trial' && tahapHasil === 'awareness');
     const pindah = boleh && tahapHasil !== lead.tahap;
     await c.query(
-      `UPDATE mj_lead SET updated_at=now(), pic_nama=COALESCE(pic_nama,$2), telepon=COALESCE(telepon,$3)${pindah ? ', tahap=$4, tahap_sejak=now()' : ''} WHERE id=$1`,
-      pindah ? [lead.id, pemilik, hp, tahapHasil] : [lead.id, pemilik, hp]
+      `UPDATE mj_lead SET updated_at=now(), pic_nama=COALESCE(pic_nama,$2), telepon=COALESCE(telepon,$3),
+         lat=COALESCE(lat,$4), lng=CASE WHEN lat IS NULL THEN $5 ELSE lng END${pindah ? ', tahap=$6, tahap_sejak=now()' : ''} WHERE id=$1`,
+      pindah ? [lead.id, pemilik, hp, log.lat ?? null, log.lng ?? null, tahapHasil] : [lead.id, pemilik, hp, log.lat ?? null, log.lng ?? null]
     );
     if (pindah) await catat('tahap', `Tahap: ${NAMA_TAHAP[lead.tahap] || lead.tahap} → ${NAMA_TAHAP[tahapHasil]} (dari kunjungan #${log.nomor})`);
   }

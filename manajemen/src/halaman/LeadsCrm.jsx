@@ -691,6 +691,17 @@ function Inspector({ api, lead, admins, onTutup, onBerubah }) {
             {lead.email || 'Email belum diisi'}
           </div>
           <div className="adm-mono">{lead.telepon || 'Telepon belum diisi'}</div>
+          {lead.lat != null && (
+            <div style={{ marginTop: 8 }}>
+              <span className="adm-redup">Lokasi toko (dari kunjungan): </span>
+              <span className="adm-mono">
+                {Number(lead.lat).toFixed(6)}, {Number(lead.lng).toFixed(6)}
+              </span>{' '}
+              <a className="adm-link" href={`https://www.google.com/maps?q=${lead.lat},${lead.lng}`} target="_blank" rel="noopener noreferrer">
+                buka peta
+              </a>
+            </div>
+          )}
           <div className="adm-tombol">
             {telp && (
               <a className="btn kecil" href={`tel:${telp}`}>
