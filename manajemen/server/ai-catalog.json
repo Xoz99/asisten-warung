@@ -246,7 +246,7 @@
     "path": "/lapangan/log",
     "body": [],
     "query": [],
-    "petunjuk": "Log kunjungan sales. hasil: berhasil, tertarik, pikir (pikir-pikir), ditolak. query: dari/sampai YYYY-MM-DD, hasil, q."
+    "petunjuk": "Log kunjungan sales. hasil: berhasil, tertarik, pikir (pikir-pikir), ditolak. query: dari/sampai YYYY-MM-DD, hasil, q. foto[].id = foto bukti; lampirkan pakai path /lapangan/foto/{id}."
   },
   {
     "method": "POST",
@@ -383,7 +383,8 @@
       "q",
       "tipe",
       "urut"
-    ]
+    ],
+    "petunjuk": "Daftar artifact (file & catatan). query: q, folder, jenis. Kalau pengguna minta file-nya, panggil alat lampirkan dengan path /artifact/{id}."
   },
   {
     "method": "GET",
@@ -679,7 +680,8 @@
     "method": "GET",
     "path": "/rekrutmen/lamaran/:id",
     "body": [],
-    "query": []
+    "query": [],
+    "petunjuk": "Detail satu kandidat (id lamaran dari /rekrutmen/board atau /rekrutmen/lamaran). dokumen[] berisi CV & foto: kalau pengguna minta CV/foto, panggil alat lampirkan dengan path /rekrutmen/dokumen/{dokumen[].id}. event[]=riwayat, attempt[]=hasil tes/interview."
   },
   {
     "method": "POST",
@@ -1038,7 +1040,8 @@
     "method": "GET",
     "path": "/leads/:id/detail",
     "body": [],
-    "query": []
+    "query": [],
+    "petunjuk": "Detail lead: kunjungan[] (dengan foto[]), checklist, pic, supervisor. Foto warung (kalau lead.foto ada): lampirkan path /leads/{id}/foto."
   },
   {
     "method": "POST",

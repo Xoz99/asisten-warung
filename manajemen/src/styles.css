@@ -949,7 +949,7 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 .ai-suggestions, .ai-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .ai-message { padding: 16px; margin-bottom: 16px; background: #f3f3f3; overflow-wrap: anywhere; }
 .ai-message.user { background: #e9efff; margin-left: 12%; }
-.ai-message b { display: block; margin-bottom: 8px; font-size: 12px; }
+.ai-message > b { display: block; margin-bottom: 8px; font-size: 12px; }
 .ai-message div { white-space: pre-wrap; line-height: 1.65; }
 .ai-action { border: 2px solid #1b1b1b; border-left: 8px solid #fed01b; padding: 16px; margin: 16px 0; overflow-wrap: anywhere; }
 .ai-action pre { overflow: auto; max-height: 240px; background: #f3f3f3; padding: 12px; }
@@ -964,3 +964,17 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 .ai-teks p:last-child{margin-bottom:0}
 .ai-teks ul,.ai-teks ol{margin:0 0 8px;padding-left:22px}
 .ai-teks li{margin:2px 0}
+
+.ai-teks strong{font-weight:700}
+.ai-teks code{font-family:ui-monospace,Menlo,monospace;font-size:.9em;background:rgba(0,0,0,.07);padding:1px 5px;border-radius:3px;overflow-wrap:anywhere}
+.ai-teks .ai-judul{font-weight:700;font-size:15px;margin:10px 0 6px}
+.ai-lampiran-daftar{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.ai-lampiran{display:flex;align-items:center;gap:12px;background:#fff;border:2px solid #1b1b1b;padding:10px;min-width:0}
+.ai-lampiran img{width:64px;height:64px;object-fit:cover;border:2px solid #1b1b1b;flex:none}
+.ai-lampiran-ikon{width:52px;height:52px;display:grid;place-items:center;border:2px solid #1b1b1b;background:#FACC15;font-family:ui-monospace,Menlo,monospace;font-size:10px;font-weight:700;flex:none}
+.ai-lampiran-info{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.ai-lampiran-info b{overflow-wrap:anywhere;margin:0;font-size:14px}
+.ai-lampiran-info small{color:#555}
+.ai-lampiran-tombol{display:flex;gap:6px;flex:none}
+.ai-chat .ai-lampiran-tombol button{padding:6px 10px;font-size:13px}
+@media (max-width:520px){.ai-lampiran{flex-wrap:wrap}.ai-lampiran-tombol{width:100%}.ai-lampiran-tombol button{flex:1}}
