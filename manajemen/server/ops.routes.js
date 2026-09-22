@@ -20,6 +20,9 @@ const tahapDari = (v) => {
   const t = String(v || '').trim().toLowerCase();
   return TAHAP_CRM.includes(t) ? t : ALIAS_TAHAP[t] || 'awareness';
 };
+const PRIORITAS = ['rendah', 'sedang', 'tinggi'];
+// Jenis catatan yang boleh ditulis manual (tahap/data/kunjungan/checklist dicatat sistem).
+const JENIS_CATATAN = ['catatan', 'follow_up', 'kendala', 'telepon', 'meeting', 'email', 'wa', 'eskalasi'];
 const KATEGORI_KELUAR = ['gaji', 'komisi', 'operasional', 'marketing', 'server', 'pajak', 'lainnya'];
 const KATEGORI_MASUK = ['penjualan', 'proyek', 'investasi', 'lainnya'];
 
@@ -53,6 +56,15 @@ export function pastikanTabelOps() {
         admin_nama TEXT,
         jenis TEXT NOT NULL DEFAULT 'catatan',
         isi TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT now()
+      )`);
+      // Detail lead v2: data toko, prioritas, alasan gagal, foto warung, checklist follow-up.
+      await query(`ALTER TABLE mj_lead ADD COLUMN IF NOT EXISTS alamat TEXT, ADD COLUMN IF NOT EXISTS jenis_usaha TEXT,
+        ADD COLUMN IF NOT EXISTS prioritas TEXT NOT NULL DEFAULT 'sedang', ADD COLUMN IF NOT EXISTS alasan_gagal TEXT, ADD COLUMN IF NOT EXISTS foto TEXT`);
+      await query(`CREATE TABLE IF NOT EXISTS mj_lead_checklist (
+        id BIGSERIAL PRIMARY KEY,
+        lead_id UUID NOT NULL REFERENCES mj_lead(id) ON DELETE CASCADE,
+        teks TEXT NOT NULL, selesai BOOLEAN NOT NULL DEFAULT false,
         created_at TIMESTAMPTZ DEFAULT now()
       )`);
       await query(`CREATE TABLE IF NOT EXISTS mj_transaksi (
@@ -321,13 +333,17 @@ router.post('/leads/impor', async (req, res, next) => {
 
 function bersihkanLead(b, sebagian = false) {
   const x = {};
-  for (const [k, n] of [['perusahaan', 120], ['pic_nama', 80], ['pic_jabatan', 80], ['email', 120], ['telepon', 30], ['sumber', 40]]) {
+  for (const [k, n] of [['perusahaan', 120], ['pic_nama', 80], ['pic_jabatan', 80], ['email', 120], ['telepon', 30], ['sumber', 40], ['alamat', 200], ['jenis_usaha', 60]]) {
     if (b[k] !== undefined || !sebagian) x[k] = teks(b[k], n) || null;
   }
   if (b.nilai !== undefined || !sebagian) x.nilai = angkaPositif(b.nilai) ?? 0;
   if (b.tahap !== undefined) x.tahap = tahapDari(b.tahap);
   if (b.hasil !== undefined) x.hasil = ['menang', 'gagal'].includes(b.hasil) ? b.hasil : null;
   if (b.pemilik_id !== undefined) x.pemilik_id = POLA_UUID.test(b.pemilik_id || '') ? b.pemilik_id : null;
+  if (b.prioritas !== undefined) x.prioritas = PRIORITAS.includes(b.prioritas) ? b.prioritas : 'sedang';
+  if (b.alasan_gagal !== undefined) x.alasan_gagal = teks(b.alasan_gagal, 80) || null;
+  // Alamat & jenis usaha cuma ikut kalau dikirim (form tambah lead lama nggak punya kolom ini).
+  if (sebagian === false) for (const k of ['alamat', 'jenis_usaha']) if (b[k] === undefined) delete x[k];
   return x;
 }
 
@@ -355,7 +371,8 @@ router.patch('/leads/:id', async (req, res, next) => {
     if (x.perusahaan === null) return res.status(400).json({ error: 'Nama perusahaan/prospek wajib diisi' });
     const kolom = Object.keys(x);
     if (!kolom.length) return res.status(400).json({ error: 'Nggak ada yang diubah' });
-    const { rows: lama } = await query('SELECT tahap, hasil, perusahaan FROM mj_lead WHERE id=$1', [req.params.id]);
+    if (x.hasil !== 'gagal' && x.hasil !== undefined) x.alasan_gagal = null; // dibuka lagi / menang: alasan gagal dibuang
+    const { rows: lama } = await query('SELECT tahap, hasil, perusahaan, prioritas, pemilik_id FROM mj_lead WHERE id=$1', [req.params.id]);
     if (!lama.length) return res.status(404).json({ error: 'Lead tidak ditemukan' });
     const { rows } = await query(
       `UPDATE mj_lead SET ${kolom.map((k, i) => `${k}=$${i + 2}`).join(', ')}, updated_at=now()${x.tahap && x.tahap !== lama[0].tahap ? ', tahap_sejak=now()' : ''}
@@ -365,8 +382,20 @@ router.patch('/leads/:id', async (req, res, next) => {
     // Pindah tahap / ditutup kecatat di riwayat lead-nya.
     const catat = [];
     if (x.tahap && x.tahap !== lama[0].tahap) catat.push(`Tahap: ${NAMA_TAHAP[lama[0].tahap] || lama[0].tahap} → ${NAMA_TAHAP[x.tahap]}`);
-    if (x.hasil !== undefined && x.hasil !== lama[0].hasil) catat.push(x.hasil ? `Ditandai ${x.hasil.toUpperCase()}` : 'Dibuka lagi');
+    if (x.hasil !== undefined && x.hasil !== lama[0].hasil)
+      catat.push(x.hasil ? `Ditandai ${x.hasil.toUpperCase()}${x.hasil === 'gagal' && x.alasan_gagal ? `: ${x.alasan_gagal}` : ''}` : 'Dibuka lagi');
     for (const isi of catat) await query("INSERT INTO mj_lead_aktivitas (lead_id, admin_nama, jenis, isi) VALUES ($1,$2,'tahap',$3)", [req.params.id, req.admin.nama, isi]);
+    // Perubahan data lain (prioritas, sales PIC, isi kontak) kecatat sebagai "data".
+    const data = [];
+    if (x.prioritas && x.prioritas !== lama[0].prioritas) data.push(`Prioritas: ${lama[0].prioritas} → ${x.prioritas}`);
+    if (x.pemilik_id !== undefined && x.pemilik_id !== lama[0].pemilik_id) {
+      const { rows: p } = await query('SELECT nama FROM mj_admin WHERE id=$1', [x.pemilik_id]);
+      data.push(`Sales PIC diganti jadi ${p[0]?.nama || '-'}`);
+    }
+    const kolomData = kolom.filter((k) => ['perusahaan', 'pic_nama', 'pic_jabatan', 'email', 'telepon', 'alamat', 'jenis_usaha', 'nilai', 'sumber'].includes(k));
+    const LABEL = { perusahaan: 'nama', pic_nama: 'PIC', pic_jabatan: 'jabatan PIC', email: 'email', telepon: 'telepon', alamat: 'alamat', jenis_usaha: 'jenis usaha', nilai: 'estimasi deal', sumber: 'sumber' };
+    if (kolomData.length && req.body._catatUbah) data.push(`Data diubah: ${kolomData.map((k) => LABEL[k]).join(', ')}`);
+    for (const isi of data) await query("INSERT INTO mj_lead_aktivitas (lead_id, admin_nama, jenis, isi) VALUES ($1,$2,'data',$3)", [req.params.id, req.admin.nama, isi]);
     await catatLog(req, 'ops.lead.ubah', { perusahaan: rows[0].perusahaan, ...(catat.length ? { perubahan: catat.join('; ') } : {}) });
     res.json(rows[0]);
   } catch (e) {
@@ -401,7 +430,7 @@ router.post('/leads/:id/aktivitas', async (req, res, next) => {
   try {
     if (!POLA_UUID.test(req.params.id)) return res.status(404).json({ error: 'Lead tidak ditemukan' });
     const isi = teks(req.body.isi, 1000);
-    const jenis = ['catatan', 'telepon', 'meeting', 'email'].includes(req.body.jenis) ? req.body.jenis : 'catatan';
+    const jenis = JENIS_CATATAN.includes(req.body.jenis) ? req.body.jenis : 'catatan';
     if (!isi) return res.status(400).json({ error: 'Catatannya diisi dulu' });
     const { rows } = await query('INSERT INTO mj_lead_aktivitas (lead_id, admin_nama, jenis, isi) VALUES ($1,$2,$3,$4) RETURNING *', [
       req.params.id,

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { rupiah, tgl, waktu } from '../lib/format.js';
 import { Gagal, Konfirmasi, Kosong, Memuat, Modal } from '../komponen/Ui.jsx';
+import LeadDetail from './LeadDetail.jsx';
 
 // CRM leads (sesuai referensi Leads Management): kartu tahap + total pipeline, toolbar tabel/kanban + filter, tabel
 // dengan pilih-banyak & aksi massal, kanban drag & drop, panel inspector di samping, impor CSV & ekspor.
@@ -67,7 +68,12 @@ export default function LeadsCrm({ api, tabs }) {
     setHalaman(1);
     setCentang(new Set());
   };
-  const lead = data?.leads.find((l) => l.id === dipilih) || null;
+  // Lead yang lagi dibuka tetap ditampilin walau udah nggak ada di daftar (misal ditandai gagal di Kanban yang cuma
+  // nampilin lead jalan) - panelnya ngambil data terbaru sendiri.
+  const terakhirDibuka = useRef(null);
+  const ketemu = data?.leads.find((l) => l.id === dipilih) || null;
+  if (ketemu) terakhirDibuka.current = ketemu;
+  const lead = ketemu || (dipilih && terakhirDibuka.current?.id === dipilih ? terakhirDibuka.current : null);
   const totalPipeline = (data?.ringkas || []).reduce((a, r) => a + r.nilai, 0);
   const totalLead = (data?.ringkas || []).reduce((a, r) => a + r.n, 0);
 
@@ -319,13 +325,13 @@ export default function LeadsCrm({ api, tabs }) {
             }}
             onEkspor={() => ekspor(centang).catch((e) => setPesan(e.message))}
           />
-          {lead && <Inspector key={lead.id} api={api} lead={lead} admins={admins} onTutup={() => setDipilih(null)} onBerubah={muat} />}
+          {lead && <LeadDetail key={lead.id} api={api} lead={lead} admins={admins} onTutup={() => setDipilih(null)} onBerubah={muat} />}
         </div>
       )}
 
       {tampilan === 'kanban' && lead && (
         <div className="adm-inspector-laci">
-          <Inspector key={lead.id} api={api} lead={lead} admins={admins} onTutup={() => setDipilih(null)} onBerubah={muat} />
+          <LeadDetail key={lead.id} api={api} lead={lead} admins={admins} onTutup={() => setDipilih(null)} onBerubah={muat} />
         </div>
       )}
 
@@ -530,8 +536,13 @@ function Kanban({ leads, onBuka, onPindah }) {
             }}
           >
             <header className={`adm-kanban-kepala tahap-${t.id}`}>
-              <span>{t.nama}</span>
-              <span className="adm-chip" style={{ background: '#000', color: '#fff' }}>
+              <span style={{ minWidth: 0 }}>
+                {t.nama}
+                <span className="adm-kanban-total p-num" title={`Total potensial ${t.nama}`}>
+                  {rupiah(isi.reduce((a, l) => a + (Number(l.nilai) || 0), 0))}
+                </span>
+              </span>
+              <span className="adm-chip" style={{ background: '#000', color: '#fff' }} title={`${isi.length} lead`}>
                 {isi.length}
               </span>
             </header>
@@ -585,264 +596,6 @@ function Kanban({ leads, onBuka, onPindah }) {
   );
 }
 
-// ---------------- Inspector ----------------
-const JENIS_AKTIVITAS = { catatan: 'Catatan', telepon: 'Telepon', meeting: 'Meeting', email: 'Email', tahap: 'Perubahan', kunjungan: 'Kunjungan' };
-const WARNA_AKTIVITAS = { tahap: 'ungu', telepon: 'hijau', meeting: 'kuning', email: 'biru', catatan: '', kunjungan: 'oranye' };
-
-function Inspector({ api, lead, admins, onTutup, onBerubah }) {
-  const [edit, setEdit] = useState(false);
-  const [hapus, setHapus] = useState(false);
-  const [error, setError] = useState('');
-  const [catatan, setCatatan] = useState('');
-  const [jenis, setJenis] = useState('catatan');
-  const [aktivitas, setAktivitas] = useState(null);
-  const ref = useRef(null);
-
-  const muatAktivitas = useCallback(() => {
-    api('GET', `/leads/${lead.id}/aktivitas`)
-      .then(setAktivitas)
-      .catch((e) => setError(e.message));
-  }, [api, lead.id]);
-
-  useEffect(() => {
-    muatAktivitas();
-    ref.current?.focus();
-    // Escape nutup inspector, kecuali lagi ada modal (ubah/hapus) di atasnya.
-    const tekan = (e) => e.key === 'Escape' && !document.querySelector('.adm-modal') && onTutup();
-    document.addEventListener('keydown', tekan);
-    return () => document.removeEventListener('keydown', tekan);
-  }, [muatAktivitas, onTutup]);
-
-  const ubah = async (perubahan) => {
-    setError('');
-    try {
-      await api('PATCH', `/leads/${lead.id}`, perubahan);
-      onBerubah();
-      muatAktivitas();
-    } catch (e) {
-      setError(e.message);
-    }
-  };
-  const idxTahap = TAHAP_CRM.findIndex((t) => t.id === lead.tahap);
-  const telp = (lead.telepon || '').replace(/[^\d+]/g, '');
-
-  return (
-    <aside className="adm-inspector" aria-label={`Detail ${lead.perusahaan}`} tabIndex={-1} ref={ref}>
-      <div className="adm-modal-kepala" style={{ margin: 0 }}>
-        <h2 className="adm-mono" style={{ fontSize: 14 }}>
-          {lead.kode}
-        </h2>
-        <button className="adm-tutup" onClick={onTutup} aria-label="Tutup detail">
-          ×
-        </button>
-      </div>
-      <div style={{ padding: 16 }}>
-        <span className={`adm-chip ${lead.hasil ? (lead.hasil === 'menang' ? 'hijau' : 'merah') : namaTahap(lead.tahap).warna}`}>
-          {lead.hasil ? `Ditutup: ${lead.hasil}` : `Tahap: ${namaTahap(lead.tahap).nama}`}
-        </span>
-        <h3 style={{ fontSize: 22, margin: '8px 0 12px', textTransform: 'uppercase', letterSpacing: '-.01em' }}>{lead.perusahaan}</h3>
-        <div className="adm-kartu" style={{ boxShadow: 'none', padding: 12, display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-end' }}>
-          <div>
-            <span className="adm-label" style={{ fontSize: 10 }}>
-              Estimasi deal
-            </span>
-            <div className="p-num" style={{ fontSize: 26, fontWeight: 700 }}>
-              {rupiah(lead.nilai)}
-            </div>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <span className="adm-label" style={{ fontSize: 10 }}>
-              Pemilik
-            </span>
-            <div style={{ fontWeight: 700 }}>{lead.pemilik_nama || '-'}</div>
-          </div>
-        </div>
-
-        {!lead.hasil && (
-          <>
-            <p className="adm-label" style={{ fontSize: 10, margin: '14px 0 6px' }}>
-              Alur pipeline
-            </p>
-            <div className="adm-tahap" role="group" aria-label="Pindah tahap">
-              {TAHAP_CRM.map((t, i) => {
-                // Stuck bukan kelanjutan repeat order - kalau lagi stuck, tahap lain nggak dicentang "udah lewat".
-                const lewat = lead.tahap !== 'stuck' && t.id !== 'stuck' && i < idxTahap;
-                return (
-                  <button key={t.id} className={(i === idxTahap ? 'on' : lewat ? 'lewat' : '') + (t.id === 'stuck' ? ' stuck' : '')} onClick={() => i !== idxTahap && ubah({ tahap: t.id })} aria-pressed={i === idxTahap}>
-                    {lewat ? '✓ ' : ''}
-                    {t.nama}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="adm-redup" style={{ margin: '6px 0 0' }}>
-              Di tahap ini {hariSejak(lead.tahap_sejak)} hari
-            </p>
-          </>
-        )}
-
-        <div className="adm-kartu" style={{ boxShadow: 'none', padding: 12, marginTop: 14 }}>
-          <span className="adm-label" style={{ fontSize: 10 }}>
-            Informasi PIC
-          </span>
-          <div style={{ fontWeight: 700, marginTop: 4 }}>{lead.pic_nama || 'PIC belum diisi'}</div>
-          {lead.pic_jabatan && <div className="adm-redup">{lead.pic_jabatan}</div>}
-          <div className="adm-mono" style={{ marginTop: 8 }}>
-            {lead.email || 'Email belum diisi'}
-          </div>
-          <div className="adm-mono">{lead.telepon || 'Telepon belum diisi'}</div>
-          {lead.lat != null && (
-            <div style={{ marginTop: 8 }}>
-              <span className="adm-redup">Lokasi toko (dari kunjungan): </span>
-              <span className="adm-mono">
-                {Number(lead.lat).toFixed(6)}, {Number(lead.lng).toFixed(6)}
-              </span>{' '}
-              <a className="adm-link" href={`https://www.google.com/maps?q=${lead.lat},${lead.lng}`} target="_blank" rel="noopener noreferrer">
-                buka peta
-              </a>
-            </div>
-          )}
-          <div className="adm-tombol">
-            {telp && (
-              <a className="btn kecil" href={`tel:${telp}`}>
-                Telepon
-              </a>
-            )}
-            {lead.email && (
-              <a className="btn kecil" href={`mailto:${lead.email}`}>
-                Kirim email
-              </a>
-            )}
-            <button className="btn kecil" onClick={() => setEdit(true)}>
-              Ubah data
-            </button>
-          </div>
-          <p className="adm-redup" style={{ margin: '8px 0 0' }}>
-            Sumber {lead.sumber || '-'} · dibuat {tgl(lead.created_at)}
-          </p>
-        </div>
-
-        {error && <p className="adm-error">{error}</p>}
-
-        <p className="adm-label" style={{ fontSize: 10, margin: '16px 0 6px' }}>
-          Riwayat aktivitas & interaksi {aktivitas ? `(${aktivitas.length})` : ''}
-        </p>
-        {!aktivitas ? (
-          <Memuat apa="riwayat" />
-        ) : aktivitas.length === 0 ? (
-          <p className="adm-redup">Belum ada catatan.</p>
-        ) : (
-          <div className="adm-riwayat">
-            {aktivitas.map((a) => (
-              <div key={a.id} className="adm-riwayat-item">
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                  <span className={`adm-chip ${WARNA_AKTIVITAS[a.jenis] || ''}`}>{JENIS_AKTIVITAS[a.jenis] || a.jenis}</span>
-                  <span className="adm-redup">{waktu(a.created_at)}</span>
-                </div>
-                <div style={{ whiteSpace: 'pre-wrap', margin: '6px 0 2px' }}>{a.isi}</div>
-                <div className="adm-redup">oleh {a.admin_nama || '-'}</div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <form
-          className="adm-kartu"
-          style={{ boxShadow: 'none', padding: 12, marginTop: 12 }}
-          onSubmit={async (e) => {
-            e.preventDefault();
-            if (!catatan.trim()) return;
-            try {
-              await api('POST', `/leads/${lead.id}/aktivitas`, { isi: catatan, jenis });
-              setCatatan('');
-              muatAktivitas();
-              onBerubah();
-            } catch (err) {
-              setError(err.message);
-            }
-          }}
-        >
-          <label className="adm-label" htmlFor={`catatan-${lead.id}`} style={{ fontSize: 10 }}>
-            Tambah catatan interaksi
-          </label>
-          <textarea
-            id={`catatan-${lead.id}`}
-            className="adm-input"
-            style={{ marginTop: 6, minHeight: 70, resize: 'vertical' }}
-            value={catatan}
-            onChange={(e) => setCatatan(e.target.value)}
-            placeholder="Tulis catatan aktivitas, follow up, atau kenapa macet"
-          />
-          <div className="adm-tombol" style={{ justifyContent: 'space-between' }}>
-            <select value={jenis} onChange={(e) => setJenis(e.target.value)} aria-label="Jenis catatan">
-              {['catatan', 'telepon', 'meeting', 'email'].map((j) => (
-                <option key={j} value={j}>
-                  {JENIS_AKTIVITAS[j]}
-                </option>
-              ))}
-            </select>
-            <button className="btn kecil utama" type="submit" disabled={!catatan.trim()}>
-              Simpan catatan
-            </button>
-          </div>
-        </form>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 16 }}>
-          {lead.hasil ? (
-            <button className="btn" style={{ gridColumn: '1 / -1' }} onClick={() => ubah({ hasil: null })}>
-              Buka lagi
-            </button>
-          ) : (
-            <>
-              <button className="btn" style={{ background: 'var(--hijau)' }} onClick={() => ubah({ hasil: 'menang' })}>
-                Tandai menang
-              </button>
-              <button className="btn bahaya" onClick={() => ubah({ hasil: 'gagal' })}>
-                Tandai gagal
-              </button>
-            </>
-          )}
-        </div>
-        <button className="adm-link" style={{ marginTop: 14, color: 'var(--merah)' }} onClick={() => setHapus(true)}>
-          Hapus lead ini
-        </button>
-      </div>
-
-      {edit && (
-        <FormLead
-          judul={`Ubah ${lead.kode}`}
-          awal={lead}
-          admins={admins}
-          onTutup={() => setEdit(false)}
-          onSimpan={async (isi) => {
-            await api('PATCH', `/leads/${lead.id}`, isi);
-            setEdit(false);
-            onBerubah();
-          }}
-        />
-      )}
-      {hapus && (
-        <Konfirmasi
-          judul="Hapus lead"
-          pesan={`Hapus ${lead.perusahaan} (${lead.kode}) beserta semua catatannya? Ini nggak bisa dibalikin.`}
-          onBatal={() => setHapus(false)}
-          onYa={async () => {
-            try {
-              await api('DELETE', `/leads/${lead.id}`);
-              setHapus(false);
-              onTutup();
-              onBerubah();
-            } catch (e) {
-              setError(e.message);
-              setHapus(false);
-            }
-          }}
-        />
-      )}
-    </aside>
-  );
-}
-
 // ---------------- Form tambah/ubah ----------------
 export function FormLead({ judul, awal = {}, admins, onTutup, onSimpan }) {
   const [isi, setIsi] = useState({
@@ -854,6 +607,8 @@ export function FormLead({ judul, awal = {}, admins, onTutup, onSimpan }) {
     sumber: awal.sumber || '',
     nilai: awal.nilai ? String(awal.nilai) : '',
     pemilik_id: awal.pemilik_id || '',
+    alamat: awal.alamat || '',
+    jenis_usaha: awal.jenis_usaha || '',
   });
   const [error, setError] = useState('');
   const [sibuk, setSibuk] = useState(false);
@@ -887,6 +642,7 @@ export function FormLead({ judul, awal = {}, admins, onTutup, onSimpan }) {
           {field('email', 'Email', { type: 'email', placeholder: 'email@perusahaan.com' })}
           {field('telepon', 'Telepon / WA', { inputMode: 'tel' })}
           {field('nilai', 'Perkiraan nilai deal (Rp)', { inputMode: 'numeric', placeholder: '0' })}
+          {field('jenis_usaha', 'Jenis usaha', { placeholder: 'Warung kelontong' })}
           <div className="field">
             <label htmlFor="lead-sumber">Sumber</label>
             <select id="lead-sumber" value={isi.sumber} onChange={ubah('sumber')} style={pilih}>
@@ -897,6 +653,7 @@ export function FormLead({ judul, awal = {}, admins, onTutup, onSimpan }) {
             </select>
           </div>
         </div>
+        {field('alamat', 'Alamat', { placeholder: 'Jalan, kelurahan, kota' })}
         {admins.length > 0 && (
           <div className="field">
             <label htmlFor="lead-pemilik">Pemilik lead</label>

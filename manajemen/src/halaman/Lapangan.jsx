@@ -616,9 +616,10 @@ export function FormLog({ api, awal, wajibGps, onTutup, onSelesai }) {
               const h = await api('POST', '/lapangan/log', {
                 ...body,
                 toko: isi.id_kunjungan,
-                lead_id: tokoLama?.id || null,
-                pemilik_nama: tokoLama ? null : pemilikToko.nama,
-                pemilik_hp: tokoLama ? null : pemilikToko.hp,
+                // Dibuka dari detail lead di CRM: langsung nempel ke kartu itu (walau pemiliknya sales lain).
+                lead_id: tokoLama?.id || awal.lead_id || null,
+                pemilik_nama: tokoLama || awal.lead_id ? null : pemilikToko.nama,
+                pemilik_hp: tokoLama || awal.lead_id ? null : pemilikToko.hp,
                 foto: fotoBaru,
               });
               onSelesai(`Kunjungan #${h.nomor} dicatat.`);
@@ -658,6 +659,10 @@ export function FormLog({ api, awal, wajibGps, onTutup, onSelesai }) {
           tokoLama ? (
             <p className="adm-redup" style={{ margin: '6px 0 0' }}>
               Toko lama, nempel ke kartu CRM yang sama (sekarang di tahap <b>{NAMA_TAHAP_CRM[tokoLama.tahap] || tokoLama.tahap}</b>).
+            </p>
+          ) : awal.lead_id ? (
+            <p className="adm-redup" style={{ margin: '6px 0 0' }}>
+              Nempel ke kartu CRM yang lagi kamu buka.
             </p>
           ) : (
             <div className="adm-kartu" style={{ boxShadow: 'none', padding: 12, marginTop: 10 }}>

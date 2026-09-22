@@ -14,6 +14,10 @@ const JEDA_MS = 60 * 1000;
 const URUTAN = { awareness: 0, stuck: 0, trial: 1, konversi: 2, repeat_order: 3 };
 const NAMA_TAHAP = { awareness: 'Awareness', trial: 'Trial 7 hari', konversi: 'Konversi', repeat_order: 'Repeat order', stuck: 'Stuck' };
 const SUMBER = { link: 'Daftar lewat link/QR sales', kode: 'Daftar pakai kode sales' };
+// Estimasi deal kartu otomatis = harga paket tokonya (trial: paket bulanan, yang paling murah). Cuma ngisi kartu yang
+// nilainya masih 0 - estimasi yang udah diisi manual nggak ditimpa.
+const HARGA_PAKET = { bulanan: 78000, triwulan: 210000, tahunan: 684000, permanen: 3650000 };
+const estimasi = (plan) => HARGA_PAKET[plan] || HARGA_PAKET.bulanan;
 const angkaHp = (h) => (h || '').replace(/\D/g, '').replace(/^0/, '62');
 
 let siap = null;
@@ -76,7 +80,7 @@ async function sinkron() {
        WHERE NOT COALESCE(w.demo, false)`
     ),
     query(`SELECT DISTINCT ON (wp_sales_id) id, nama, wp_sales_id FROM mj_admin WHERE peran = 'sales' AND wp_sales_id IS NOT NULL ORDER BY wp_sales_id, aktif DESC, created_at`),
-    query(`SELECT id, perusahaan, telepon, tahap, pemilik_id, warung_id, hasil FROM mj_lead`),
+    query(`SELECT id, perusahaan, telepon, tahap, pemilik_id, warung_id, hasil, nilai::float AS nilai FROM mj_lead`),
   ]);
   const { rows: abaikan } = await query('SELECT warung_id FROM mj_crm_abaikan');
   const diabaikan = new Set(abaikan.map((r) => r.warung_id));
@@ -91,7 +95,7 @@ async function sinkron() {
     if (diabaikan.has(w.id) && !perWarung.has(w.id)) continue;
     const tahapToko = tahapDariWarung(w);
     const ada = perWarung.get(w.id);
-    if (ada && ada.pemilik_id === a.id && (ada.hasil || !tahapBaru(ada.tahap, tahapToko))) continue; // nggak ada yang berubah
+    if (ada && ada.pemilik_id === a.id && ada.nilai > 0 && (ada.hasil || !tahapBaru(ada.tahap, tahapToko))) continue; // nggak ada yang berubah
     const c = await pool.connect();
     try {
       await c.query('BEGIN');
@@ -111,9 +115,9 @@ async function sinkron() {
           }
         } else {
           const { rows } = await c.query(
-            `INSERT INTO mj_lead (perusahaan, telepon, sumber, tahap, pemilik_id, warung_id, created_at, tahap_sejak)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,now()) ON CONFLICT (warung_id) WHERE warung_id IS NOT NULL DO NOTHING RETURNING *`,
-            [w.nama, w.no_hp, SUMBER[w.sumber_daftar] || 'Toko dari sales', tahapToko, a.id, w.id, w.created_at]
+            `INSERT INTO mj_lead (perusahaan, telepon, sumber, tahap, pemilik_id, warung_id, created_at, tahap_sejak, nilai)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,now(),$8) ON CONFLICT (warung_id) WHERE warung_id IS NOT NULL DO NOTHING RETURNING *`,
+            [w.nama, w.no_hp, SUMBER[w.sumber_daftar] || 'Toko dari sales', tahapToko, a.id, w.id, w.created_at, estimasi(w.plan)]
           );
           if (rows.length) {
             await catat(rows[0].id, 'tahap', `Kartu dibuat otomatis: toko daftar Asisten Warung (@${w.username}) lewat ${a.nama}, tahap ${NAMA_TAHAP[tahapToko]}`);
@@ -123,6 +127,7 @@ async function sinkron() {
           continue;
         }
       }
+      if (!(Number(k.nilai) > 0)) await c.query('UPDATE mj_lead SET nilai=$2 WHERE id=$1 AND nilai = 0', [k.id, estimasi(w.plan)]);
       if (k.pemilik_id !== a.id) {
         await c.query('UPDATE mj_lead SET pemilik_id=$2, updated_at=now() WHERE id=$1', [k.id, a.id]);
         await catat(k.id, 'tahap', `Toko pindah ke sales ${a.nama}`);

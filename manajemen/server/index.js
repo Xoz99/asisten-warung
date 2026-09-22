@@ -13,6 +13,7 @@ import artifactRoutes, { berkasRouter as artifactBerkas } from './artifact.route
 import lapanganRoutes from './lapangan.routes.js';
 import komisiRoutes from './komisi.routes.js';
 import timRoutes from './tim.routes.js';
+import leadDetailRoutes from './leadDetail.routes.js';
 import { PRODUK } from './produk/index.js';
 
 // Server aplikasi manajemen Konsulin: API /api/* (wajib login admin, lihat auth.js) + nyajiin hasil build tampilannya (dist/).
@@ -31,6 +32,8 @@ app.use('/api/publik/daftar', express.json({ limit: '9mb' }));
 app.use('/api/lapangan', express.json({ limit: '13mb' }));
 // Foto profil sales (udah dikecilin di HP, maks 1 MB -> base64 ~1,4 MB).
 app.use(['/api/tim-sales', '/api/saya/foto'], express.json({ limit: '2mb' }));
+// Foto warung di detail lead (maks 1,5 MB -> base64 ~2 MB).
+app.use('/api/leads', express.json({ limit: '3mb' }));
 app.use(express.json({ limit: '100kb' }));
 
 app.get('/health', (req, res) => res.json({ ok: true }));
@@ -49,6 +52,7 @@ app.use('/api', artifactRoutes);
 app.use('/api', lapanganRoutes);
 app.use('/api', komisiRoutes);
 app.use('/api', timRoutes);
+app.use('/api', leadDetailRoutes);
 app.get('/api/produk', (req, res) => {
   res.json(PRODUK.filter((p) => p.aktif).map(({ id, nama, url }) => ({ id, nama, url })));
 });
