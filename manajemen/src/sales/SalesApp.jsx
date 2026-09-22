@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { rupiah, tgl, waktu } from '../lib/format.js';
 import { Gagal, Kosong, Memuat, Modal, useData } from '../komponen/Ui.jsx';
-import { Detail, FormLog, HASIL, STATUS_TOKO, sisaHari } from '../halaman/Lapangan.jsx';
+import { Detail, FormLog, HASIL, STATUS_TOKO, daftarKelompok, saringKamus, sisaHari } from '../halaman/Lapangan.jsx';
 
 // Tampilan khusus akun peran sales: app HP buat di lapangan, beda dari panel admin. Nggak ada sidebar; menu di bawah
 // (Beranda, Toko, Catat, Riwayat, Contekan) biar gampang dipencet satu tangan. Datanya dari API /lapangan/* yang sama,
@@ -401,34 +401,73 @@ function Riwayat({ api, versi, onBuka }) {
   );
 }
 
-// ---------------- Contekan (bank keberatan) ----------------
+// ---------------- Contekan (kamus keberatan) ----------------
 function Contekan({ api, onCatat }) {
   const { data, error, muat } = useData(api, '/lapangan/keberatan');
   const [buka, setBuka] = useState(null);
+  const [q, setQ] = useState('');
+  const [kelompok, setKelompok] = useState('');
+  const tampil = saringKamus(data, q, kelompok);
   return (
     <>
       <h1 className="sl-h1">Contekan jawaban</h1>
       <p className="sl-redup" style={{ margin: '0 0 12px' }}>
-        Keberatan yang sering keluar dari pemilik warung, plus fakta produk buat ngejawabnya.
+        Keberatan yang sering keluar dari pemilik warung, fakta produk buat ngejawab, dan contoh omongannya.
       </p>
+      <div className="sl-cari">
+        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder='Cari: "mahal", "gaptek", "utang"…' aria-label="Cari contekan" />
+      </div>
+      {data && data.length > 0 && (
+        <div className="sl-chip-gulir">
+          <button className={kelompok === '' ? 'on' : ''} onClick={() => setKelompok('')}>
+            Semua
+          </button>
+          {daftarKelompok(data).map((g) => (
+            <button key={g} className={kelompok === g ? 'on' : ''} onClick={() => setKelompok(g)} aria-pressed={kelompok === g}>
+              {g}
+            </button>
+          ))}
+        </div>
+      )}
       {error ? (
         <Gagal apa="contekan" pesan={error} onUlang={muat} />
       ) : !data ? (
         <Memuat apa="contekan" />
       ) : data.length === 0 ? (
         <Kosong judul="Contekan masih kosong">Minta admin ngisi bank keberatan.</Kosong>
+      ) : tampil.length === 0 ? (
+        <div className="sl-kosong">Nggak ketemu. Coba kata lain, atau catat sebagai "Lainnya" biar admin nambahin.</div>
       ) : (
         <ul className="sl-daftar">
-          {data.map((k) => (
+          {tampil.map((k) => (
             <li key={k.id} className="sl-kartu sl-contekan">
               <button className="sl-contekan-buka" onClick={() => setBuka(buka === k.id ? null : k.id)} aria-expanded={buka === k.id}>
-                <span className="sl-tag">{k.kategori}</span>
+                <span className="sl-baris">
+                  <span className="sl-tag">{k.kategori}</span>
+                  {k.kelompok && k.kelompok !== k.kategori && <span className="sl-redup">{k.kelompok}</span>}
+                </span>
                 <b>"{k.ucapan}"</b>
               </button>
               {buka === k.id && (
                 <div className="sl-fakta">
+                  {k.variasi && (
+                    <p className="sl-redup" style={{ margin: '0 0 10px' }}>
+                      Juga sering diomongin: {k.variasi.split('\n').filter(Boolean).map((v) => `"${v}"`).join(', ')}
+                    </p>
+                  )}
                   <span className="sl-label">Jawab pakai fakta ini</span>
                   <p>{k.fakta}</p>
+                  {k.contoh_jawaban && (
+                    <>
+                      <span className="sl-label">Contoh omongan</span>
+                      <p className="sl-contoh">"{k.contoh_jawaban}"</p>
+                    </>
+                  )}
+                  {k.jangan && (
+                    <p className="sl-jangan">
+                      <b>Jangan:</b> {k.jangan}
+                    </p>
+                  )}
                   <button className="sl-tombol" onClick={() => onCatat({ keberatan_id: k.id })}>
                     Catat kunjungan dengan keberatan ini
                   </button>

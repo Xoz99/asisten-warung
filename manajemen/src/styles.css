@@ -585,3 +585,8 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 .mk-ingat{display:flex;gap:12px;align-items:flex-start;margin-top:16px;cursor:pointer;font-weight:600;font-size:15px}
 .mk-ingat input{width:22px;height:22px;margin:1px 0 0;accent-color:var(--biru);flex:none;cursor:pointer}
 .mk-ingat small{display:block;font-weight:400;color:var(--redup);font-size:13px;margin-top:2px}
+.sl-cari{margin-bottom:10px}
+.sl-cari input{width:100%;min-height:48px;border:2px solid var(--hitam);border-radius:999px;padding:0 18px;font:inherit;font-size:16px;background:var(--putih)}
+.sl-cari input:focus{outline:none;box-shadow:0 0 0 3px rgba(29,78,216,.25)}
+.sl-contoh{font-style:italic;background:#EEF2FF;padding:8px 12px;border-radius:10px}
+.sl-jangan{color:var(--merah);font-size:14px;margin:0 0 12px}

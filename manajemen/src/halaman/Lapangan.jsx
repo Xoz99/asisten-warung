@@ -680,10 +680,16 @@ export function FormLog({ api, awal, wajibGps, onTutup, onSelesai }) {
           <select id="l-bank" value={tanpa ? '__tanpa' : lainnya ? '__lain' : isi.keberatan_id} onChange={pilihBank} style={gaya} required={!lainnya && !tanpa}>
             <option value="">{bank ? 'Pilih dari bank keberatan' : 'Memuat…'}</option>
             <option value="__tanpa">Nggak ada keberatan (langsung mau)</option>
-            {(bank || []).map((k) => (
-              <option key={k.id} value={k.id}>
-                {k.kategori}: {k.ucapan.length > 70 ? k.ucapan.slice(0, 70) + '…' : k.ucapan}
-              </option>
+            {daftarKelompok(bank).map((g) => (
+              <optgroup key={g} label={g}>
+                {(bank || [])
+                  .filter((k) => (k.kelompok || 'Lainnya') === g)
+                  .map((k) => (
+                    <option key={k.id} value={k.id}>
+                      {k.kategori}: {k.ucapan.length > 60 ? k.ucapan.slice(0, 60) + '…' : k.ucapan}
+                    </option>
+                  ))}
+              </optgroup>
             ))}
             <option value="__lain">Lainnya (belum ada di bank)</option>
           </select>
@@ -700,6 +706,12 @@ export function FormLog({ api, awal, wajibGps, onTutup, onSelesai }) {
               Fakta buat ngejawab
             </span>
             <p style={{ margin: '4px 0 0' }}>{dipilih.fakta}</p>
+            {dipilih.contoh_jawaban && <p style={{ margin: '8px 0 0', fontStyle: 'italic' }}>Contoh: "{dipilih.contoh_jawaban}"</p>}
+            {dipilih.jangan && (
+              <p style={{ margin: '8px 0 0', color: 'var(--merah)', fontSize: 14 }}>
+                <b>Jangan:</b> {dipilih.jangan}
+              </p>
+            )}
           </div>
         )}
         {!tanpa && (
@@ -1155,9 +1167,27 @@ function Toko({ api, sales }) {
   );
 }
 
-// ---------------- Bank keberatan ----------------
+// ---------------- Bank keberatan (kamus contekan) ----------------
+const DRAF = '[PERLU DIISI ADMIN]';
+export const KELOMPOK_URUT = ['Harga', 'Kebiasaan', 'Teknologi', 'Waktu & tenaga', 'Operasional', 'Kepercayaan', 'Pesaing'];
+// Filter kamus: kata dicari di kategori, ucapan, cara lain ngomong, fakta, dan contoh jawaban.
+export function saringKamus(daftar, q, kelompok) {
+  const kata = q.trim().toLowerCase();
+  return (daftar || []).filter(
+    (k) =>
+      (!kelompok || (k.kelompok || 'Lainnya') === kelompok) &&
+      (!kata || [k.kategori, k.ucapan, k.variasi, k.fakta, k.contoh_jawaban].some((x) => (x || '').toLowerCase().includes(kata)))
+  );
+}
+export const daftarKelompok = (daftar) => {
+  const ada = [...new Set((daftar || []).map((k) => k.kelompok || 'Lainnya'))];
+  return [...KELOMPOK_URUT.filter((x) => ada.includes(x)), ...ada.filter((x) => !KELOMPOK_URUT.includes(x))];
+};
+
 function Bank({ api, sales, setPesan, onPakai }) {
   const [semua, setSemua] = useState(false);
+  const [q, setQ] = useState('');
+  const [kelompok, setKelompok] = useState('');
   const { data, error, muat } = useData(api, `/lapangan/keberatan${semua ? '?semua=1' : ''}`);
   const [form, setForm] = useState(null);
   const simpanAktif = async (k, aktif) => {
@@ -1171,68 +1201,107 @@ function Bank({ api, sales, setPesan, onPakai }) {
   };
   if (error) return <Gagal apa="bank keberatan" pesan={error} onUlang={muat} />;
   if (!data) return <Memuat apa="bank keberatan" />;
+  const tampil = saringKamus(data, q, kelompok);
+  const draf = data.filter((k) => k.fakta.startsWith(DRAF)).length;
   return (
     <>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
-        <p className="adm-redup" style={{ margin: 0, marginRight: 'auto' }}>
-          Keberatan yang sering muncul + fakta produk buat ngejawabnya. {sales ? 'Pakai ini sebagai contekan waktu kunjungan.' : 'Sales milih dari daftar ini waktu nyatet kunjungan.'}
-        </p>
+      <section className="adm-kartu" style={{ marginBottom: 12, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari keberatan, fakta, contoh jawaban" aria-label="Cari di kamus contekan" style={{ flex: '1 1 220px', minWidth: 0, maxWidth: 'none' }} />
+        <select value={kelompok} onChange={(e) => setKelompok(e.target.value)} aria-label="Filter kelompok">
+          <option value="">Semua kelompok</option>
+          {daftarKelompok(data).map((x) => (
+            <option key={x}>{x}</option>
+          ))}
+        </select>
         {!sales && (
           <>
             <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <input type="checkbox" className="adm-centang" checked={semua} onChange={(e) => setSemua(e.target.checked)} /> Tampilkan yang nonaktif
+              <input type="checkbox" className="adm-centang" checked={semua} onChange={(e) => setSemua(e.target.checked)} /> Tampilkan nonaktif & draf
             </label>
             <button className="btn utama" onClick={() => setForm({})}>
               + Tambah keberatan
             </button>
           </>
         )}
-      </div>
-      {data.length === 0 ? (
-        <Kosong judul="Bank keberatan masih kosong">{sales ? 'Minta admin ngisi daftar keberatan.' : 'Tambah keberatan yang sering didengar sales di lapangan.'}</Kosong>
+      </section>
+      <p className="adm-redup" style={{ margin: '0 0 12px' }}>
+        {tampil.length} dari {data.length} keberatan. Fakta cuma boleh berisi fitur yang beneran ada di Asisten Warung.
+        {!sales && semua && draf > 0 && ` Ada ${draf} draf bertanda ${DRAF} yang perlu kamu isi sebelum diaktifin.`}
+        {!sales && !semua && ' Centang "Tampilkan nonaktif & draf" buat lihat draf yang perlu diisi.'}
+      </p>
+      {tampil.length === 0 ? (
+        <Kosong judul={data.length ? 'Nggak ada yang cocok' : 'Bank keberatan masih kosong'}>
+          {data.length ? 'Coba kata lain atau hapus filter kelompok.' : sales ? 'Minta admin ngisi daftar keberatan.' : 'Tambah keberatan yang sering didengar sales di lapangan.'}
+        </Kosong>
       ) : (
         <div className="adm-lap-bank">
-          {data.map((k) => (
-            <article key={k.id} className="adm-kartu" style={k.aktif ? undefined : { opacity: 0.6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-                <span className="adm-chip ungu">{k.kategori}</span>
-                <span className="adm-redup p-num" style={{ fontSize: 13 }}>
-                  {k.dipakai ? `dipakai ${k.dipakai}× · ${Math.round((k.berhasil / k.dipakai) * 100)}% berhasil` : 'belum dipakai'}
-                </span>
-              </div>
-              <p style={{ margin: '12px 0 0', fontWeight: 700, fontSize: 17 }}>"{k.ucapan}"</p>
-              <div style={{ borderTop: '1px solid #E4E4E7', marginTop: 12, paddingTop: 10 }}>
-                <span className="adm-label" style={{ fontSize: 11 }}>
-                  Fakta dari produk
-                </span>
-                <p style={{ margin: '4px 0 0' }}>{k.fakta}</p>
-              </div>
-              <div className="adm-tombol">
-                {k.aktif && (
-                  <button className="btn kecil utama" onClick={() => onPakai(k)}>
-                    Catat kunjungan dengan ini
-                  </button>
+          {tampil.map((k) => {
+            const isDraf = k.fakta.startsWith(DRAF);
+            return (
+              <article key={k.id} className="adm-kartu" style={k.aktif ? undefined : { opacity: isDraf ? 1 : 0.6, borderStyle: isDraf ? 'dashed' : undefined }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span>
+                    <span className="adm-chip ungu">{k.kategori}</span> {k.kelompok && k.kelompok !== k.kategori && <span className="adm-chip">{k.kelompok}</span>}
+                  </span>
+                  <span className="adm-redup p-num" style={{ fontSize: 13 }}>
+                    {isDraf ? <span className="adm-chip kuning">Draf, perlu diisi</span> : k.dipakai ? `dipakai ${k.dipakai}× · ${Math.round((k.berhasil / k.dipakai) * 100)}% berhasil` : 'belum dipakai'}
+                  </span>
+                </div>
+                <p style={{ margin: '12px 0 0', fontWeight: 700, fontSize: 17 }}>"{k.ucapan}"</p>
+                {k.variasi && (
+                  <p className="adm-redup" style={{ margin: '4px 0 0', fontSize: 13 }}>
+                    Juga sering diomongin: {k.variasi.split('\n').filter(Boolean).map((v) => `"${v}"`).join(', ')}
+                  </p>
                 )}
-                {!sales && (
-                  <>
-                    <button className="btn kecil" onClick={() => setForm(k)}>
-                      Ubah
-                    </button>
-                    <button className="btn kecil" onClick={() => simpanAktif(k, !k.aktif)}>
-                      {k.aktif ? 'Nonaktifkan' : 'Aktifkan'}
-                    </button>
-                  </>
+                <div style={{ borderTop: '1px solid #E4E4E7', marginTop: 12, paddingTop: 10 }}>
+                  <span className="adm-label" style={{ fontSize: 11 }}>
+                    Fakta dari produk
+                  </span>
+                  <p style={{ margin: '4px 0 0' }}>{k.fakta}</p>
+                </div>
+                {k.contoh_jawaban && (
+                  <div style={{ marginTop: 10 }}>
+                    <span className="adm-label" style={{ fontSize: 11 }}>
+                      Contoh jawaban
+                    </span>
+                    <p style={{ margin: '4px 0 0', fontStyle: 'italic' }}>"{k.contoh_jawaban}"</p>
+                  </div>
                 )}
-                {!k.aktif && <span className="adm-chip">Nonaktif</span>}
-              </div>
-            </article>
-          ))}
+                {k.jangan && (
+                  <p style={{ margin: '10px 0 0', color: 'var(--merah)', fontSize: 14 }}>
+                    <b>Jangan:</b> {k.jangan}
+                  </p>
+                )}
+                <div className="adm-tombol">
+                  {k.aktif && (
+                    <button className="btn kecil utama" onClick={() => onPakai(k)}>
+                      Catat kunjungan dengan ini
+                    </button>
+                  )}
+                  {!sales && (
+                    <>
+                      <button className="btn kecil" onClick={() => setForm(k)}>
+                        {isDraf ? 'Isi draf' : 'Ubah'}
+                      </button>
+                      {!isDraf && (
+                        <button className="btn kecil" onClick={() => simpanAktif(k, !k.aktif)}>
+                          {k.aktif ? 'Nonaktifkan' : 'Aktifkan'}
+                        </button>
+                      )}
+                    </>
+                  )}
+                  {!k.aktif && !isDraf && <span className="adm-chip">Nonaktif</span>}
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
       {form && (
         <FormBank
           api={api}
           awal={form}
+          kelompokAda={daftarKelompok(data)}
           onTutup={() => setForm(null)}
           onSelesai={(t) => {
             setForm(null);
@@ -1245,41 +1314,83 @@ function Bank({ api, sales, setPesan, onPakai }) {
   );
 }
 
-function FormBank({ api, awal, onTutup, onSelesai }) {
-  const [isi, setIsi] = useState({ kategori: awal.kategori || '', ucapan: awal.ucapan || '', fakta: awal.fakta || '' });
+function FormBank({ api, awal, kelompokAda, onTutup, onSelesai }) {
+  const [isi, setIsi] = useState({
+    kelompok: awal.kelompok || '',
+    kategori: awal.kategori || '',
+    ucapan: awal.ucapan || '',
+    variasi: awal.variasi || '',
+    fakta: awal.fakta || '',
+    contoh_jawaban: awal.contoh_jawaban || '',
+    jangan: awal.jangan || '',
+  });
+  const [aktifkan, setAktifkan] = useState(false);
   const [error, setError] = useState('');
   const [sibuk, setSibuk] = useState(false);
   const ubah = (k) => (e) => setIsi((x) => ({ ...x, [k]: e.target.value }));
+  const masihDraf = isi.fakta.trim().startsWith(DRAF);
+  const drafAwal = (awal.fakta || '').startsWith(DRAF);
   return (
-    <Modal judul={awal.id ? `Ubah ${awal.kategori}` : 'Tambah keberatan'} onTutup={onTutup}>
+    <Modal judul={awal.id ? (drafAwal ? `Isi draf: ${awal.kategori}` : `Ubah ${awal.kategori}`) : 'Tambah keberatan'} onTutup={onTutup} lebar={720}>
       <form
         onSubmit={async (e) => {
           e.preventDefault();
           setError('');
           setSibuk(true);
           try {
-            if (awal.id) await api('PATCH', `/lapangan/keberatan/${awal.id}`, isi);
-            else await api('POST', '/lapangan/keberatan', isi);
-            onSelesai(`${isi.kategori} disimpan.`);
+            if (awal.id) {
+              await api('PATCH', `/lapangan/keberatan/${awal.id}`, isi);
+              if (drafAwal && aktifkan && !masihDraf) await api('PATCH', `/lapangan/keberatan/${awal.id}`, { aktif: true });
+            } else await api('POST', '/lapangan/keberatan', isi);
+            onSelesai(`${isi.kategori} disimpan${drafAwal && aktifkan && !masihDraf ? ' dan diaktifin' : ''}.`);
           } catch (err) {
             setError(err.message);
             setSibuk(false);
           }
         }}
       >
-        <div className="field">
-          <label htmlFor="b-kat">Kategori</label>
-          <input id="b-kat" value={isi.kategori} onChange={ubah('kategori')} maxLength={60} placeholder="Gaptek/HP" required />
+        <div className="adm-baris" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+          <div className="field">
+            <label htmlFor="b-kel">Kelompok</label>
+            <input id="b-kel" value={isi.kelompok} onChange={ubah('kelompok')} maxLength={40} placeholder="Harga" list="b-kel-ada" />
+            <datalist id="b-kel-ada">
+              {[...new Set([...KELOMPOK_URUT, ...(kelompokAda || [])])].map((x) => (
+                <option key={x} value={x} />
+              ))}
+            </datalist>
+          </div>
+          <div className="field">
+            <label htmlFor="b-kat">Kategori</label>
+            <input id="b-kat" value={isi.kategori} onChange={ubah('kategori')} maxLength={60} placeholder="Gaptek/HP" required />
+          </div>
         </div>
         <div className="field">
           <label htmlFor="b-ucapan">Ucapan pelanggan</label>
           <textarea id="b-ucapan" value={isi.ucapan} onChange={ubah('ucapan')} rows={2} maxLength={500} placeholder="Saya gaptek, gak ngerti HP." required />
         </div>
         <div className="field">
-          <label htmlFor="b-fakta">Fakta dari produk (buat ngejawab)</label>
-          <textarea id="b-fakta" value={isi.fakta} onChange={ubah('fakta')} rows={4} maxLength={1500} required />
+          <label htmlFor="b-variasi">Cara lain pelanggan ngomong (satu per baris, opsional)</label>
+          <textarea id="b-variasi" value={isi.variasi} onChange={ubah('variasi')} rows={3} maxLength={1000} placeholder={'Anak saya aja yang ngerti\nUdah tua, nggak bisa beginian'} />
         </div>
-        {awal.id && <p className="adm-redup">Log kunjungan lama tetap nyimpen kategori aslinya; fakta yang ditampilin ikut versi terbaru.</p>}
+        <div className="field">
+          <label htmlFor="b-fakta">Fakta dari produk (cuma fitur yang beneran ada)</label>
+          <textarea id="b-fakta" value={isi.fakta} onChange={ubah('fakta')} rows={3} maxLength={1500} required />
+        </div>
+        <div className="field">
+          <label htmlFor="b-contoh">Contoh jawaban (bahasa lisan, opsional)</label>
+          <textarea id="b-contoh" value={isi.contoh_jawaban} onChange={ubah('contoh_jawaban')} rows={3} maxLength={1500} placeholder="Kalau Ibu bisa kirim WA, pasti bisa, Bu…" />
+        </div>
+        <div className="field">
+          <label htmlFor="b-jangan">Jangan dijanjiin (opsional)</label>
+          <input id="b-jangan" value={isi.jangan} onChange={ubah('jangan')} maxLength={600} placeholder="Jangan janji bisa offline penuh" />
+        </div>
+        {drafAwal && (
+          <label className="adm-setuju">
+            <input type="checkbox" className="adm-centang" checked={aktifkan} onChange={(e) => setAktifkan(e.target.checked)} disabled={masihDraf} />
+            <span>{masihDraf ? `Hapus tanda ${DRAF} dan isi faktanya dulu biar bisa diaktifin.` : 'Aktifin sekarang (langsung kelihatan di contekan sales).'}</span>
+          </label>
+        )}
+        {awal.id && !drafAwal && <p className="adm-redup">Log kunjungan lama tetap nyimpen kategori aslinya; fakta yang ditampilin ikut versi terbaru.</p>}
         {error && <p className="adm-error">{error}</p>}
         <div className="adm-tombol" style={{ justifyContent: 'flex-end', marginTop: 16 }}>
           <button type="button" className="btn" onClick={onTutup}>

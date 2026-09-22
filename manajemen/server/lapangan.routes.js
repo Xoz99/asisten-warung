@@ -7,6 +7,7 @@ import { catatLog, query, pool } from './db.js';
 import { query as queryWp, pastikanTabelSales } from './produk/warung-pintar/db.js';
 import { pastikanTabelOps } from './ops.routes.js';
 import { normalisasiNoHp } from './utils/noHp.js';
+import { FAKTA_BUKU_BENAR, FAKTA_LAMA_SALAH, KAMUS, PENANDA_KAMUS } from './kamusKeberatan.js';
 
 // Sales Lapangan: bank keberatan pelanggan (kategori, ucapan, fakta produk buat ngejawab) + log kunjungan sales
 // (respon sales, respon pelanggan, hasil, insight, foto bukti WEBP, titik GPS otomatis dari HP).
@@ -25,24 +26,7 @@ const JAM_UBAH_SALES = 24;
 
 export const HASIL = ['berhasil', 'tertarik', 'pikir', 'ditolak'];
 
-// Isi awal bank keberatan (dari tabel yang dipakai tim). Cuma dimasukin kalau bank-nya masih kosong.
-const BANK_AWAL = [
-  {
-    kategori: 'Gaptek/HP',
-    ucapan: 'Saya gaptek / gak mengerti HP. (bisa jadi takut dikira bodoh/malu)',
-    fakta: 'Tampilan Asisten Warung dirancang sederhana: tombol besar, alur mirip kirim WA. Tim bantu setup langsung di tempat, gratis.',
-  },
-  {
-    kategori: 'Kebiasaan/Buku manual',
-    ucapan: 'Saya sudah biasa pakai buku catatan kertas.',
-    fakta: 'Data di aplikasi tersimpan otomatis, tidak hilang/basah/robek. Ada fitur pengingat tagihan otomatis via WA.',
-  },
-  {
-    kategori: 'Harga',
-    ucapan: 'Bayar gak ini? Mahal gak?',
-    fakta: 'Trial gratis 7 hari. Harga paket resmi: Rp78rb/bulan atau Rp684rb/tahun.',
-  },
-];
+// Isi awal bank keberatan ada di kamusKeberatan.js.
 
 let siap = null;
 function pastikanTabel() {
@@ -87,10 +71,10 @@ function pastikanTabel() {
       await query('ALTER TABLE mj_lapangan_log ADD COLUMN IF NOT EXISTS lead_id UUID');
       // Titik toko di kartu CRM: diambil dari GPS kunjungan pertama yang punya lokasi.
       await query('ALTER TABLE mj_lead ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION, ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION');
-      const { rows } = await query('SELECT count(*)::int AS n FROM mj_keberatan');
-      if (!rows[0].n) {
-        for (const b of BANK_AWAL) await query('INSERT INTO mj_keberatan (kategori, ucapan, fakta) VALUES ($1,$2,$3)', [b.kategori, b.ucapan, b.fakta]);
-      }
+      // Kartu contekan yang lebih lengkap: kelompok, cara lain pelanggan ngomong, contoh jawaban, yang jangan dijanjiin.
+      await query(`ALTER TABLE mj_keberatan ADD COLUMN IF NOT EXISTS kelompok TEXT, ADD COLUMN IF NOT EXISTS variasi TEXT,
+        ADD COLUMN IF NOT EXISTS contoh_jawaban TEXT, ADD COLUMN IF NOT EXISTS jangan TEXT`);
+      await isiKamusSekali();
       fs.mkdirSync(DIR, { recursive: true });
     })().catch((e) => {
       siap = null;
@@ -99,6 +83,43 @@ function pastikanTabel() {
   }
   return siap;
 }
+// Kamus contekan awal dimasukin SEKALI (penanda di mj_seed). Baris yang udah ada (sama kategori & ucapan) cuma
+// dilengkapin kolom yang masih kosong - hasil edit admin nggak ditimpa. Kalau admin nanti ngedit / nonaktifin, nggak
+// bakal dimunculin lagi.
+async function isiKamusSekali() {
+  await query('CREATE TABLE IF NOT EXISTS mj_seed (nama TEXT PRIMARY KEY, created_at TIMESTAMPTZ DEFAULT now())');
+  const c = await pool.connect();
+  try {
+    await c.query('BEGIN');
+    const { rowCount } = await c.query('INSERT INTO mj_seed (nama) VALUES ($1) ON CONFLICT DO NOTHING', [PENANDA_KAMUS]);
+    if (!rowCount) {
+      await c.query('ROLLBACK');
+      return;
+    }
+    for (const k of KAMUS) {
+      const { rows } = await c.query('SELECT id, fakta FROM mj_keberatan WHERE lower(kategori)=lower($1) AND lower(ucapan)=lower($2) LIMIT 1', [k.kategori, k.ucapan]);
+      if (rows.length) {
+        await c.query(
+          `UPDATE mj_keberatan SET kelompok=COALESCE(kelompok,$2), variasi=COALESCE(variasi,$3), contoh_jawaban=COALESCE(contoh_jawaban,$4),
+             jangan=COALESCE(jangan,$5), fakta=CASE WHEN fakta=$6 THEN $7 ELSE fakta END, diubah_at=now() WHERE id=$1`,
+          [rows[0].id, k.kelompok, k.variasi || null, k.contoh_jawaban || null, k.jangan || null, FAKTA_LAMA_SALAH, FAKTA_BUKU_BENAR]
+        );
+      } else {
+        await c.query(
+          `INSERT INTO mj_keberatan (kelompok, kategori, ucapan, variasi, fakta, contoh_jawaban, jangan, aktif) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [k.kelompok, k.kategori, k.ucapan, k.variasi || null, k.fakta, k.contoh_jawaban || null, k.jangan || null, k.aktif]
+        );
+      }
+    }
+    await c.query('COMMIT');
+  } catch (e) {
+    await c.query('ROLLBACK');
+    throw e;
+  } finally {
+    c.release();
+  }
+}
+
 router.use('/lapangan', async (req, res, next) => {
   try {
     await pastikanTabel();
@@ -121,7 +142,7 @@ router.get('/lapangan/keberatan', async (req, res, next) => {
          count(l.id) FILTER (WHERE l.hasil = 'berhasil')::int AS berhasil
        FROM mj_keberatan k LEFT JOIN mj_lapangan_log l ON l.keberatan_id = k.id
        ${semua ? '' : 'WHERE k.aktif'}
-       GROUP BY k.id ORDER BY k.aktif DESC, k.nomor`
+       GROUP BY k.id ORDER BY k.aktif DESC, k.kelompok NULLS LAST, k.nomor`
     );
     res.json(rows);
   } catch (e) {
@@ -130,7 +151,15 @@ router.get('/lapangan/keberatan', async (req, res, next) => {
 });
 
 function bersihkanBank(b) {
-  const x = { kategori: teks(b.kategori, 60), ucapan: teks(b.ucapan, 500), fakta: teks(b.fakta, 1500) };
+  const x = {
+    kategori: teks(b.kategori, 60),
+    ucapan: teks(b.ucapan, 500),
+    fakta: teks(b.fakta, 1500),
+    kelompok: teks(b.kelompok, 40) || null,
+    variasi: teks(b.variasi, 1000) || null,
+    contoh_jawaban: teks(b.contoh_jawaban, 1500) || null,
+    jangan: teks(b.jangan, 600) || null,
+  };
   if (!x.kategori) throw salah('Kategori wajib diisi');
   if (!x.ucapan) throw salah('Ucapan pelanggan wajib diisi');
   if (!x.fakta) throw salah('Fakta dari produk wajib diisi');
@@ -141,12 +170,10 @@ router.post('/lapangan/keberatan', async (req, res, next) => {
   try {
     adminSaja(req);
     const x = bersihkanBank(req.body || {});
-    const { rows } = await query('INSERT INTO mj_keberatan (kategori, ucapan, fakta, dibuat_oleh) VALUES ($1,$2,$3,$4) RETURNING id', [
-      x.kategori,
-      x.ucapan,
-      x.fakta,
-      req.admin.id,
-    ]);
+    const { rows } = await query(
+      'INSERT INTO mj_keberatan (kategori, ucapan, fakta, kelompok, variasi, contoh_jawaban, jangan, dibuat_oleh) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
+      [x.kategori, x.ucapan, x.fakta, x.kelompok, x.variasi, x.contoh_jawaban, x.jangan, req.admin.id]
+    );
     await catatLog(req, 'lapangan.keberatan.tambah', { kategori: x.kategori });
     res.status(201).json(rows[0]);
   } catch (e) {
@@ -160,15 +187,22 @@ router.patch('/lapangan/keberatan/:id', async (req, res, next) => {
     if (!POLA_UUID.test(req.params.id)) throw salah('Keberatan nggak ditemukan', 404);
     let rows;
     if (typeof req.body.aktif === 'boolean' && req.body.kategori === undefined) {
+      // Draf dari kamus awal belum boleh dilihat sales sebelum faktanya diisi admin.
+      if (req.body.aktif) {
+        const { rows: cek } = await query('SELECT fakta FROM mj_keberatan WHERE id=$1', [req.params.id]);
+        if (cek[0]?.fakta.startsWith('[PERLU DIISI ADMIN]')) throw salah('Isi dulu fakta & contoh jawabannya (hapus tanda [PERLU DIISI ADMIN]) sebelum diaktifin');
+      }
       ({ rows } = await query('UPDATE mj_keberatan SET aktif=$2, diubah_at=now() WHERE id=$1 RETURNING kategori', [req.params.id, req.body.aktif]));
     } else {
       const x = bersihkanBank(req.body || {});
-      ({ rows } = await query('UPDATE mj_keberatan SET kategori=$2, ucapan=$3, fakta=$4, diubah_at=now() WHERE id=$1 RETURNING kategori', [
-        req.params.id,
-        x.kategori,
-        x.ucapan,
-        x.fakta,
-      ]));
+      if (x.fakta.startsWith('[PERLU DIISI ADMIN]')) {
+        const { rows: cek } = await query('SELECT aktif FROM mj_keberatan WHERE id=$1', [req.params.id]);
+        if (cek[0]?.aktif) throw salah('Fakta masih bertanda [PERLU DIISI ADMIN] - isi dulu sebelum disimpan');
+      }
+      ({ rows } = await query(
+        'UPDATE mj_keberatan SET kategori=$2, ucapan=$3, fakta=$4, kelompok=$5, variasi=$6, contoh_jawaban=$7, jangan=$8, diubah_at=now() WHERE id=$1 RETURNING kategori',
+        [req.params.id, x.kategori, x.ucapan, x.fakta, x.kelompok, x.variasi, x.contoh_jawaban, x.jangan]
+      ));
     }
     if (!rows.length) throw salah('Keberatan nggak ditemukan', 404);
     await catatLog(req, 'lapangan.keberatan.ubah', { kategori: rows[0].kategori, ...(typeof req.body.aktif === 'boolean' ? { aktif: req.body.aktif } : {}) });
