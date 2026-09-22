@@ -34,6 +34,8 @@ export const NAMA_AKSI = {
   'admin.ubah_peran': 'ganti peran akun',
   'komisi.tutup': 'nutup bulan bagi hasil',
   'komisi.cairkan': 'nyairin bagi hasil sales',
+  'komisi.konfirmasi_masuk': 'bilang bagi hasilnya udah masuk',
+  'komisi.lapor_belum_masuk': 'lapor bagi hasilnya BELUM masuk',
   'tim.sales.tambah': 'nambah sales (akun + kode + data karyawan)',
   'tim.sales.ubah': 'ubah profil sales',
   'tim.sales.cek_rekening': 'ngecek rekening sales',

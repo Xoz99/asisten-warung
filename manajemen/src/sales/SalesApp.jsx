@@ -170,6 +170,8 @@ function Beranda({ api, admin, versi, profil, onBuka, onCatat }) {
         <span>{new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
       </section>
 
+      <PemberitahuanCair api={api} versi={versi} />
+
       <section className="sl-angka" aria-label="Ringkasan hari ini">
         <div>
           <b className="p-num">{log ? hariIni.length : '…'}</b>
@@ -596,6 +598,91 @@ function KartuPenghasilan({ api, versi, profil }) {
   );
 }
 
+// Pemberitahuan pencairan: muncul sampai sales bilang "udah masuk". Kalau dia lapor belum masuk, admin dapet notifikasi.
+const samarTujuan = (t) => (t || '').replace(/\d(?=\d{4})/g, '•');
+const tunai = (m) => /tunai|cash/i.test(m || '');
+function PemberitahuanCair({ api, versi, onBerubah }) {
+  const [v, setV] = useState(0);
+  const { data } = useData(api, `/lapangan/komisi?v=${versi}-${v}`);
+  const [lapor, setLapor] = useState(null); // periode yang lagi diisi laporan "belum masuk"
+  const [catatan, setCatatan] = useState('');
+  const [sibuk, setSibuk] = useState(false);
+  const [error, setError] = useState('');
+  if (!data?.terhubung) return null;
+  const daftar = data.riwayat.filter((r) => r.dicairkan_tanggal && r.konfirmasi_sales !== 'masuk');
+  if (!daftar.length) return null;
+  const kirim = async (periode, status) => {
+    setSibuk(true);
+    setError('');
+    try {
+      await api('POST', '/lapangan/komisi/konfirmasi', { periode, status, catatan: status === 'belum' ? catatan : undefined });
+      setLapor(null);
+      setCatatan('');
+      setV((x) => x + 1);
+      onBerubah?.();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSibuk(false);
+    }
+  };
+  return daftar.map((r) =>
+    r.konfirmasi_sales === 'belum' ? (
+      <section key={r.periode} className="sl-kartu sl-cair lapor" role="status">
+        <span className="sl-label">Dilaporin ke admin</span>
+        <b>
+          Bagi hasil {bulanLabel(r.periode, true)} ({rupiah(r.neto)}) belum masuk
+        </b>
+        <span className="sl-redup">Admin udah dikabarin {waktu(r.konfirmasi_at)}. Kalau ternyata udah masuk, pencet tombol di bawah.</span>
+        {error && <p className="adm-error">{error}</p>}
+        <button className="sl-tombol" disabled={sibuk} onClick={() => kirim(r.periode, 'masuk')}>
+          Sekarang udah masuk
+        </button>
+      </section>
+    ) : (
+      <section key={r.periode} className="sl-kartu sl-cair" role="status">
+        <span className="sl-label">{tunai(r.metode) ? 'Bagi hasil udah dibayar' : 'Bagi hasil udah ditransfer'}</span>
+        <b className="p-num sl-cair-angka">{rupiah(r.neto)}</b>
+        <span>
+          {bulanLabel(r.periode, true)} · {tunai(r.metode) ? 'tunai' : 'ditransfer'} {tgl(r.dicairkan_tanggal)}
+          {r.rekening_tujuan ? ` ke ${samarTujuan(r.rekening_tujuan)}` : ''}
+        </span>
+        {r.referensi && <span className="sl-redup">Catatan admin: {r.referensi}</span>}
+        {lapor === r.periode ? (
+          <>
+            <div className="field">
+              <label htmlFor={`lapor-${r.periode}`}>Ceritain singkat (opsional)</label>
+              <textarea id={`lapor-${r.periode}`} rows={2} maxLength={300} value={catatan} onChange={(e) => setCatatan(e.target.value)} placeholder="Misal: udah cek mutasi BCA sampai hari ini, belum ada" />
+            </div>
+            {error && <p className="adm-error">{error}</p>}
+            <div className="sl-cair-tombol">
+              <button className="sl-tombol keluar" style={{ marginTop: 0 }} disabled={sibuk} onClick={() => setLapor(null)}>
+                Batal
+              </button>
+              <button className="sl-tombol" disabled={sibuk} onClick={() => kirim(r.periode, 'belum')}>
+                {sibuk ? 'Ngirim…' : 'Kirim laporan'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <span className="sl-redup">{tunai(r.metode) ? 'Udah kamu terima?' : 'Cek mutasi rekeningmu, terus kabarin di sini.'}</span>
+            {error && <p className="adm-error">{error}</p>}
+            <div className="sl-cair-tombol">
+              <button className="sl-tombol keluar" style={{ marginTop: 0 }} disabled={sibuk} onClick={() => setLapor(r.periode)}>
+                Belum masuk
+              </button>
+              <button className="sl-tombol" disabled={sibuk} onClick={() => kirim(r.periode, 'masuk')}>
+                Udah masuk
+              </button>
+            </div>
+          </>
+        )}
+      </section>
+    )
+  );
+}
+
 // Rekening tujuan transfer bagi hasil (dipakai di Penghasilan).
 function KartuRekening({ profil }) {
   if (!profil) return null;
@@ -632,6 +719,7 @@ function Penghasilan({ api, profil }) {
   return (
     <>
       <h1 className="sl-h1">Penghasilan</h1>
+      <PemberitahuanCair api={api} versi={0} onBerubah={muat} />
       <section className="sl-kartu sl-penghasilan">
         <span className="sl-label">Bulan ini, {bulanLabel(b.periode, true)}</span>
         <b className="p-num sl-penghasilan-angka">{rupiah(b.neto)}</b>
@@ -704,14 +792,17 @@ function Penghasilan({ api, profil }) {
                 <b>{bulanLabel(r.periode, true)}</b>
                 <span className="sl-redup">
                   {r.dicairkan_tanggal
-                    ? `Dicairkan ${tgl(r.dicairkan_tanggal)}${r.rekening_tujuan ? ` ke ${r.rekening_tujuan.replace(/\d(?=\d{4})/g, '•')}` : r.metode ? ` · ${r.metode}` : ''}`
+                    ? `Dicairkan ${tgl(r.dicairkan_tanggal)}${r.rekening_tujuan ? ` ke ${samarTujuan(r.rekening_tujuan)}` : r.metode ? ` · ${r.metode}` : ''}`
                     : `Dikunci, dicairkan ${tgl(r.jadwalCair)}`}
                 </span>
               </div>
               <span style={{ textAlign: 'right' }}>
                 <b className="p-num">{rupiah(r.neto)}</b>
-                <span className={`sl-hasil ${r.dicairkan_tanggal ? 'berhasil' : 'pikir'}`} style={{ display: 'block', marginTop: 4 }}>
-                  {r.dicairkan_tanggal ? 'Cair' : 'Siap cair'}
+                <span
+                  className={`sl-hasil ${!r.dicairkan_tanggal ? 'pikir' : r.konfirmasi_sales === 'belum' ? 'ditolak' : r.konfirmasi_sales === 'masuk' ? 'berhasil' : 'tertarik'}`}
+                  style={{ display: 'block', marginTop: 4 }}
+                >
+                  {!r.dicairkan_tanggal ? 'Siap cair' : r.konfirmasi_sales === 'belum' ? 'Belum masuk' : r.konfirmasi_sales === 'masuk' ? 'Diterima' : 'Cair'}
                 </span>
               </span>
             </li>

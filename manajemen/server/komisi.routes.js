@@ -60,6 +60,9 @@ function pastikanTabel() {
       await query('CREATE INDEX IF NOT EXISTS idx_mj_komisi_periode ON mj_komisi (periode, wp_sales_id)');
       // Salinan rekening tujuan waktu dicairin (rekening di profil sales bisa ganti belakangan).
       await query('ALTER TABLE mj_komisi_periode ADD COLUMN IF NOT EXISTS rekening_tujuan TEXT');
+      // Pemberitahuan ke sales: kapan dia lihat, dan konfirmasi balik (masuk / belum masuk).
+      await query(`ALTER TABLE mj_komisi_periode ADD COLUMN IF NOT EXISTS dilihat_sales_at TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS konfirmasi_sales TEXT, ADD COLUMN IF NOT EXISTS konfirmasi_at TIMESTAMPTZ, ADD COLUMN IF NOT EXISTS konfirmasi_catatan TEXT`);
     })().catch((e) => {
       siap = null;
       throw e;
@@ -300,6 +303,33 @@ router.post('/komisi/cairkan', async (req, res, next) => {
 });
 
 // ---------------- Sales: penghasilan sendiri ----------------
+// Sales ngabarin balik: bagi hasil udah masuk ke rekeningnya, atau belum (admin dapet notifikasi dari catatan aktivitas).
+router.post('/lapangan/komisi/konfirmasi', async (req, res, next) => {
+  try {
+    const S = req.admin.wp_sales_id;
+    if (!S) throw salah('Akunmu belum disambungin ke kode sales');
+    const periode = POLA_PERIODE.test(req.body.periode || '') ? req.body.periode : null;
+    const status = ['masuk', 'belum'].includes(req.body.status) ? req.body.status : null;
+    if (!periode || !status) throw salah('Periode & status wajib diisi');
+    const catatan = status === 'belum' ? teks(req.body.catatan, 300) || null : null;
+    const { rows } = await query(
+      `UPDATE mj_komisi_periode SET konfirmasi_sales=$3, konfirmasi_at=now(), konfirmasi_catatan=$4
+       WHERE periode=$1 AND wp_sales_id=$2 AND dicairkan_at IS NOT NULL RETURNING neto, sales_kode`,
+      [periode, S, status, catatan]
+    );
+    if (!rows.length) throw salah('Bagi hasil bulan itu belum dicairkan admin', 404);
+    await catatLog(req, status === 'masuk' ? 'komisi.konfirmasi_masuk' : 'komisi.lapor_belum_masuk', {
+      periode,
+      sales: rows[0].sales_kode,
+      jumlah: Number(rows[0].neto),
+      ...(catatan ? { catatan } : {}),
+    });
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
 router.get('/lapangan/komisi', async (req, res, next) => {
   try {
     const S = req.admin.wp_sales_id;
@@ -307,10 +337,13 @@ router.get('/lapangan/komisi', async (req, res, next) => {
     const periode = periodeSekarang();
     const [est] = await estimasi(periode, S);
     const { rows: riwayat } = await query(
-      `SELECT periode, toko_baru, rate_perpanjangan, bruto, pajak, neto, dicairkan_tanggal::text AS dicairkan_tanggal, metode, rekening_tujuan
+      `SELECT periode, toko_baru, rate_perpanjangan, bruto, pajak, neto, dicairkan_tanggal::text AS dicairkan_tanggal, dicairkan_at, metode, rekening_tujuan,
+              catatan AS referensi, konfirmasi_sales, konfirmasi_at
        FROM mj_komisi_periode WHERE wp_sales_id=$1 ORDER BY periode DESC LIMIT 12`,
       [S]
     );
+    // Pencairan yang belum dikonfirmasi sales = pemberitahuan di app-nya. Dibuka = kecatat "dilihat" (kelihatan di admin).
+    await query('UPDATE mj_komisi_periode SET dilihat_sales_at=now() WHERE wp_sales_id=$1 AND dicairkan_at IS NOT NULL AND dilihat_sales_at IS NULL', [S]);
     // Bulan lalu yang belum ditutup admin: tetap estimasi.
     const lalu = (() => {
       const [y, m] = periode.split('-').map(Number);

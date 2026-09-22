@@ -632,3 +632,11 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 .sl-rek,.sl-rek-ingat{display:flex;flex-direction:column;gap:2px;text-decoration:none;color:inherit}
 .sl-rek b{font-size:17px}
 .sl-rek-ingat{margin-top:12px}
+
+/* Sales: pemberitahuan bagi hasil dicairkan */
+.sl-cair{display:flex;flex-direction:column;gap:6px;background:var(--hijau);margin-bottom:14px}
+.sl-cair.lapor{background:#FFE1E1}
+.sl-cair .sl-redup{color:var(--tinta);opacity:.75}
+.sl-cair-angka{font-size:30px;line-height:1.1}
+.sl-cair-tombol{display:grid;grid-template-columns:1fr 1.4fr;gap:10px;margin-top:6px}
+.sl-cair .sl-tombol.keluar{border:2px solid var(--hitam)}

@@ -132,6 +132,20 @@ export default function BagiHasil({ api }) {
                           {tgl(s.dicairkan_tanggal)} · {s.metode}
                         </div>
                         {s.rekening_tujuan && <div className="adm-redup adm-mono">{s.rekening_tujuan}</div>}
+                        {s.konfirmasi_sales === 'masuk' ? (
+                          <div className="adm-chip hijau" style={{ marginTop: 4 }}>
+                            Diterima sales · {tgl(s.konfirmasi_at)}
+                          </div>
+                        ) : s.konfirmasi_sales === 'belum' ? (
+                          <>
+                            <div className="adm-chip merah" style={{ marginTop: 4 }}>
+                              Sales lapor belum masuk · {waktu(s.konfirmasi_at)}
+                            </div>
+                            {s.konfirmasi_catatan && <div className="adm-redup">"{s.konfirmasi_catatan}"</div>}
+                          </>
+                        ) : (
+                          <div className="adm-redup">{s.dilihat_sales_at ? `Dilihat sales ${waktu(s.dilihat_sales_at)}, belum dikonfirmasi` : 'Belum dilihat sales'}</div>
+                        )}
                       </>
                     ) : s.status === 'ditutup' ? (
                       <span className="adm-chip kuning">Siap dicairkan</span>
