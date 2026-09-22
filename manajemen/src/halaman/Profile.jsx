@@ -10,10 +10,7 @@ export default function Profile({ api, admin, onKeluar }) {
   return (
     <>
       <header className="adm-kepala">
-        <div>
-          <h1>Profile</h1>
-          <p className="adm-sub">Akun kamu di Makalin Ops.</p>
-        </div>
+        <h1 className="sr-only">Profile</h1>
         <button className="btn" onClick={() => onKeluar()}>
           Keluar
         </button>

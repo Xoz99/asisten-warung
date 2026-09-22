@@ -23,10 +23,7 @@ export default function Dashboard({ api }) {
   return (
     <>
       <header className="adm-kepala">
-        <div>
-          <h1>Dashboard</h1>
-          <p className="adm-sub">Ringkasan operasional {bulanLabel(bulanIni, true)}. Semua angka diambil langsung dari data aplikasi.</p>
-        </div>
+        <h1 className="sr-only">Dashboard</h1>
         <button className="btn" onClick={muat}>
           Muat ulang
         </button>

@@ -51,10 +51,7 @@ export default function Rekrutmen({ api, tab }) {
   return (
     <>
       <header className="adm-kepala">
-        <div>
-          <h1>Rekrutmen</h1>
-          <p className="adm-sub">Calon Sales Partner dari lamaran masuk sampai diangkat. Syarat wajib dicek otomatis, kuis &amp; jadwal interview diisi kandidat sendiri, trial dihitung dari kode referral.</p>
-        </div>
+        <h1 className="sr-only">Rekrutmen</h1>
         <div className="adm-tombol" style={{ marginTop: 0 }}>
           <button
             className="btn"

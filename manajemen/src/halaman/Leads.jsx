@@ -15,12 +15,7 @@ export default function Leads({ api, apiProduk, produkWp, tab }) {
   const tabs = <Tabs daftar={TABS} aktif={aktif} href={(id) => `#/leads/${id}`} />;
   return (
     <>
-      <header className="adm-kepala">
-        <div>
-          <h1>Leads Management</h1>
-          <p className="adm-sub">Kelola semua prospek dan pipeline penjualan dalam satu tempat, plus warung yang daftar lewat sales.</p>
-        </div>
-      </header>
+      <h1 className="sr-only">Leads Management</h1>
       {aktif === 'crm' ? <LeadsCrm api={api} tabs={tabs} /> : tabs}
       {aktif === 'warung' && (apiProduk ? <PelangganWp api={apiProduk} /> : <ProdukMati />)}
       {aktif === 'sales' && (apiProduk ? <Sales api={apiProduk} produk={produkWp} /> : <ProdukMati />)}

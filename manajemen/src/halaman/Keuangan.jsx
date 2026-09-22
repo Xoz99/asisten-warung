@@ -29,12 +29,7 @@ export default function Keuangan({ api, apiProduk, tab }) {
   const aktif = TABS.some((t) => t.id === tab) ? tab : 'ringkasan';
   return (
     <>
-      <header className="adm-kepala">
-        <div>
-          <h1>Keuangan</h1>
-          <p className="adm-sub">Uang masuk dari langganan Warung Pintar dan semua transaksi yang dicatat tim.</p>
-        </div>
-      </header>
+      <h1 className="sr-only">Keuangan</h1>
       <Tabs daftar={TABS} aktif={aktif} href={(id) => `#/keuangan/${id}`} />
       {aktif === 'ringkasan' && <Ringkasan api={api} />}
       {aktif === 'bagi-hasil' && <BagiHasil api={api} />}

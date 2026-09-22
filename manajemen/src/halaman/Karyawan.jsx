@@ -69,10 +69,7 @@ export default function Karyawan({ api, tab }) {
   return (
     <>
       <header className="adm-kepala">
-        <div>
-          <h1>Karyawan</h1>
-          <p className="adm-sub">Data kepegawaian, kehadiran, cuti & izin, dan payroll tim Makalin. Kehadiran dicatat admin per hari.</p>
-        </div>
+        <h1 className="sr-only">Karyawan</h1>
         <div className="adm-tombol" style={{ marginTop: 0 }}>
           <button className="btn utama" onClick={() => setForm({ awal: {} })}>
             + Tambah karyawan

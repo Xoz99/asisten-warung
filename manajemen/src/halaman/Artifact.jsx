@@ -78,9 +78,8 @@ export default function Artifact({ api, tab }) {
     <div onDragEnter={onDragEnter} onDragLeave={onDragLeave} onDragOver={(e) => adaFile(e) && e.preventDefault()} onDrop={onDrop}>
       <header className="adm-art-kepala">
         <div>
-          <h1 style={{ margin: 0 }}>Artifact</h1>
-          <p className="adm-sub">Tempat nyimpen SOP, dokumen, aset, video, dan catatan tim. Tiap perubahan kesimpen sebagai versi.</p>
-          <div className="adm-tombol">
+          <h1 className="sr-only">Artifact</h1>
+          <div className="adm-tombol" style={{ marginTop: 0 }}>
             <button className="btn" onClick={() => setModal({ jenis: 'folder', induk: folderAktif })}>
               Buat folder
             </button>

@@ -39,10 +39,7 @@ export default function Notifikasi({ api, onDibaca }) {
   return (
     <>
       <header className="adm-kepala">
-        <div>
-          <h1>Notifikasi</h1>
-          <p className="adm-sub">Kejadian 30 hari terakhir: warung baru daftar, pembayaran lunas, dan perubahan dari admin lain.</p>
-        </div>
+        <h1 className="sr-only">Notifikasi</h1>
         <button className="btn" onClick={tandaiDibaca} disabled={sibuk || !data?.belumDibaca}>
           {data?.belumDibaca ? `Tandai ${data.belumDibaca} dibaca` : 'Semua udah dibaca'}
         </button>

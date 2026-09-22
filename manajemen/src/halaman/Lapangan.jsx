@@ -46,14 +46,7 @@ export default function Lapangan({ api, admin, tab }) {
   return (
     <>
       <header className="adm-kepala">
-        <div>
-          <h1>Sales Lapangan</h1>
-          <p className="adm-sub">
-            {sales
-              ? 'Catat tiap keberatan pelanggan waktu kunjungan: apa katanya, kamu jawab apa, dan hasilnya.'
-              : 'Keberatan pelanggan yang ditemui sales di lapangan, cara ngejawabnya, dan hasilnya.'}
-          </p>
-        </div>
+        <h1 className="sr-only">Sales Lapangan</h1>
         <button className="btn utama" onClick={() => setForm({ awal: {} })}>
           + Catat kunjungan
         </button>

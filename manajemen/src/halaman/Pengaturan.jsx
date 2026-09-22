@@ -12,12 +12,7 @@ export default function Pengaturan({ api, apiProduk, admin, tab }) {
   const aktif = TABS.some((t) => t.id === tab) ? tab : 'tim';
   return (
     <>
-      <header className="adm-kepala">
-        <div>
-          <h1>Pengaturan</h1>
-          <p className="adm-sub">Siapa aja yang bisa masuk Makalin Ops, dan akun demo yang dipinjemin ke sales.</p>
-        </div>
-      </header>
+      <h1 className="sr-only">Pengaturan</h1>
       <Tabs daftar={TABS} aktif={aktif} href={(id) => `#/pengaturan/${id}`} />
       {aktif === 'tim' && <Admin api={api} admin={admin} />}
       {aktif === 'demo' &&
