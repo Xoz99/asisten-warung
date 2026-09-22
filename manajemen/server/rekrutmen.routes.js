@@ -14,12 +14,14 @@ import { normalisasiNoHp } from './utils/noHp.js';
 
 // Urutan tahap (D-77, tidak berubah). HIRING_DECISION = peristiwa, bukan status (§8.2): lamaran yang lulus Closing
 // Test tetap di 'closing_test' sampai keputusan manusia dicatat.
-export const TAHAP = ['new', 'screening', 'screening_passed', 'product_test', 'interview', 'field_test_24h', 'closing_test', 'hired'];
+// 'pelajari_produk' (revisi Sep 2026): setelah lolos screening kandidat dikirimin paket materi + link APK + kuis online;
+// selesai pakai APK dan kuis 5/5 -> otomatis ke Interview (lihat rekrutmenAlur.js).
+export const TAHAP = ['new', 'screening', 'screening_passed', 'pelajari_produk', 'product_test', 'interview', 'field_test_24h', 'closing_test', 'hired'];
 export const KELUAR = ['rejected', 'withdrawn', 'no_response', 'on_hold', 'talent_pool'];
 // Tahap yang majunya lewat attempt yang lulus (bukan tombol "maju" biasa).
 const TAHAP_DENGAN_TES = ['product_test', 'interview', 'field_test_24h', 'closing_test'];
 const HARI_NO_RESPONSE = 3; // D-32
-const HARI_CLOSING_TEST = 6; // D-33
+export const HARI_CLOSING_TEST = 6; // D-33
 const KANAL = { FB: 'Grup Facebook', WA: 'Komunitas WhatsApp', PST: 'Poster QR', IG: 'Instagram', WEB: 'Halaman sendiri', REF: 'Referral', LAIN: 'Lainnya' };
 // Pilihan "Tahu Konsulin dari mana?" - sumber keyakinan RENDAH (D-72), dilaporkan terpisah.
 export const DROPDOWN_SUMBER = ['Facebook', 'WhatsApp', 'Instagram', 'TikTok', 'Poster', 'Teman / keluarga', 'Lainnya'];
@@ -115,11 +117,11 @@ export function pastikanTabelRekrutmen() {
 
 const kodeRefBaru = () => 'REF-' + crypto.randomBytes(3).toString('hex').toUpperCase();
 
-async function catatEvent(c, lamaranId, jenis, { dari = null, ke = null, isi = null }, aktor) {
+export async function catatEvent(c, lamaranId, jenis, { dari = null, ke = null, isi = null }, aktor) {
   await c.query('INSERT INTO mj_lamaran_event (lamaran_id, jenis, dari, ke, isi, aktor) VALUES ($1,$2,$3,$4,$5,$6)', [lamaranId, jenis, dari, ke, isi, aktor]);
 }
 
-async function transaksi(fn) {
+export async function transaksi(fn) {
   const c = await pool.connect();
   try {
     await c.query('BEGIN');
@@ -204,7 +206,7 @@ function bersihkanJawaban(b, wajib) {
   j.setujuWa = b.setujuWa === true;
   return j;
 }
-const LABEL = {
+export const LABEL = {
   jenisKelamin: 'Jenis kelamin', pendidikan: 'Pendidikan terakhir', pekerjaan: 'Pekerjaan sekarang', pengalamanSales: 'Pengalaman jualan',
   waktuKerja: 'Waktu kerja', kendaraan: 'Kendaraan', kenalWarung: 'Jumlah warung yang dikenal', kota: 'Kota / kabupaten', kecamatan: 'Kecamatan',
   ketersediaan: 'Hari & jam tersedia', area: 'Area yang mau digarap', alasan: 'Alasan tertarik', bidangPengalaman: 'Bidang pengalaman', sosmed: 'Link sosmed',
@@ -380,7 +382,7 @@ router.use(async (req, res, next) => {
 });
 
 // D-32: 3 hari setelah di-follow-up nggak ada respons -> NO_RESPONSE, dijalanin sistem tiap kali data dibaca.
-async function tandaiNoResponse() {
+export async function tandaiNoResponse() {
   const { rows } = await query(
     `UPDATE mj_lamaran SET status='no_response', status_sejak=now(), alasan_keluar='Nggak membalas ${HARI_NO_RESPONSE} hari setelah di-follow-up (D-32)'
      WHERE status NOT IN ('hired','rejected','withdrawn','no_response','on_hold','talent_pool')
@@ -391,11 +393,11 @@ async function tandaiNoResponse() {
   for (const r of rows) await query("INSERT INTO mj_lamaran_event (lamaran_id, jenis, ke, isi, aktor) VALUES ($1,'status','no_response',$2,'sistem')", [r.id, `Otomatis: nggak membalas ${HARI_NO_RESPONSE} hari (D-32)`]);
 }
 
-const KOLOM_LAMARAN = `l.*, 'KD-' || lpad(l.nomor::text, 4, '0') AS kode, o.nama, o.no_hp, o.email, o.domisili, o.kode_ref,
+export const KOLOM_LAMARAN = `l.*, 'KD-' || lpad(l.nomor::text, 4, '0') AS kode, o.nama, o.no_hp, o.email, o.domisili, o.kode_ref,
   t.kanal AS sumber_kanal, k.nama AS kampanye_nama, ro.nama AS referrer_nama,
   (SELECT count(*)::int FROM mj_lamaran l2 WHERE l2.orang_id = l.orang_id) AS jumlah_lamaran,
   (SELECT row_to_json(a) FROM (SELECT hasil, jadwal, pewawancara, created_at FROM mj_rek_attempt a WHERE a.lamaran_id=l.id AND a.tahap=l.status ORDER BY a.id DESC LIMIT 1) a) AS attempt_terakhir`;
-const JOIN_LAMARAN = `FROM mj_lamaran l JOIN mj_orang o ON o.id = l.orang_id
+export const JOIN_LAMARAN = `FROM mj_lamaran l JOIN mj_orang o ON o.id = l.orang_id
   LEFT JOIN mj_rek_titik t ON t.id = l.sumber_titik_id LEFT JOIN mj_rek_kampanye k ON k.id = t.kampanye_id
   LEFT JOIN mj_orang ro ON ro.id = l.referrer_orang_id`;
 
@@ -484,14 +486,14 @@ router.get('/rekrutmen/lamaran/:id', async (req, res, next) => {
   }
 });
 
-async function ambilLamaran(c, id) {
+export async function ambilLamaran(c, id) {
   if (!POLA_UUID.test(id)) throw salah('Lamaran tidak ditemukan', 404);
   const { rows } = await c.query('SELECT l.*, o.nama FROM mj_lamaran l JOIN mj_orang o ON o.id=l.orang_id WHERE l.id=$1 FOR UPDATE OF l', [id]);
   if (!rows.length) throw salah('Lamaran tidak ditemukan', 404);
   return rows[0];
 }
 
-async function ganti(c, l, ke, isi, aktor, ekstra = '') {
+export async function ganti(c, l, ke, isi, aktor, ekstra = '') {
   await c.query(`UPDATE mj_lamaran SET status=$2, status_sejak=now()${ekstra} WHERE id=$1`, [l.id, ke]);
   await catatEvent(c, l.id, 'status', { dari: l.status, ke, isi }, aktor);
 }

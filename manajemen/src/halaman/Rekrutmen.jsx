@@ -2,16 +2,18 @@ import { useCallback, useEffect, useState } from 'react';
 import { rupiah, tampilHp, tgl, waktu, waktuRelatif } from '../lib/format.js';
 import { Gagal, Kosong, Memuat, Modal, Tabs, useData } from '../komponen/Ui.jsx';
 import { bukaFile } from '../lib/api.js';
+import Board, { DetailKandidat, Ketersediaan, KuisMateri } from './RekrutmenBoard.jsx';
 
 // Rekrutmen Sales Partner (PRD v0.2 §7-10). Tahap nggak boleh dilompati; tahap bertes majunya lewat hasil tes.
 export const TAHAP = [
   { id: 'new', nama: 'New', ket: 'Baru masuk' },
   { id: 'screening', nama: 'Screening', ket: 'Lagi dicek' },
-  { id: 'screening_passed', nama: 'Lolos screening', ket: 'Siap product test' },
-  { id: 'product_test', nama: 'Product test', ket: '5 soal, benar semua' },
-  { id: 'interview', nama: 'Interview', ket: 'Keputusan pewawancara' },
-  { id: 'field_test_24h', nama: '24H field test', ket: '3 warung + laporan' },
-  { id: 'closing_test', nama: 'Closing test', ket: '3 customer, maks 6 hari' },
+  { id: 'screening_passed', nama: 'Lolos screening', ket: 'Siap kirim materi' },
+  { id: 'pelajari_produk', nama: 'Pelajari produk', ket: 'Pakai APK + baca materi + kuis' },
+  { id: 'product_test', nama: 'Product test', ket: 'Kuis 5 soal, benar semua' },
+  { id: 'interview', nama: 'Interview', ket: 'Kandidat pilih slot, pewawancara mutusin' },
+  { id: 'field_test_24h', nama: 'Trial H+1', ket: '3 warung daftar pakai kodenya dalam 24 jam' },
+  { id: 'closing_test', nama: 'Trial H+6', ket: '3 warung bayar dalam 6 hari' },
   { id: 'hired', nama: 'Hired', ket: 'Jadi Sales Partner' },
 ];
 const KELUAR = {
@@ -25,9 +27,10 @@ const namaStatus = (s) => TAHAP.find((t) => t.id === s)?.nama || KELUAR[s]?.nama
 const KEYAKINAN = { tinggi: { nama: 'Keyakinan tinggi', warna: 'hijau' }, rendah: { nama: 'Keyakinan rendah', warna: 'kuning' }, unknown: { nama: 'Sumber nggak diketahui', warna: '' } };
 const hariSejak = (t) => Math.max(0, Math.floor((Date.now() - new Date(t).getTime()) / 86400000));
 const TABS = [
-  { id: 'papan', nama: 'Papan kandidat' },
+  { id: 'papan', nama: 'Board kandidat' },
+  { id: 'jadwal', nama: 'Ketersediaan interview' },
+  { id: 'kuis', nama: 'Kuis & materi' },
   { id: 'sumber', nama: 'Sumber & kampanye' },
-  { id: 'jadwal', nama: 'Jadwal interview' },
   { id: 'arsip', nama: 'Arsip' },
 ];
 
@@ -38,6 +41,7 @@ export default function Rekrutmen({ api, tab }) {
   const [dipilih, setDipilih] = useState(null);
   const [versi, setVersi] = useState(0);
   const [pesan, setPesan] = useState('');
+  const [urutan, setUrutan] = useState([]);
   const segarkan = useCallback(() => {
     setVersi((v) => v + 1);
     muatRingkasan();
@@ -49,7 +53,7 @@ export default function Rekrutmen({ api, tab }) {
       <header className="adm-kepala">
         <div>
           <h1>Rekrutmen</h1>
-          <p className="adm-sub">Calon Sales Partner dari lamaran masuk sampai diangkat. Tahap nggak bisa dilompati, dan tiap percobaan tercatat.</p>
+          <p className="adm-sub">Calon Sales Partner dari lamaran masuk sampai diangkat. Syarat wajib dicek otomatis, kuis &amp; jadwal interview diisi kandidat sendiri, trial dihitung dari kode referral.</p>
         </div>
         <div className="adm-tombol" style={{ marginTop: 0 }}>
           <button
@@ -98,9 +102,10 @@ export default function Rekrutmen({ api, tab }) {
         </p>
       )}
 
-      {aktif === 'papan' && <Papan api={api} versi={versi} onBuka={setDipilih} onTambah={() => setTambah(true)} />}
+      {aktif === 'papan' && <Board api={api} versi={versi} onBuka={setDipilih} setPesan={setPesan} onUrutan={setUrutan} />}
+      {aktif === 'jadwal' && <Ketersediaan api={api} versi={versi} onBuka={setDipilih} />}
+      {aktif === 'kuis' && <KuisMateri api={api} />}
       {aktif === 'sumber' && <Sumber api={api} />}
-      {aktif === 'jadwal' && <Jadwal api={api} versi={versi} onBuka={setDipilih} />}
       {aktif === 'arsip' && <Arsip api={api} versi={versi} onBuka={setDipilih} />}
 
       {tambah && (
@@ -115,319 +120,13 @@ export default function Rekrutmen({ api, tab }) {
           }}
         />
       )}
-      {dipilih && <Detail key={dipilih} api={api} id={dipilih} onTutup={() => setDipilih(null)} onBerubah={segarkan} onBuka={setDipilih} />}
+      {dipilih && <DetailKandidat key={dipilih} api={api} id={dipilih} urutan={aktif === 'papan' ? urutan : []} onTutup={() => setDipilih(null)} onBerubah={segarkan} onBuka={setDipilih} />}
     </>
   );
 }
 
-// ---------------- Papan ----------------
-function Papan({ api, versi, onBuka, onTambah }) {
-  const [q, setQ] = useState('');
-  const [cari, setCari] = useState('');
-  const { data, error, muat } = useData(api, `/rekrutmen/lamaran?mode=aktif${cari ? `&q=${encodeURIComponent(cari)}` : ''}&v=${versi}`);
-  if (error) return <Gagal apa="kandidat" pesan={error} onUlang={muat} />;
-  return (
-    <>
-      <form
-        className="adm-cari"
-        style={{ marginTop: 0, marginBottom: 16 }}
-        onSubmit={(e) => {
-          e.preventDefault();
-          setCari(q.trim());
-        }}
-      >
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari nama, no. HP, kode sumber" aria-label="Cari kandidat" />
-        <button className="btn" type="submit">
-          Cari
-        </button>
-      </form>
-      {!data ? (
-        <Memuat apa="kandidat" />
-      ) : data.length === 0 && !cari ? (
-        <Kosong judul="Papan kosong" aksi={<button className="btn kecil utama" onClick={onTambah}>+ Tambah kandidat</button>}>
-          Belum ada kandidat yang lagi diproses. Bagiin link daftar (tombol "Salin link daftar") atau tambah manual.
-        </Kosong>
-      ) : (
-        <div className="adm-kanban" style={{ gridTemplateColumns: 'repeat(7, minmax(210px, 1fr))' }}>
-          {TAHAP.filter((t) => t.id !== 'hired').map((t) => {
-            const isi = data.filter((l) => l.status === t.id);
-            return (
-              <section key={t.id} className="adm-kanban-kolom" aria-label={`Tahap ${t.nama}`}>
-                <header className="adm-kanban-kepala" style={t.id === 'closing_test' ? { background: 'var(--biru)', color: '#fff' } : t.id === 'interview' ? { background: 'var(--kuning)' } : undefined}>
-                  <span>{t.nama}</span>
-                  <span className="adm-chip" style={{ background: '#000', color: '#fff' }}>
-                    {isi.length}
-                  </span>
-                </header>
-                <div className="adm-kanban-daftar">
-                  {isi.length === 0 && (
-                    <p className="adm-redup" style={{ margin: 0, textAlign: 'center' }}>
-                      {t.ket}
-                    </p>
-                  )}
-                  {isi.map((l) => (
-                    <KartuKandidat key={l.id} l={l} onBuka={onBuka} />
-                  ))}
-                </div>
-              </section>
-            );
-          })}
-        </div>
-      )}
-    </>
-  );
-}
-
-function KartuKandidat({ l, onBuka }) {
-  const perluFu = hariSejak(l.terakhir_followup || l.created_at) >= 2;
-  const sisaClosing = l.status === 'closing_test' ? 6 - hariSejak(l.closing_mulai || l.status_sejak) : null;
-  const jadwal = l.attempt_terakhir?.hasil === 'dijadwalkan' ? l.attempt_terakhir.jadwal : null;
-  return (
-    <article
-      className="adm-kanban-kartu"
-      style={{ cursor: 'pointer' }}
-      onClick={() => onBuka(l.id)}
-      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onBuka(l.id))}
-      tabIndex={0}
-      aria-label={`Buka ${l.nama}`}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
-        <b>{l.nama}</b>
-        <span className="adm-chip" title="Hari di tahap ini">
-          {hariSejak(l.status_sejak)} hr
-        </span>
-      </div>
-      <div className="adm-redup adm-mono">{l.kode}</div>
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
-        {l.sumber_kode ? <span className="adm-chip">{l.sumber_kode}</span> : l.referrer_nama ? <span className="adm-chip ungu">Referral</span> : <span className="adm-chip">{l.sumber_dropdown || 'Sumber ?'}</span>}
-        {l.jumlah_lamaran > 1 && <span className="adm-chip">Lamaran ke-{l.jumlah_lamaran}</span>}
-        {perluFu && <span className="adm-chip kuning">Perlu FU</span>}
-        {jadwal && <span className="adm-chip biru">{waktu(jadwal)}</span>}
-        {sisaClosing !== null && <span className={`adm-chip ${sisaClosing <= 1 ? 'merah' : ''}`}>{sisaClosing > 0 ? `Sisa ${sisaClosing} hari` : 'Tenggat lewat'}</span>}
-      </div>
-    </article>
-  );
-}
-
-// ---------------- Detail kandidat ----------------
-function Detail({ api, id, onTutup, onBerubah, onBuka }) {
-  const [d, setD] = useState(null);
-  const [error, setError] = useState('');
-  const [pesan, setPesan] = useState('');
-  const [versi, setVersi] = useState(0);
-
-  useEffect(() => {
-    let batal = false;
-    api('GET', `/rekrutmen/lamaran/${id}`)
-      .then((x) => !batal && (setD(x), setError('')))
-      .catch((e) => !batal && setError(e.message));
-    return () => {
-      batal = true;
-    };
-  }, [api, id, versi]);
-  useEffect(() => {
-    const tekan = (e) => e.key === 'Escape' && !document.querySelector('.adm-modal') && onTutup();
-    document.addEventListener('keydown', tekan);
-    return () => document.removeEventListener('keydown', tekan);
-  }, [onTutup]);
-
-  const kirim = async (path, body, ok) => {
-    setError('');
-    setPesan('');
-    try {
-      const hasil = await api('POST', `/rekrutmen/lamaran/${id}${path}`, body);
-      setPesan(typeof ok === 'function' ? ok(hasil) : ok);
-      setVersi((v) => v + 1);
-      onBerubah();
-      return hasil;
-    } catch (e) {
-      setError(e.message);
-      return null;
-    }
-  };
-
-  const l = d?.lamaran;
-  const selesai = l && (KELUAR[l.status] || l.status === 'hired');
-  const idx = l ? TAHAP.findIndex((t) => t.id === l.status) : -1;
-
-  return (
-    <>
-      <div className="adm-latar" style={{ padding: 0 }} onMouseDown={(e) => e.target === e.currentTarget && onTutup()} />
-      <aside className="adm-laci" role="dialog" aria-modal="true" aria-label="Detail kandidat" style={{ width: 'min(540px, 100%)' }}>
-        <div className="adm-modal-kepala">
-          <h2 className="adm-mono">{l ? `Detail kandidat · ${l.kode}` : 'Detail kandidat'}</h2>
-          <button className="adm-tutup" onClick={onTutup} aria-label="Tutup">
-            ×
-          </button>
-        </div>
-        {!d ? (
-          error ? <p className="adm-error">{error}</p> : <Memuat apa="kandidat" />
-        ) : (
-          <>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-              <span className="adm-inisial" style={{ width: 56, height: 56, fontSize: 24 }} aria-hidden="true">
-                {l.nama?.[0]?.toUpperCase()}
-              </span>
-              <div>
-                <h3 style={{ fontSize: 22, margin: 0 }}>{l.nama}</h3>
-                <span className={`adm-chip ${KELUAR[l.status]?.warna || (l.status === 'hired' ? 'hijau' : 'biru')}`}>{namaStatus(l.status)}</span>{' '}
-                <span className="adm-redup">sejak {tgl(l.status_sejak)}</span>
-              </div>
-            </div>
-            <div className="adm-kartu" style={{ boxShadow: 'none', padding: 12, marginTop: 14 }}>
-              <div className="adm-mono">{tampilHp(l.no_hp)}</div>
-              {l.email && <div className="adm-mono">{l.email}</div>}
-              {l.domisili && <div className="adm-redup">Domisili {l.domisili}</div>}
-              <div className="adm-tombol">
-                <a className="btn kecil" href={`https://wa.me/${l.no_hp}`} target="_blank" rel="noopener noreferrer">
-                  WhatsApp
-                </a>
-                <a className="btn kecil" href={`tel:+${l.no_hp}`}>
-                  Telepon
-                </a>
-              </div>
-              <p className="adm-redup" style={{ margin: '10px 0 0' }}>
-                Sumber:{' '}
-                <b style={{ color: 'var(--tinta)' }}>
-                  {l.sumber_kode ? `${l.sumber_kode}${l.kampanye_nama ? ` (${l.kampanye_nama})` : ''}` : l.referrer_nama ? `Referral dari ${l.referrer_nama}` : l.sumber_dropdown || 'nggak diketahui'}
-                </b>{' '}
-                <span className={`adm-chip ${KEYAKINAN[l.keyakinan].warna}`}>{KEYAKINAN[l.keyakinan].nama}</span>
-              </p>
-              <p className="adm-redup" style={{ margin: '4px 0 0' }}>
-                Kode referral orang ini: <b className="adm-mono">{l.kode_ref}</b>
-              </p>
-            </div>
-
-            <DataLamaran jawaban={l.jawaban} label={d.label} dokumen={d.dokumen} onError={setError} />
-
-            <h4 className="adm-label" style={{ fontSize: 11, margin: '16px 0 6px' }}>
-              Tahapan rekrutmen
-            </h4>
-            <ol className="adm-tahapan">
-              {TAHAP.map((t, i) => {
-                const lewat = l.status === 'hired' || (idx >= 0 && i < idx);
-                const sekarang = t.id === l.status;
-                return (
-                  <li key={t.id} className={sekarang ? 'sekarang' : lewat ? 'lewat' : ''}>
-                    <span>{lewat ? '✓' : i + 1}</span>
-                    <b>{t.nama}</b>
-                    <em>{sekarang ? 'Sedang berjalan' : lewat ? 'Selesai' : t.ket}</em>
-                  </li>
-                );
-              })}
-            </ol>
-
-            {error && <p className="adm-error">{error}</p>}
-            {pesan && <p className="adm-ok">{pesan}</p>}
-
-            {!selesai && <AksiTahap l={l} attempt={d.attempt} hariClosing={d.hariClosing} kirim={kirim} />}
-            {!selesai && <FollowUp l={l} hari={d.hariNoResponse} kirim={kirim} />}
-            {!selesai && <Keluarkan kirim={kirim} />}
-            {l.status === 'hired' && (
-              <div className="adm-kartu" style={{ boxShadow: 'none', padding: 12, marginTop: 14 }}>
-                <b>Udah jadi Sales Partner.</b>
-                <p className="adm-redup" style={{ margin: '6px 0' }}>
-                  Masukkan ke data karyawan biar kehadiran, kontrak, dan rekeningnya tercatat di halaman Karyawan.
-                </p>
-                <a className="btn kecil utama" href="#/karyawan">
-                  Buka halaman Karyawan
-                </a>
-              </div>
-            )}
-            {KELUAR[l.status] && (
-              <div className="adm-kartu" style={{ boxShadow: 'none', padding: 12, marginTop: 14 }}>
-                <b>Alasan: </b>
-                {l.alasan_keluar || '-'}
-                <p className="adm-redup" style={{ margin: '6px 0' }}>
-                  Balik lagi = lamaran baru dari New. Hasil tahap lama nggak berlaku (D-31), dan retry nggak dibatasi (D-30).
-                </p>
-                <button
-                  className="btn kecil utama"
-                  onClick={async () => {
-                    const baru = await kirim('/lamar-ulang', {}, 'Lamaran baru dibuat dari tahap New.');
-                    if (baru?.id) onBuka(baru.id);
-                  }}
-                >
-                  Lamar ulang (lamaran baru)
-                </button>
-              </div>
-            )}
-
-            <Catatan kirim={kirim} />
-
-            {d.attempt.length > 0 && (
-              <>
-                <h4 className="adm-label" style={{ fontSize: 11, margin: '16px 0 6px' }}>
-                  Riwayat percobaan ({d.attempt.length})
-                </h4>
-                <div className="adm-riwayat">
-                  {d.attempt.map((a) => (
-                    <div key={a.id} className="adm-riwayat-item">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                        <span>
-                          <b>{namaStatus(a.tahap)}</b> <span className={`adm-chip ${a.hasil === 'lulus' ? 'hijau' : a.hasil === 'gagal' ? 'merah' : 'kuning'}`}>{a.hasil}</span>
-                        </span>
-                        <span className="adm-redup">{waktu(a.created_at)}</span>
-                      </div>
-                      <div className="adm-redup">{ringkasAttempt(a)}</div>
-                      {a.catatan && <div style={{ marginTop: 4 }}>{a.catatan}</div>}
-                      <div className="adm-redup">oleh {a.aktor}</div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-
-            <h4 className="adm-label" style={{ fontSize: 11, margin: '16px 0 6px' }}>
-              Riwayat kejadian
-            </h4>
-            <div className="adm-riwayat">
-              {d.event.map((e) => (
-                <div key={e.id} className="adm-riwayat-item">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                    <span className="adm-chip">{e.jenis}</span>
-                    <span className="adm-redup">{waktu(e.created_at)}</span>
-                  </div>
-                  <div style={{ marginTop: 4 }}>
-                    {e.dari && e.ke && e.jenis === 'status' ? `${namaStatus(e.dari)} → ${namaStatus(e.ke)}` : ''} {e.jenis !== 'attempt' ? e.isi : `Hasil: ${e.ke}`}
-                  </div>
-                  <div className="adm-redup">oleh {e.aktor}</div>
-                </div>
-              ))}
-            </div>
-
-            {d.riwayat.length > 0 && (
-              <>
-                <h4 className="adm-label" style={{ fontSize: 11, margin: '16px 0 6px' }}>
-                  Lamaran sebelumnya
-                </h4>
-                <ul className="adm-daftar">
-                  {d.riwayat.map((x) => (
-                    <li key={x.id}>
-                      <div>
-                        <button className="adm-link" onClick={() => onBuka(x.id)}>
-                          {x.kode}
-                        </button>{' '}
-                        <span className={`adm-chip ${KELUAR[x.status]?.warna || ''}`}>{namaStatus(x.status)}</span>
-                        <div className="adm-redup">
-                          {tgl(x.created_at)} · sumber {x.sumber_kode || '-'} {x.alasan_keluar ? `· ${x.alasan_keluar}` : ''}
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </>
-        )}
-      </aside>
-    </>
-  );
-}
-
-// Jawaban form lamaran + CV/foto. Urutan tampil = urutan di form.
 const URUT_JAWABAN = ['tanggalLahir', 'jenisKelamin', 'kota', 'kecamatan', 'pendidikan', 'pekerjaan', 'pengalamanSales', 'bidangPengalaman', 'waktuKerja', 'ketersediaan', 'kendaraan', 'hpAndroid', 'area', 'kenalWarung', 'skemaKerja', 'tempatProspek', 'tempatProspekLain', 'waktuHubungi', 'sosmed'];
-function DataLamaran({ jawaban, label, dokumen, onError }) {
+export function DataLamaran({ jawaban, label, dokumen, onError }) {
   if (!jawaban && !dokumen?.length) return null;
   const j = jawaban || {};
   const nilai = (k) => {
@@ -478,146 +177,7 @@ function DataLamaran({ jawaban, label, dokumen, onError }) {
   );
 }
 
-function ringkasAttempt(a) {
-  const d = a.data || {};
-  if (a.tahap === 'product_test') return `${d.benar}/${d.dari} benar · ${d.setujuBagiHasil ? 'setuju' : 'belum setuju'} bagi hasil`;
-  if (a.tahap === 'interview') return a.hasil === 'dijadwalkan' ? `Dijadwalkan ${waktu(a.jadwal)} · ${a.pewawancara}` : `Pewawancara ${a.pewawancara || '-'} · ${d.alasan || ''}`;
-  if (a.tahap === 'field_test_24h') return `${d.warung} warung dikunjungi · laporan ${d.laporan ? 'terkirim' : 'belum'}`;
-  if (a.tahap === 'closing_test') return `${d.customer} customer · hari ke-${d.hariBerjalan}`;
-  return '';
-}
-
-// Form sesuai tahap. Aturan lulusnya dicek server (D-33); di sini cuma input.
-function AksiTahap({ l, attempt, hariClosing, kirim }) {
-  const [f, setF] = useState({ benar: '', setuju: false, pewawancara: '', jadwal: '', hasil: '', alasan: '', warung: '', laporan: false, customer: '', keputusan: '', catatan: '' });
-  const ubah = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
-  const kotak = { boxShadow: 'none', padding: 12, marginTop: 14, background: '#FEF9C3' };
-  const judul = (t) => (
-    <h4 className="adm-label" style={{ fontSize: 11, margin: '0 0 8px' }}>
-      {t}
-    </h4>
-  );
-  const berikut = TAHAP[TAHAP.findIndex((t) => t.id === l.status) + 1];
-
-  if (['new', 'screening', 'screening_passed'].includes(l.status)) {
-    return (
-      <div className="adm-kartu" style={kotak}>
-        {judul(`Langkah berikutnya: ${berikut.nama}`)}
-        <input className="adm-input" value={f.catatan} onChange={ubah('catatan')} placeholder="Catatan (opsional)" aria-label="Catatan" />
-        <button className="btn utama" style={{ marginTop: 10 }} onClick={() => kirim('/maju', { catatan: f.catatan }, `Maju ke ${berikut.nama}.`)}>
-          Maju ke {berikut.nama}
-        </button>
-      </div>
-    );
-  }
-  if (l.status === 'product_test') {
-    return (
-      <div className="adm-kartu" style={kotak}>
-        {judul('Hasil product test (lulus = 5/5 benar + setuju bagi hasil)')}
-        <div className="field" style={{ marginTop: 0 }}>
-          <label htmlFor="pt-benar">Jawaban benar (dari 5)</label>
-          <input id="pt-benar" type="number" min="0" max="5" value={f.benar} onChange={ubah('benar')} />
-        </div>
-        <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10, fontWeight: 700 }}>
-          <input type="checkbox" className="adm-centang" checked={f.setuju} onChange={ubah('setuju')} /> Setuju model bagi hasil
-        </label>
-        <button className="btn utama" style={{ marginTop: 10 }} disabled={f.benar === ''} onClick={() => kirim('/attempt', { benar: Number(f.benar), setujuBagiHasil: f.setuju }, (r) => (r.hasil === 'lulus' ? 'Lulus product test, maju ke Interview.' : 'Belum lulus. Percobaan dicatat, bisa dicoba lagi.'))}>
-          Simpan hasil
-        </button>
-      </div>
-    );
-  }
-  if (l.status === 'interview') {
-    return (
-      <div className="adm-kartu" style={kotak}>
-        {judul('Interview')}
-        <div className="field" style={{ marginTop: 0 }}>
-          <label htmlFor="iv-pw">Pewawancara</label>
-          <input id="iv-pw" value={f.pewawancara} onChange={ubah('pewawancara')} placeholder="Nama pewawancara" />
-        </div>
-        <div className="adm-baris" style={{ gridTemplateColumns: '1fr auto', alignItems: 'end' }}>
-          <div className="field">
-            <label htmlFor="iv-jadwal">Jadwal</label>
-            <input id="iv-jadwal" type="datetime-local" value={f.jadwal} onChange={ubah('jadwal')} />
-          </div>
-          <button className="btn" disabled={!f.pewawancara.trim() || !f.jadwal} onClick={() => kirim('/attempt', { jadwalkan: true, jadwal: new Date(f.jadwal).toISOString(), pewawancara: f.pewawancara }, 'Interview dijadwalkan.')}>
-            Jadwalkan
-          </button>
-        </div>
-        <div className="field">
-          <label htmlFor="iv-hasil">Hasil interview</label>
-          <select id="iv-hasil" value={f.hasil} onChange={ubah('hasil')} style={{ maxWidth: 'none', width: '100%', minHeight: 44 }}>
-            <option value="">Belum ada hasil</option>
-            <option value="lulus">Lulus</option>
-            <option value="gagal">Gagal</option>
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor="iv-alasan">Alasan keputusan (wajib)</label>
-          <input id="iv-alasan" value={f.alasan} onChange={ubah('alasan')} />
-        </div>
-        <button className="btn utama" style={{ marginTop: 10 }} disabled={!f.pewawancara.trim() || !f.hasil || !f.alasan.trim()} onClick={() => kirim('/attempt', { hasil: f.hasil, pewawancara: f.pewawancara, alasan: f.alasan }, (r) => (r.hasil === 'lulus' ? 'Lulus interview, lanjut 24H field test.' : 'Hasil interview dicatat: gagal.'))}>
-          Simpan hasil interview
-        </button>
-      </div>
-    );
-  }
-  if (l.status === 'field_test_24h') {
-    return (
-      <div className="adm-kartu" style={kotak}>
-        {judul('24H field test (lulus = 3 warung + laporan)')}
-        <div className="field" style={{ marginTop: 0 }}>
-          <label htmlFor="ft-w">Warung yang dikunjungi</label>
-          <input id="ft-w" type="number" min="0" value={f.warung} onChange={ubah('warung')} />
-        </div>
-        <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10, fontWeight: 700 }}>
-          <input type="checkbox" className="adm-centang" checked={f.laporan} onChange={ubah('laporan')} /> Laporan & objection udah dikirim
-        </label>
-        <button className="btn utama" style={{ marginTop: 10 }} disabled={f.warung === ''} onClick={() => kirim('/attempt', { warung: Number(f.warung), laporan: f.laporan }, (r) => (r.hasil === 'lulus' ? 'Lulus field test, closing test dimulai (6 hari).' : 'Belum lulus. Percobaan dicatat.'))}>
-          Simpan hasil
-        </button>
-      </div>
-    );
-  }
-  if (l.status === 'closing_test') {
-    const lulus = attempt.some((a) => a.tahap === 'closing_test' && a.hasil === 'lulus');
-    const sisa = hariClosing - hariSejak(l.closing_mulai || l.status_sejak);
-    if (lulus) {
-      return (
-        <div className="adm-kartu" style={{ ...kotak, background: '#DCFCE7' }}>
-          {judul('Closing test lulus. Butuh keputusan hiring')}
-          <select value={f.keputusan} onChange={ubah('keputusan')} aria-label="Keputusan" style={{ maxWidth: 'none', width: '100%', minHeight: 44 }}>
-            <option value="">Pilih keputusan</option>
-            <option value="terima">Terima jadi Sales Partner</option>
-            <option value="tolak">Tolak</option>
-          </select>
-          <div className="field">
-            <label htmlFor="hd-alasan">Alasan (wajib)</label>
-            <input id="hd-alasan" value={f.alasan} onChange={ubah('alasan')} />
-          </div>
-          <button className="btn utama" style={{ marginTop: 10 }} disabled={!f.keputusan || !f.alasan.trim()} onClick={() => kirim('/keputusan', { keputusan: f.keputusan, alasan: f.alasan }, f.keputusan === 'terima' ? 'Diangkat jadi Sales Partner.' : 'Ditolak, keputusan dicatat.')}>
-            Simpan keputusan
-          </button>
-        </div>
-      );
-    }
-    return (
-      <div className="adm-kartu" style={kotak}>
-        {judul(`Closing test: 3 customer dalam ${hariClosing} hari · ${sisa > 0 ? `sisa ${sisa} hari` : 'tenggat lewat'}`)}
-        <div className="field" style={{ marginTop: 0 }}>
-          <label htmlFor="ct-c">Warung yang udah jadi customer</label>
-          <input id="ct-c" type="number" min="0" value={f.customer} onChange={ubah('customer')} />
-        </div>
-        <button className="btn utama" style={{ marginTop: 10 }} disabled={f.customer === ''} onClick={() => kirim('/attempt', { customer: Number(f.customer) }, (r) => (r.hasil === 'lulus' ? 'Lulus closing test. Tinggal keputusan hiring.' : 'Closing test gagal (tenggat lewat).'))}>
-          Catat hasil
-        </button>
-      </div>
-    );
-  }
-  return null;
-}
-
-function FollowUp({ l, hari, kirim }) {
+export function FollowUp({ l, hari, kirim }) {
   return (
     <div className="adm-kartu" style={{ boxShadow: 'none', padding: 12, marginTop: 14 }}>
       <h4 className="adm-label" style={{ fontSize: 11, margin: '0 0 6px' }}>
@@ -639,33 +199,7 @@ function FollowUp({ l, hari, kirim }) {
   );
 }
 
-function Keluarkan({ kirim }) {
-  const [status, setStatus] = useState('');
-  const [alasan, setAlasan] = useState('');
-  return (
-    <div className="adm-kartu" style={{ boxShadow: 'none', padding: 12, marginTop: 14 }}>
-      <h4 className="adm-label" style={{ fontSize: 11, margin: '0 0 6px' }}>
-        Keluarkan dari proses
-      </h4>
-      <div className="adm-baris" style={{ gridTemplateColumns: 'auto 1fr' }}>
-        <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status keluar" style={{ minHeight: 44 }}>
-          <option value="">Pilih</option>
-          {Object.entries(KELUAR).map(([k, v]) => (
-            <option key={k} value={k}>
-              {v.nama}
-            </option>
-          ))}
-        </select>
-        <input className="adm-input" value={alasan} onChange={(e) => setAlasan(e.target.value)} placeholder="Alasan (wajib)" aria-label="Alasan keluar" />
-      </div>
-      <button className="btn kecil bahaya" style={{ marginTop: 10 }} disabled={!status || !alasan.trim()} onClick={() => kirim('/keluar', { status, alasan }, `Kandidat dipindah ke ${KELUAR[status].nama}.`)}>
-        Simpan
-      </button>
-    </div>
-  );
-}
-
-function Catatan({ kirim }) {
+export function Catatan({ kirim }) {
   const [isi, setIsi] = useState('');
   return (
     <form
@@ -1003,45 +537,6 @@ function FormKampanye({ onTutup, onSimpan }) {
 }
 
 // ---------------- Jadwal & arsip ----------------
-function Jadwal({ api, versi, onBuka }) {
-  const { data, error, muat } = useData(api, `/rekrutmen/lamaran?mode=aktif&v=${versi}`);
-  if (error) return <Gagal apa="jadwal" pesan={error} onUlang={muat} />;
-  if (!data) return <Memuat apa="jadwal" />;
-  const jadwal = data
-    .filter((l) => l.status === 'interview' && l.attempt_terakhir?.hasil === 'dijadwalkan')
-    .sort((a, b) => new Date(a.attempt_terakhir.jadwal) - new Date(b.attempt_terakhir.jadwal));
-  const belum = data.filter((l) => l.status === 'interview' && l.attempt_terakhir?.hasil !== 'dijadwalkan');
-  return (
-    <>
-      {jadwal.length === 0 ? (
-        <Kosong judul="Belum ada interview terjadwal">Jadwalkan dari panel kandidat yang udah sampai tahap Interview.</Kosong>
-      ) : (
-        <div className="adm-angka" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))' }}>
-          {jadwal.map((l) => {
-            const t = new Date(l.attempt_terakhir.jadwal);
-            const lewat = t < new Date();
-            return (
-              <button key={l.id} className="adm-kartu adm-angka-item adm-saring" style={lewat ? { borderColor: 'var(--merah)' } : undefined} onClick={() => onBuka(l.id)}>
-                <b className="p-num" style={{ fontSize: 22 }}>
-                  {t.toLocaleString('id-ID', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                </b>
-                {lewat && <span className="adm-chip merah" style={{ alignSelf: 'flex-start' }}>Lewat, hasil belum dicatat</span>}
-                <span style={{ fontWeight: 700 }}>{l.nama}</span>
-                <span className="adm-redup">Pewawancara {l.attempt_terakhir.pewawancara}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-      {belum.length > 0 && (
-        <p className="adm-redup">
-          {belum.length} kandidat di tahap Interview belum dijadwalkan: {belum.map((l) => l.nama).join(', ')}.
-        </p>
-      )}
-    </>
-  );
-}
-
 function Arsip({ api, versi, onBuka }) {
   const { data, error, muat } = useData(api, `/rekrutmen/lamaran?mode=arsip&v=${versi}`);
   if (error) return <Gagal apa="arsip" pesan={error} onUlang={muat} />;
