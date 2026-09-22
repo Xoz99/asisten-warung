@@ -11,6 +11,7 @@ import rekrutmenRoutes, { publikRouter, DAFTAR_URL } from './rekrutmen.routes.js
 import karyawanRoutes from './karyawan.routes.js';
 import artifactRoutes, { berkasRouter as artifactBerkas } from './artifact.routes.js';
 import lapanganRoutes from './lapangan.routes.js';
+import komisiRoutes from './komisi.routes.js';
 import { PRODUK } from './produk/index.js';
 
 // Server aplikasi manajemen Konsulin: API /api/* (wajib login admin, lihat auth.js) + nyajiin hasil build tampilannya (dist/).
@@ -43,6 +44,7 @@ app.use('/api', rekrutmenRoutes);
 app.use('/api', karyawanRoutes);
 app.use('/api', artifactRoutes);
 app.use('/api', lapanganRoutes);
+app.use('/api', komisiRoutes);
 app.get('/api/produk', (req, res) => {
   res.json(PRODUK.filter((p) => p.aktif).map(({ id, nama, url }) => ({ id, nama, url })));
 });

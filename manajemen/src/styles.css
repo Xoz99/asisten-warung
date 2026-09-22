@@ -600,3 +600,10 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 .sl-mau-habis-ringkas b{font-size:17px}
 .sl-mau-habis-ringkas span{color:var(--redup);font-size:14px}
 .sl-mau-habis-ringkas .sl-wa{color:var(--biru)}
+.sl-penghasilan-ringkas{display:flex;flex-direction:column;gap:2px;margin-bottom:16px;color:var(--tinta);text-decoration:none;background:#EAF7EE}
+.sl-penghasilan-ringkas b{font-size:26px;line-height:1.15}
+.sl-penghasilan-ringkas .sl-wa{color:var(--biru);margin-top:4px}
+.sl-penghasilan{background:#EAF7EE;display:flex;flex-direction:column;gap:4px}
+.sl-penghasilan-angka{font-size:34px;line-height:1.1}
+.sl-progres{height:12px;border:2px solid var(--hitam);border-radius:999px;overflow:hidden;background:var(--putih);margin:8px 0 6px}
+.sl-progres div{height:100%;background:var(--hijau)}

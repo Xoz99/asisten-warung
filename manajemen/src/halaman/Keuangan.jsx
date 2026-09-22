@@ -3,11 +3,13 @@ import { bulanLabel, rupiah, tgl } from '../lib/format.js';
 import GrafikKas from '../komponen/GrafikKas.jsx';
 import { Gagal, Konfirmasi, Kosong, Memuat, Modal, Tabs, useData } from '../komponen/Ui.jsx';
 import Pembayaran from '../produk/warung-pintar/Pembayaran.jsx';
+import BagiHasil from './BagiHasil.jsx';
 
 // Keuangan: uang masuk (langganan Midtrans + catatan manual) & keluar (catatan manual) per bulan.
 const TABS = [
   { id: 'ringkasan', nama: 'Ringkasan & transaksi' },
   { id: 'pembayaran', nama: 'Pembayaran Midtrans' },
+  { id: 'bagi-hasil', nama: 'Bagi hasil sales' },
 ];
 const NAMA_KATEGORI = {
   gaji: 'Gaji & tunjangan',
@@ -35,6 +37,7 @@ export default function Keuangan({ api, apiProduk, tab }) {
       </header>
       <Tabs daftar={TABS} aktif={aktif} href={(id) => `#/keuangan/${id}`} />
       {aktif === 'ringkasan' && <Ringkasan api={api} />}
+      {aktif === 'bagi-hasil' && <BagiHasil api={api} />}
       {aktif === 'pembayaran' &&
         (apiProduk ? (
           <Pembayaran api={apiProduk} />

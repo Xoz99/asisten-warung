@@ -19,7 +19,7 @@ const tahapDari = (v) => {
   const t = String(v || '').trim().toLowerCase();
   return TAHAP_CRM.includes(t) ? t : ALIAS_TAHAP[t] || 'awareness';
 };
-const KATEGORI_KELUAR = ['gaji', 'operasional', 'marketing', 'server', 'pajak', 'lainnya'];
+const KATEGORI_KELUAR = ['gaji', 'komisi', 'operasional', 'marketing', 'server', 'pajak', 'lainnya'];
 const KATEGORI_MASUK = ['penjualan', 'proyek', 'investasi', 'lainnya'];
 
 let siap = null;

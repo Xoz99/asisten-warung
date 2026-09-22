@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { rupiah, tgl, waktu } from '../lib/format.js';
+import { bulanLabel, rupiah, tgl, waktu } from '../lib/format.js';
 import { Gagal, Kosong, Memuat, Modal, useData } from '../komponen/Ui.jsx';
 import { Detail, FormLog, HASIL, STATUS_TOKO, daftarKelompok, saringKamus, sisaHari } from '../halaman/Lapangan.jsx';
 
@@ -14,7 +14,7 @@ const MENU = [
   { id: 'riwayat', nama: 'Riwayat' },
   { id: 'contekan', nama: 'Contekan' },
 ];
-const HALAMAN = ['beranda', 'toko', 'riwayat', 'contekan', 'akun'];
+const HALAMAN = ['beranda', 'toko', 'riwayat', 'contekan', 'akun', 'penghasilan'];
 const hariIniWib = () => new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
 
 function bacaHalaman() {
@@ -79,6 +79,7 @@ export default function SalesApp({ api, admin, onKeluar }) {
         {halaman === 'riwayat' && <Riwayat {...props} />}
         {halaman === 'contekan' && <Contekan api={api} onCatat={catat} />}
         {halaman === 'akun' && <Akun api={api} admin={admin} onKeluar={onKeluar} />}
+        {halaman === 'penghasilan' && <Penghasilan api={api} />}
       </main>
 
       {pesan && (
@@ -172,6 +173,8 @@ function Beranda({ api, admin, versi, onBuka, onCatat }) {
         </span>
         <Ikon nama="catat" />
       </button>
+
+      <KartuPenghasilan api={api} versi={versi} />
 
       {toko?.terhubung && tokoMauHabis(toko.toko).length > 0 && (
         <a href="#/toko" className="sl-kartu sl-mau-habis-ringkas">
@@ -542,6 +545,133 @@ function Contekan({ api, onCatat }) {
           ))}
         </ul>
       )}
+    </>
+  );
+}
+
+// ---------------- Penghasilan (bagi hasil) ----------------
+const JENIS_KOMISI = { pertama: 'Order pertama', perpanjangan: 'Perpanjangan', permanen: 'Permanen' };
+const persen = (r) => `${Math.round(r * 100)}%`;
+
+function KartuPenghasilan({ api, versi }) {
+  const { data } = useData(api, `/lapangan/komisi?v=${versi}`);
+  if (!data?.terhubung) return null;
+  return (
+    <a href="#/penghasilan" className="sl-kartu sl-penghasilan-ringkas">
+      <span className="sl-label">Bagi hasil {bulanLabel(data.bulanIni.periode, true)} (estimasi)</span>
+      <b className="p-num">{rupiah(data.bulanIni.neto)}</b>
+      <span className="sl-redup">
+        {data.bulanIni.baris.length} pembayaran · dicairkan {tgl(data.bulanIni.jadwalCair)}
+      </span>
+      <span className="sl-wa">Lihat rincian</span>
+    </a>
+  );
+}
+
+function Penghasilan({ api }) {
+  const { data, error, muat } = useData(api, '/lapangan/komisi');
+  if (error) return <Gagal apa="penghasilan" pesan={error} onUlang={muat} />;
+  if (!data) return <Memuat apa="penghasilan" />;
+  if (!data.terhubung) return <div className="sl-kartu sl-peringatan">Akunmu belum disambungin ke kode sales, jadi bagi hasilnya belum bisa dihitung.</div>;
+  const b = data.bulanIni;
+  const butuh = data.ambangTokoBaru + 1;
+  return (
+    <>
+      <h1 className="sl-h1">Penghasilan</h1>
+      <section className="sl-kartu sl-penghasilan">
+        <span className="sl-label">Bulan ini, {bulanLabel(b.periode, true)}</span>
+        <b className="p-num sl-penghasilan-angka">{rupiah(b.neto)}</b>
+        <span className="sl-redup">
+          Komisi {rupiah(b.bruto)} dikurangi pajak {persen(data.rate.pajak)} ({rupiah(b.pajak)}). Masih estimasi, dikunci admin awal bulan depan, dicairkan {tgl(b.jadwalCair)}.
+        </span>
+      </section>
+
+      <section className="sl-kartu" style={{ marginTop: 12 }}>
+        <div className="sl-baris">
+          <b>Toko baru bulan ini</b>
+          <b className="p-num">
+            {b.toko_baru} / {butuh}
+          </b>
+        </div>
+        <div className="sl-progres" role="progressbar" aria-valuenow={b.toko_baru} aria-valuemin={0} aria-valuemax={butuh} aria-label="Toko baru bulan ini">
+          <div style={{ width: `${Math.min(100, (b.toko_baru / butuh) * 100)}%` }} />
+        </div>
+        <span className="sl-redup">
+          {b.toko_baru > data.ambangTokoBaru
+            ? `Mantap! Semua perpanjangan bulan ini dapat ${persen(data.rate.perpanjanganTier)}.`
+            : `${butuh - b.toko_baru} toko baru lagi biar semua perpanjangan bulan ini naik dari ${persen(data.rate.perpanjangan)} jadi ${persen(data.rate.perpanjanganTier)}.`}
+        </span>
+      </section>
+
+      <div className="sl-judul">
+        <h2>Rincian bulan ini</h2>
+      </div>
+      {b.baris.length === 0 ? (
+        <div className="sl-kosong">Belum ada pembayaran dari toko kamu bulan ini.</div>
+      ) : (
+        <ul className="sl-daftar">
+          {b.baris.map((x) => (
+            <li key={x.order_id} className="sl-kartu sl-bayar">
+              <div>
+                <b>{x.warung_nama}</b>
+                <span className="sl-redup">
+                  {JENIS_KOMISI[x.jenis]} · {persen(x.rate)} dari {rupiah(x.jumlah)} · {tgl(x.lunas_pada)}
+                </span>
+              </div>
+              <b className="p-num">{rupiah(x.komisi)}</b>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {data.bulanLalu && (
+        <section className="sl-kartu" style={{ marginTop: 16 }}>
+          <div className="sl-baris">
+            <b>{bulanLabel(data.bulanLalu.periode, true)}</b>
+            <b className="p-num">{rupiah(data.bulanLalu.neto)}</b>
+          </div>
+          <span className="sl-redup">Nunggu dikunci admin, dicairkan {tgl(data.bulanLalu.jadwalCair)}.</span>
+        </section>
+      )}
+
+      <div className="sl-judul">
+        <h2>Riwayat</h2>
+      </div>
+      {data.riwayat.length === 0 ? (
+        <div className="sl-kosong">Belum ada bulan yang dikunci.</div>
+      ) : (
+        <ul className="sl-daftar">
+          {data.riwayat.map((r) => (
+            <li key={r.periode} className="sl-kartu sl-bayar">
+              <div>
+                <b>{bulanLabel(r.periode, true)}</b>
+                <span className="sl-redup">
+                  {r.dicairkan_tanggal ? `Dicairkan ${tgl(r.dicairkan_tanggal)}${r.metode ? ` · ${r.metode}` : ''}` : `Dikunci, dicairkan ${tgl(r.jadwalCair)}`}
+                </span>
+              </div>
+              <span style={{ textAlign: 'right' }}>
+                <b className="p-num">{rupiah(r.neto)}</b>
+                <span className={`sl-hasil ${r.dicairkan_tanggal ? 'berhasil' : 'pikir'}`} style={{ display: 'block', marginTop: 4 }}>
+                  {r.dicairkan_tanggal ? 'Cair' : 'Siap cair'}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <details className="sl-kartu" style={{ marginTop: 16 }}>
+        <summary style={{ fontWeight: 700, cursor: 'pointer' }}>Cara ngitung bagi hasil</summary>
+        <ul style={{ margin: '10px 0 0', paddingLeft: 20, lineHeight: 1.7 }}>
+          <li>Toko bayar pertama kali: {persen(data.rate.pertama)}</li>
+          <li>
+            Toko perpanjang: {persen(data.rate.perpanjangan)}, atau {persen(data.rate.perpanjanganTier)} kalau bulan itu kamu dapat lebih dari {data.ambangTokoBaru} toko baru
+          </li>
+          <li>Paket permanen: {persen(data.rate.permanen)}</li>
+          <li>Dipotong pajak {persen(data.rate.pajak)}, dicairkan tiap tanggal 5 buat bulan sebelumnya</li>
+          <li>Yang dihitung cuma toko yang kamu pegang waktu dia bayar</li>
+        </ul>
+      </details>
     </>
   );
 }

@@ -32,6 +32,8 @@ export const NAMA_AKSI = {
   'rekrutmen.titik.tambah': 'nambah titik sebar',
   'rekrutmen.titik.status': 'ubah status posting',
   'admin.ubah_peran': 'ganti peran akun',
+  'komisi.tutup': 'nutup bulan bagi hasil',
+  'komisi.cairkan': 'nyairin bagi hasil sales',
   'admin.hubung_sales': 'nyambungin akun ke kode sales',
   'lapangan.keberatan.tambah': 'nambah keberatan di bank',
   'lapangan.keberatan.ubah': 'ubah keberatan di bank',
