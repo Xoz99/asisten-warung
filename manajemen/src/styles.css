@@ -48,7 +48,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .adm-akun div{flex:1;min-width:0}
 .adm-akun b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .adm-utama{flex:1;min-width:0;display:flex;flex-direction:column}
-.adm-topbar{display:flex;align-items:center;gap:12px;padding:12px 28px;border-bottom:var(--garis);background:var(--putih);position:sticky;top:0;z-index:5}
+.adm-topbar{display:none}
 .adm-crumb{font-size:12px;color:var(--redup);flex:1;min-width:0}
 .adm-crumb b{color:var(--tinta)}
 .adm-bel{position:relative;display:grid;place-items:center;width:44px;height:44px;border:var(--garis-tipis);background:var(--putih);cursor:pointer;text-decoration:none;color:var(--tinta);font-weight:700}
@@ -204,7 +204,7 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
   .adm-samping{position:fixed;left:0;top:0;bottom:0;z-index:30;transform:translateX(-105%);box-shadow:6px 0 0 var(--hitam)}
   .adm-samping.buka{transform:none}
   .adm-menu-tombol{display:grid;place-items:center;min-width:44px;height:44px;padding:0 12px;border:var(--garis-tipis);background:var(--kuning);font-weight:700;letter-spacing:.05em;font-size:12px;cursor:pointer;flex:none}
-  .adm-topbar{padding:10px 16px}
+  .adm-topbar{display:flex;padding:12px 16px 0;position:sticky;top:0;z-index:5;background:var(--kertas)}
   .adm-isi{padding:20px 16px 48px}
   .adm-kolom,.adm-kolom-3{grid-template-columns:minmax(0,1fr)}
   .adm-angka{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -937,7 +937,7 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 
 /* AI workspace: riwayat (kiri) + panel chat (kanan) */
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
-.ai-chat{display:grid;grid-template-columns:280px minmax(0,1fr);height:calc(100dvh - 166px);min-height:520px;background:var(--putih);border:var(--garis);box-shadow:var(--bayang);position:relative;overflow:hidden}
+.ai-chat{display:grid;grid-template-columns:280px minmax(0,1fr);height:calc(100dvh - 92px);min-height:520px;background:var(--putih);border:var(--garis);box-shadow:var(--bayang);position:relative;overflow:hidden}
 .ai-chat button{font:inherit;cursor:pointer}
 .ai-chat button:disabled{opacity:.45;cursor:default}
 .ai-mini{padding:3px 8px;border:var(--garis-tipis);background:var(--putih);font-size:11px!important;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--tinta)}
@@ -1068,7 +1068,7 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 .ai-latar{display:none}
 @media (max-width:1100px){.ai-chat{grid-template-columns:240px minmax(0,1fr)}.ai-model{max-width:140px}}
 @media (max-width:900px){
-  .ai-chat{grid-template-columns:minmax(0,1fr);height:calc(100dvh - 142px);min-height:460px;box-shadow:none}
+  .ai-chat{grid-template-columns:minmax(0,1fr);height:calc(100dvh - 124px);min-height:460px;box-shadow:none}
   .ai-samping{position:absolute;inset:0 auto 0 0;width:min(300px,86%);z-index:4;transform:translateX(-105%);transition:transform .18s;box-shadow:6px 0 0 var(--hitam)}
   .ai-samping.buka{transform:none}
   .ai-latar{display:block;position:absolute;inset:0;background:rgba(0,0,0,.35);z-index:3}
