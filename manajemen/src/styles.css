@@ -737,3 +737,26 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 .ld-cepat .ic.hijau{background:var(--hijau)}.ld-cepat .ic.biru{background:#9FD8FF}.ld-cepat .ic.kuning{background:var(--kuning)}.ld-cepat .ic.ungu{background:var(--ungu)}
 .ld-toast{position:sticky;bottom:66px;margin:0 16px 8px;align-self:center;background:#000;color:#fff;border:2px solid #fff;padding:8px 12px;font-weight:700;font-size:13px;display:flex;gap:12px;align-items:center;z-index:4;box-shadow:var(--bayang)}
 .ld-toast button{background:var(--kuning);color:#000;border:2px solid #fff;font-weight:800;font-size:11px;padding:4px 8px;cursor:pointer;text-transform:uppercase}
+
+/* Sales: pipeline kanban */
+.sl-seg{display:grid;grid-template-columns:1fr 1fr;border:2px solid var(--hitam);border-radius:999px;overflow:hidden;margin:0 0 12px;background:var(--putih)}
+.sl-seg a{text-align:center;padding:10px 8px;font-weight:700;text-decoration:none;color:var(--tinta);min-height:44px;display:grid;place-items:center}
+.sl-seg a.on{background:var(--hitam);color:var(--putih)}
+.sl-kanban{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -16px;padding:2px 16px 12px;scrollbar-width:none}
+.sl-kanban::-webkit-scrollbar{display:none}
+.sl-kanban-kolom{flex:0 0 min(82vw,320px);scroll-snap-align:start;display:flex;flex-direction:column;gap:10px;min-width:0}
+.sl-kanban-kepala{display:flex;justify-content:space-between;align-items:center;gap:8px;border:2px solid var(--hitam);border-radius:14px;padding:10px 12px;background:var(--putih)}
+.sl-kanban-kepala>span:first-child{display:flex;flex-direction:column;min-width:0}
+.sl-kanban-kepala b{font-size:15px}
+.sl-kanban-kepala .p-num{font-size:13px;font-weight:700}
+.sl-kanban-kepala.tahap-trial{background:var(--kuning)}
+.sl-kanban-kepala.tahap-konversi{background:var(--hijau)}
+.sl-kanban-kepala.tahap-repeat_order{background:var(--biru);color:var(--putih)}
+.sl-kanban-kepala.tahap-stuck{background:var(--merah);color:var(--putih)}
+.sl-kanban-jumlah{background:#000;color:#fff;border-radius:999px;min-width:30px;height:30px;display:grid;place-items:center;font-weight:700;font-size:14px;padding:0 8px}
+.sl-kanban-kartu{display:flex;flex-direction:column;gap:2px;text-align:left;width:100%;font:inherit;color:inherit;cursor:pointer}
+.sl-kanban-kartu .sl-baris b{overflow-wrap:anywhere}
+.sl-lead-laci{position:fixed;inset:0;z-index:40;background:var(--putih);overflow:hidden}
+.sl-lead-laci .adm-inspector{position:static;max-height:none;height:100%;border:0;box-shadow:none;overflow-y:auto}
+.sl-lead-laci .ld-atas{padding-top:calc(10px + env(safe-area-inset-top))}
+.sl-lead-laci .ld-cepat{padding-bottom:env(safe-area-inset-bottom)}

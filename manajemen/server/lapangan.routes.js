@@ -252,7 +252,8 @@ async function tautkanKeCrm(c, req, log, b) {
   const catat = async (jenis, isi) => c.query('INSERT INTO mj_lead_aktivitas (lead_id, admin_nama, jenis, isi) VALUES ($1,$2,$3,$4)', [lead.id, req.admin.nama, jenis, isi]);
   if (!lead) {
     const { rows } = await c.query(
-      `INSERT INTO mj_lead (perusahaan, pic_nama, telepon, sumber, tahap, pemilik_id, lat, lng) VALUES ($1,$2,$3,'Kunjungan lapangan',$4,$5,$6,$7) RETURNING *`,
+      // Estimasi deal awal = paket bulanan (paling murah, Rp78rb), sama kayak kartu otomatis dari link/QR sales.
+      `INSERT INTO mj_lead (perusahaan, pic_nama, telepon, sumber, tahap, pemilik_id, lat, lng, nilai) VALUES ($1,$2,$3,'Kunjungan lapangan',$4,$5,$6,$7,78000) RETURNING *`,
       [toko, pemilik, hp, tahapHasil, req.admin.id, log.lat ?? null, log.lng ?? null]
     );
     lead = rows[0];

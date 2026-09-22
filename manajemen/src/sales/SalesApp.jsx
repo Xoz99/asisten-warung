@@ -4,6 +4,8 @@ import { bulanLabel, rupiah, tgl, waktu } from '../lib/format.js';
 import { Gagal, Kosong, Memuat, Modal, useData } from '../komponen/Ui.jsx';
 import { Detail, FormLog, HASIL, STATUS_TOKO, daftarKelompok, saringKamus, sisaHari } from '../halaman/Lapangan.jsx';
 import FotoProfil from '../komponen/FotoProfil.jsx';
+import LeadDetail from '../halaman/LeadDetail.jsx';
+import { TAHAP_CRM } from '../halaman/LeadsCrm.jsx';
 import { keWebp } from '../lib/gambar.js';
 import { DAFTAR_BANK, EWALLET, samarRekening, statusRekening } from '../lib/bank.js';
 
@@ -17,7 +19,7 @@ const MENU = [
   { id: 'riwayat', nama: 'Riwayat' },
   { id: 'contekan', nama: 'Contekan' },
 ];
-const HALAMAN = ['beranda', 'toko', 'riwayat', 'contekan', 'akun', 'penghasilan'];
+const HALAMAN = ['beranda', 'toko', 'pipeline', 'riwayat', 'contekan', 'akun', 'penghasilan'];
 const hariIniWib = () => new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
 
 function bacaHalaman() {
@@ -82,6 +84,7 @@ export default function SalesApp({ api, admin, onKeluar }) {
       <main className="sl-isi">
         {halaman === 'beranda' && <Beranda {...props} />}
         {halaman === 'toko' && <Toko api={api} />}
+        {halaman === 'pipeline' && <Pipeline api={api} versi={versi} onCatat={segarkan} />}
         {halaman === 'riwayat' && <Riwayat {...props} />}
         {halaman === 'contekan' && <Contekan api={api} onCatat={catat} />}
         {halaman === 'akun' && (
@@ -115,7 +118,7 @@ export default function SalesApp({ api, admin, onKeluar }) {
               <span>Catat</span>
             </button>
           ) : (
-            <a key={m.id} href={`#/${m.id}`} className={halaman === m.id ? 'on' : ''} aria-current={halaman === m.id ? 'page' : undefined}>
+            <a key={m.id} href={`#/${m.id}`} className={halaman === m.id || (m.id === 'toko' && halaman === 'pipeline') ? 'on' : ''} aria-current={halaman === m.id ? 'page' : undefined}>
               <Ikon nama={m.id} />
               <span>{m.nama}</span>
             </a>
@@ -348,6 +351,7 @@ function Toko({ api }) {
   const daftar = filter === 'mau_habis' ? mauHabis : data.toko.filter((t) => !filter || t.tahap === filter);
   return (
     <>
+      <PilihTokoPipeline aktif="toko" />
       <h1 className="sl-h1">Toko kamu</h1>
       <section className="sl-angka" aria-label="Ringkasan toko">
         <div>
@@ -680,6 +684,110 @@ function PemberitahuanCair({ api, versi, onBerubah }) {
         )}
       </section>
     )
+  );
+}
+
+// ---------------- Pipeline (kanban kartu CRM milik sales) ----------------
+function PilihTokoPipeline({ aktif }) {
+  return (
+    <nav className="sl-seg" aria-label="Toko atau pipeline">
+      <a href="#/toko" className={aktif === 'toko' ? 'on' : ''} aria-current={aktif === 'toko' ? 'page' : undefined}>
+        Toko langganan
+      </a>
+      <a href="#/pipeline" className={aktif === 'pipeline' ? 'on' : ''} aria-current={aktif === 'pipeline' ? 'page' : undefined}>
+        Pipeline
+      </a>
+    </nav>
+  );
+}
+
+const hariDiTahap = (t) => Math.max(0, Math.floor((Date.now() - new Date(t).getTime()) / 86400000));
+
+function Pipeline({ api, versi }) {
+  const [v, setV] = useState(0);
+  const { data, error, muat } = useData(api, `/lapangan/crm?v=${versi}-${v}`);
+  const [cari, setCari] = useState('');
+  const [dibuka, setDibuka] = useState(null);
+  if (error) return <Gagal apa="pipeline" pesan={error} onUlang={muat} />;
+  if (!data) return <Memuat apa="pipeline" />;
+  const q = cari.trim().toLowerCase();
+  const leads = q ? data.filter((l) => [l.perusahaan, l.pic_nama, l.telepon].some((x) => (x || '').toLowerCase().includes(q))) : data;
+  const total = data.reduce((a, l) => a + (Number(l.nilai) || 0), 0);
+  const lead = dibuka ? data.find((l) => l.id === dibuka) || null : null;
+  return (
+    <>
+      <PilihTokoPipeline aktif="pipeline" />
+      <h1 className="sl-h1">Pipeline kamu</h1>
+      <section className="sl-angka" aria-label="Ringkasan pipeline">
+        <div>
+          <b className="p-num">{data.length}</b>
+          <span>kartu jalan</span>
+        </div>
+        <div>
+          <b className="p-num" style={{ fontSize: 17 }}>
+            {rupiah(total)}
+          </b>
+          <span>total potensial</span>
+        </div>
+        <div>
+          <b className="p-num">{data.filter((l) => l.tahap === 'stuck').length}</b>
+          <span>macet</span>
+        </div>
+      </section>
+      <div className="sl-cari">
+        <input type="search" value={cari} onChange={(e) => setCari(e.target.value)} placeholder="Cari toko, PIC, atau nomor" aria-label="Cari kartu" />
+      </div>
+      {data.length === 0 ? (
+        <div className="sl-kosong">Belum ada kartu. Kartu muncul otomatis waktu kamu nyatet kunjungan, atau waktu toko daftar pakai link/kode kamu.</div>
+      ) : (
+        <>
+          <p className="sl-redup" style={{ margin: '0 0 8px' }}>
+            Geser ke samping buat lihat tahap lain. Ketuk kartu buat buka detail &amp; pindah tahap.
+          </p>
+          <div className="sl-kanban">
+            {TAHAP_CRM.map((t) => {
+              const isi = leads.filter((l) => l.tahap === t.id);
+              return (
+                <section key={t.id} className="sl-kanban-kolom" aria-label={`Tahap ${t.nama}`}>
+                  <header className={`sl-kanban-kepala tahap-${t.id}`}>
+                    <span>
+                      <b>{t.nama}</b>
+                      <span className="p-num">{rupiah(isi.reduce((a, l) => a + (Number(l.nilai) || 0), 0))}</span>
+                    </span>
+                    <span className="sl-kanban-jumlah">{isi.length}</span>
+                  </header>
+                  {isi.length === 0 ? (
+                    <p className="sl-redup" style={{ textAlign: 'center', margin: '12px 0' }}>
+                      Kosong
+                    </p>
+                  ) : (
+                    isi.map((l) => (
+                      <button key={l.id} className="sl-kartu sl-kanban-kartu" onClick={() => setDibuka(l.id)}>
+                        <span className="sl-baris">
+                          <b>{l.perusahaan}</b>
+                          <span className="sl-redup">{hariDiTahap(l.tahap_sejak)} hari</span>
+                        </span>
+                        <span className="sl-redup">{l.pic_nama || 'PIC belum diisi'}</span>
+                        <span className="sl-baris" style={{ marginTop: 6 }}>
+                          <b className="p-num">{rupiah(l.nilai)}</b>
+                          <span className="sl-redup">{l.jumlah_kunjungan ? `${l.jumlah_kunjungan} kunjungan` : 'belum dikunjungi'}</span>
+                        </span>
+                        {l.prioritas === 'tinggi' && <span className="sl-hasil ditolak" style={{ alignSelf: 'flex-start' }}>Prioritas tinggi</span>}
+                      </button>
+                    ))
+                  )}
+                </section>
+              );
+            })}
+          </div>
+        </>
+      )}
+      {lead && (
+        <div className="sl-lead-laci">
+          <LeadDetail key={lead.id} api={api} lead={lead} base="/lapangan/crm" modeSales onTutup={() => setDibuka(null)} onBerubah={() => setV((x) => x + 1)} />
+        </div>
+      )}
+    </>
   );
 }
 

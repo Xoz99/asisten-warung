@@ -44,7 +44,8 @@ const nomorWa = (hp) => {
 const waLink = (hp, teks) => `https://wa.me/${nomorWa(hp)}?text=${encodeURIComponent(teks)}`;
 const depan = (n) => (n || '').trim().split(/\s+/)[0] || '';
 
-export default function LeadDetail({ api, lead: leadDaftar, admins, onTutup, onBerubah }) {
+// `base`: /leads (admin) atau /lapangan/crm (sales, cuma kartu miliknya). `modeSales` nyembunyiin ganti PIC & hapus.
+export default function LeadDetail({ api, lead: leadDaftar, admins = [], onTutup, onBerubah, base = '/leads', modeSales = false }) {
   const saya = bacaSesi()?.admin || {};
   const [detail, setDetail] = useState(null);
   // Data kartu dari server lebih baru daripada salinan di daftar (daftar bisa nggak ikut ke-refresh, misal di Kanban).
@@ -59,8 +60,8 @@ export default function LeadDetail({ api, lead: leadDaftar, admins, onTutup, onB
   const inputFoto = useRef(null);
 
   const muat = useCallback(() => {
-    api('GET', `/leads/${leadDaftar.id}/detail`).then(setDetail, (e) => setError(e.message));
-    api('GET', `/leads/${leadDaftar.id}/aktivitas`).then(setAktivitas, (e) => setError(e.message));
+    api('GET', `${base}/${leadDaftar.id}/detail`).then(setDetail, (e) => setError(e.message));
+    api('GET', `${base}/${leadDaftar.id}/aktivitas`).then(setAktivitas, (e) => setError(e.message));
   }, [api, leadDaftar.id]);
   useEffect(() => {
     muat();
@@ -82,7 +83,7 @@ export default function LeadDetail({ api, lead: leadDaftar, admins, onTutup, onB
   const ubah = async (perubahan, pesan, undo) => {
     setError('');
     try {
-      await api('PATCH', `/leads/${lead.id}`, perubahan);
+      await api('PATCH', `${base}/${lead.id}`, perubahan);
       segarkan();
       if (pesan) setToast({ teks: pesan, undo });
       return true;
@@ -92,7 +93,7 @@ export default function LeadDetail({ api, lead: leadDaftar, admins, onTutup, onB
     }
   };
   const catat = async (jenis, isi) => {
-    await api('POST', `/leads/${lead.id}/aktivitas`, { jenis, isi });
+    await api('POST', `${base}/${lead.id}/aktivitas`, { jenis, isi });
     segarkan();
   };
 
@@ -133,7 +134,7 @@ export default function LeadDetail({ api, lead: leadDaftar, admins, onTutup, onB
 
   const centang = async (c) => {
     try {
-      await api('PATCH', `/leads/${lead.id}/checklist/${c.id}`, { selesai: !c.selesai });
+      await api('PATCH', `${base}/${lead.id}/checklist/${c.id}`, { selesai: !c.selesai });
       muat();
       if (!c.selesai) setToast({ teks: 'Checklist selesai' });
     } catch (e) {
@@ -150,7 +151,7 @@ export default function LeadDetail({ api, lead: leadDaftar, admins, onTutup, onB
     e.target.value = '';
     if (!f) return;
     try {
-      await api('PUT', `/leads/${lead.id}/foto`, { foto: await keWebp(f, 1200, 0.8) });
+      await api('PUT', `${base}/${lead.id}/foto`, { foto: await keWebp(f, 1200, 0.8) });
       setVersiFoto((v) => v + 1);
       segarkan();
       setToast({ teks: 'Foto warung diganti' });
@@ -172,7 +173,7 @@ export default function LeadDetail({ api, lead: leadDaftar, admins, onTutup, onB
       </div>
 
       <div className="ld-sampul">
-        <SampulWarung lead={lead} versi={versiFoto} />
+        <SampulWarung lead={lead} versi={versiFoto} base={base} />
         <span className={`adm-chip ld-tahap-chip ${lead.hasil === 'menang' ? 'hijau' : lead.hasil === 'gagal' || macet ? 'merah' : 'kuning'}`}>
           {lead.hasil ? `Ditutup: ${lead.hasil}` : `Tahap: ${namaTahap(lead.tahap).nama}`}
         </span>
@@ -254,7 +255,7 @@ export default function LeadDetail({ api, lead: leadDaftar, admins, onTutup, onB
         <div className="adm-kartu ld-tim">
           <div className="ld-orang">
             {detail?.pic ? (
-              <FotoProfil src={`/api/tim-sales/${detail.pic.id}/foto`} ada={detail.pic.ada_foto && detail.pic.peran === 'sales'} nama={detail.pic.nama} ukuran={44} />
+              <FotoProfil src={modeSales ? '/api/saya/foto' : `/api/tim-sales/${detail.pic.id}/foto`} ada={detail.pic.ada_foto && detail.pic.peran === 'sales'} nama={detail.pic.nama} ukuran={44} />
             ) : (
               <span className="ld-inisial kecil">?</span>
             )}
@@ -265,9 +266,11 @@ export default function LeadDetail({ api, lead: leadDaftar, admins, onTutup, onB
                 {detail?.pic?.jabatan || (detail?.pic?.peran === 'sales' ? 'Sales' : 'Admin')}
               </div>
             </div>
-            <button className="btn kecil" style={{ marginLeft: 'auto' }} onClick={() => setModal({ jenis: 'pic' })}>
-              Ganti
-            </button>
+            {!modeSales && (
+              <button className="btn kecil" style={{ marginLeft: 'auto' }} onClick={() => setModal({ jenis: 'pic' })}>
+                Ganti
+              </button>
+            )}
           </div>
           <div className="ld-orang">
             <span className="ld-inisial kecil ungu">{detail?.supervisor ? depan(detail.supervisor.nama)[0]?.toUpperCase() : '–'}</span>
@@ -337,7 +340,7 @@ export default function LeadDetail({ api, lead: leadDaftar, admins, onTutup, onB
         {!detail || !aktivitas ? (
           <Memuat apa="detail lead" />
         ) : tab === 'ringkas' ? (
-          <TabRingkas api={api} lead={lead} detail={detail} aktivitas={aktivitas} muat={muat} setError={setError} centang={centang} onUbahData={() => setModal({ jenis: 'data' })} onMenang={() => ubah({ hasil: 'menang' }, 'Lead ditandai menang', () => ubah({ hasil: null }))} onGagal={() => setModal({ jenis: 'gagal' })} onHapus={() => setModal({ jenis: 'hapus' })} />
+          <TabRingkas api={api} base={base} modeSales={modeSales} lead={lead} detail={detail} aktivitas={aktivitas} muat={muat} setError={setError} centang={centang} onUbahData={() => setModal({ jenis: 'data' })} onMenang={() => ubah({ hasil: 'menang' }, 'Lead ditandai menang', () => ubah({ hasil: null }))} onGagal={() => setModal({ jenis: 'gagal' })} onHapus={() => setModal({ jenis: 'hapus' })} />
         ) : tab === 'kunjungan' ? (
           <TabKunjungan kunjungan={kunjungan} kategoriTop={kategoriTop} onWa={(kat) => setModal({ jenis: 'wa', template: kat })} onBuka={(k) => setModal({ jenis: 'lihat-kunjungan', k })} onLihatFoto={(url) => setModal({ jenis: 'foto', url })} onBaru={() => setModal({ jenis: 'kunjungan' })} />
         ) : (
@@ -401,7 +404,7 @@ export default function LeadDetail({ api, lead: leadDaftar, admins, onTutup, onB
           admins={admins}
           onTutup={() => setModal(null)}
           onSimpan={async (isi) => {
-            await api('PATCH', `/leads/${lead.id}`, { ...isi, _catatUbah: true });
+            await api('PATCH', `${base}/${lead.id}`, { ...isi, _catatUbah: true });
             setModal(null);
             segarkan();
             setToast({ teks: 'Perubahan disimpan' });
@@ -415,7 +418,7 @@ export default function LeadDetail({ api, lead: leadDaftar, admins, onTutup, onB
           onBatal={() => setModal(null)}
           onYa={async () => {
             try {
-              await api('DELETE', `/leads/${lead.id}`);
+              await api('DELETE', `${base}/${lead.id}`);
               setModal(null);
               onTutup();
               onBerubah();
@@ -430,7 +433,7 @@ export default function LeadDetail({ api, lead: leadDaftar, admins, onTutup, onB
         <FormLog
           api={api}
           awal={modal.l || { id_kunjungan: lead.perusahaan, lead_id: lead.id }}
-          wajibGps={false}
+          wajibGps={modeSales}
           onTutup={() => setModal(null)}
           onSelesai={(t) => {
             setModal(null);
@@ -460,13 +463,13 @@ export default function LeadDetail({ api, lead: leadDaftar, admins, onTutup, onB
 }
 
 // Sampul: foto warung yang diupload, atau gambar warung (ilustrasi) kalau belum ada.
-function SampulWarung({ lead, versi }) {
+function SampulWarung({ lead, versi, base }) {
   const [url, setUrl] = useState(null);
   useEffect(() => {
     if (!lead.foto) return setUrl(null);
     let u = null;
     let batal = false;
-    fetch(`/api/leads/${lead.id}/foto`, { headers: { Authorization: 'Bearer ' + (bacaSesi()?.token || '') } })
+    fetch(`/api${base}/${lead.id}/foto`, { headers: { Authorization: 'Bearer ' + (bacaSesi()?.token || '') } })
       .then((r) => (r.ok ? r.blob() : Promise.reject()))
       .then((b) => !batal && setUrl((u = URL.createObjectURL(b))))
       .catch(() => !batal && setUrl(null));
@@ -474,7 +477,7 @@ function SampulWarung({ lead, versi }) {
       batal = true;
       if (u) URL.revokeObjectURL(u);
     };
-  }, [lead.id, lead.foto, versi]);
+  }, [lead.id, lead.foto, versi, base]);
   if (url) return <img src={url} alt={`Foto ${lead.perusahaan}`} />;
   return <IlustrasiWarung nama={lead.perusahaan} />;
 }
@@ -517,7 +520,7 @@ function IlustrasiWarung({ nama }) {
 }
 
 // ---------------- Tab Ringkasan ----------------
-function TabRingkas({ api, lead, detail, aktivitas, muat, setError, centang, onUbahData, onMenang, onGagal, onHapus }) {
+function TabRingkas({ api, base, modeSales, lead, detail, aktivitas, muat, setError, centang, onUbahData, onMenang, onGagal, onHapus }) {
   const [baru, setBaru] = useState('');
   const selesai = detail.checklist.filter((c) => c.selesai).length;
   const catatan = aktivitas.filter((a) => CATATAN.includes(a.jenis));
@@ -525,7 +528,7 @@ function TabRingkas({ api, lead, detail, aktivitas, muat, setError, centang, onU
     const t = baru.trim();
     if (!t) return;
     try {
-      await api('POST', `/leads/${lead.id}/checklist`, { teks: t });
+      await api('POST', `${base}/${lead.id}/checklist`, { teks: t });
       setBaru('');
       muat();
     } catch (e) {
@@ -585,7 +588,7 @@ function TabRingkas({ api, lead, detail, aktivitas, muat, setError, centang, onU
               onClick={async (e) => {
                 e.preventDefault();
                 try {
-                  await api('DELETE', `/leads/${lead.id}/checklist/${c.id}`);
+                  await api('DELETE', `${base}/${lead.id}/checklist/${c.id}`);
                   muat();
                 } catch (err) {
                   setError(err.message);
@@ -634,9 +637,11 @@ function TabRingkas({ api, lead, detail, aktivitas, muat, setError, centang, onU
           </button>
         </div>
       )}
-      <button className="adm-link" style={{ marginTop: 14, color: 'var(--merah)' }} onClick={onHapus}>
-        Hapus lead ini
-      </button>
+      {!modeSales && (
+        <button className="adm-link" style={{ marginTop: 14, color: 'var(--merah)' }} onClick={onHapus}>
+          Hapus lead ini
+        </button>
+      )}
     </>
   );
 }

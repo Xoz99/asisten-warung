@@ -364,40 +364,46 @@ router.post('/leads', async (req, res, next) => {
   }
 });
 
+// Ubah lead + catat riwayatnya. Dipakai admin (/leads/:id) dan sales buat kartu miliknya (/lapangan/crm/:id).
+const galat = (pesan, status = 400) => Object.assign(new Error(pesan), { status });
+export async function ubahLead(req, id, body) {
+  if (!POLA_UUID.test(id)) throw galat('Lead tidak ditemukan', 404);
+  const x = bersihkanLead(body, true);
+  if (x.perusahaan === null) throw galat('Nama perusahaan/prospek wajib diisi');
+  const kolom = Object.keys(x);
+  if (!kolom.length) throw galat('Nggak ada yang diubah');
+  if (x.hasil !== 'gagal' && x.hasil !== undefined) x.alasan_gagal = null; // dibuka lagi / menang: alasan gagal dibuang
+  const { rows: lama } = await query('SELECT tahap, hasil, perusahaan, prioritas, pemilik_id FROM mj_lead WHERE id=$1', [id]);
+  if (!lama.length) throw galat('Lead tidak ditemukan', 404);
+  const { rows } = await query(
+    `UPDATE mj_lead SET ${kolom.map((k, i) => `${k}=$${i + 2}`).join(', ')}, updated_at=now()${x.tahap && x.tahap !== lama[0].tahap ? ', tahap_sejak=now()' : ''}
+     WHERE id=$1 RETURNING *, nilai::float AS nilai`,
+    [id, ...kolom.map((k) => x[k])]
+  );
+  // Pindah tahap / ditutup kecatat di riwayat lead-nya.
+  const catat = [];
+  if (x.tahap && x.tahap !== lama[0].tahap) catat.push(`Tahap: ${NAMA_TAHAP[lama[0].tahap] || lama[0].tahap} → ${NAMA_TAHAP[x.tahap]}`);
+  if (x.hasil !== undefined && x.hasil !== lama[0].hasil)
+    catat.push(x.hasil ? `Ditandai ${x.hasil.toUpperCase()}${x.hasil === 'gagal' && x.alasan_gagal ? `: ${x.alasan_gagal}` : ''}` : 'Dibuka lagi');
+  for (const isi of catat) await query("INSERT INTO mj_lead_aktivitas (lead_id, admin_nama, jenis, isi) VALUES ($1,$2,'tahap',$3)", [id, req.admin.nama, isi]);
+  // Perubahan data lain (prioritas, sales PIC, isi kontak) kecatat sebagai "data".
+  const data = [];
+  if (x.prioritas && x.prioritas !== lama[0].prioritas) data.push(`Prioritas: ${lama[0].prioritas} → ${x.prioritas}`);
+  if (x.pemilik_id !== undefined && x.pemilik_id !== lama[0].pemilik_id) {
+    const { rows: p } = await query('SELECT nama FROM mj_admin WHERE id=$1', [x.pemilik_id]);
+    data.push(`Sales PIC diganti jadi ${p[0]?.nama || '-'}`);
+  }
+  const kolomData = kolom.filter((k) => ['perusahaan', 'pic_nama', 'pic_jabatan', 'email', 'telepon', 'alamat', 'jenis_usaha', 'nilai', 'sumber'].includes(k));
+  const LABEL = { perusahaan: 'nama', pic_nama: 'PIC', pic_jabatan: 'jabatan PIC', email: 'email', telepon: 'telepon', alamat: 'alamat', jenis_usaha: 'jenis usaha', nilai: 'estimasi deal', sumber: 'sumber' };
+  if (kolomData.length && body._catatUbah) data.push(`Data diubah: ${kolomData.map((k) => LABEL[k]).join(', ')}`);
+  for (const isi of data) await query("INSERT INTO mj_lead_aktivitas (lead_id, admin_nama, jenis, isi) VALUES ($1,$2,'data',$3)", [id, req.admin.nama, isi]);
+  await catatLog(req, 'ops.lead.ubah', { perusahaan: rows[0].perusahaan, ...(catat.length ? { perubahan: catat.join('; ') } : {}) });
+  return rows[0];
+}
+
 router.patch('/leads/:id', async (req, res, next) => {
   try {
-    if (!POLA_UUID.test(req.params.id)) return res.status(404).json({ error: 'Lead tidak ditemukan' });
-    const x = bersihkanLead(req.body, true);
-    if (x.perusahaan === null) return res.status(400).json({ error: 'Nama perusahaan/prospek wajib diisi' });
-    const kolom = Object.keys(x);
-    if (!kolom.length) return res.status(400).json({ error: 'Nggak ada yang diubah' });
-    if (x.hasil !== 'gagal' && x.hasil !== undefined) x.alasan_gagal = null; // dibuka lagi / menang: alasan gagal dibuang
-    const { rows: lama } = await query('SELECT tahap, hasil, perusahaan, prioritas, pemilik_id FROM mj_lead WHERE id=$1', [req.params.id]);
-    if (!lama.length) return res.status(404).json({ error: 'Lead tidak ditemukan' });
-    const { rows } = await query(
-      `UPDATE mj_lead SET ${kolom.map((k, i) => `${k}=$${i + 2}`).join(', ')}, updated_at=now()${x.tahap && x.tahap !== lama[0].tahap ? ', tahap_sejak=now()' : ''}
-       WHERE id=$1 RETURNING *, nilai::float AS nilai`,
-      [req.params.id, ...kolom.map((k) => x[k])]
-    );
-    // Pindah tahap / ditutup kecatat di riwayat lead-nya.
-    const catat = [];
-    if (x.tahap && x.tahap !== lama[0].tahap) catat.push(`Tahap: ${NAMA_TAHAP[lama[0].tahap] || lama[0].tahap} → ${NAMA_TAHAP[x.tahap]}`);
-    if (x.hasil !== undefined && x.hasil !== lama[0].hasil)
-      catat.push(x.hasil ? `Ditandai ${x.hasil.toUpperCase()}${x.hasil === 'gagal' && x.alasan_gagal ? `: ${x.alasan_gagal}` : ''}` : 'Dibuka lagi');
-    for (const isi of catat) await query("INSERT INTO mj_lead_aktivitas (lead_id, admin_nama, jenis, isi) VALUES ($1,$2,'tahap',$3)", [req.params.id, req.admin.nama, isi]);
-    // Perubahan data lain (prioritas, sales PIC, isi kontak) kecatat sebagai "data".
-    const data = [];
-    if (x.prioritas && x.prioritas !== lama[0].prioritas) data.push(`Prioritas: ${lama[0].prioritas} → ${x.prioritas}`);
-    if (x.pemilik_id !== undefined && x.pemilik_id !== lama[0].pemilik_id) {
-      const { rows: p } = await query('SELECT nama FROM mj_admin WHERE id=$1', [x.pemilik_id]);
-      data.push(`Sales PIC diganti jadi ${p[0]?.nama || '-'}`);
-    }
-    const kolomData = kolom.filter((k) => ['perusahaan', 'pic_nama', 'pic_jabatan', 'email', 'telepon', 'alamat', 'jenis_usaha', 'nilai', 'sumber'].includes(k));
-    const LABEL = { perusahaan: 'nama', pic_nama: 'PIC', pic_jabatan: 'jabatan PIC', email: 'email', telepon: 'telepon', alamat: 'alamat', jenis_usaha: 'jenis usaha', nilai: 'estimasi deal', sumber: 'sumber' };
-    if (kolomData.length && req.body._catatUbah) data.push(`Data diubah: ${kolomData.map((k) => LABEL[k]).join(', ')}`);
-    for (const isi of data) await query("INSERT INTO mj_lead_aktivitas (lead_id, admin_nama, jenis, isi) VALUES ($1,$2,'data',$3)", [req.params.id, req.admin.nama, isi]);
-    await catatLog(req, 'ops.lead.ubah', { perusahaan: rows[0].perusahaan, ...(catat.length ? { perubahan: catat.join('; ') } : {}) });
-    res.json(rows[0]);
+    res.json(await ubahLead(req, req.params.id, req.body));
   } catch (e) {
     next(e);
   }
