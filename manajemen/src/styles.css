@@ -590,3 +590,13 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 .sl-cari input:focus{outline:none;box-shadow:0 0 0 3px rgba(29,78,216,.25)}
 .sl-contoh{font-style:italic;background:#EEF2FF;padding:8px 12px;border-radius:10px}
 .sl-jangan{color:var(--merah);font-size:14px;margin:0 0 12px}
+.sl-mau-habis{margin-bottom:14px;background:#FFF8DB}
+.sl-mau-habis ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.sl-mau-habis li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-top:1px solid #E9DFA8}
+.sl-mau-habis li b{display:block;overflow-wrap:anywhere}
+.sl-mendesak{color:var(--merah);font-weight:700;font-size:13px;display:block}
+.sl-wa-kecil{flex:none;display:inline-flex;align-items:center;min-height:40px;padding:0 14px;border:2px solid var(--hitam);border-radius:999px;background:var(--hijau);color:var(--tinta);font-weight:700;font-size:14px;text-decoration:none}
+.sl-mau-habis-ringkas{display:flex;flex-direction:column;gap:2px;margin-bottom:16px;background:#FFF8DB;color:var(--tinta);text-decoration:none}
+.sl-mau-habis-ringkas b{font-size:17px}
+.sl-mau-habis-ringkas span{color:var(--redup);font-size:14px}
+.sl-mau-habis-ringkas .sl-wa{color:var(--biru)}

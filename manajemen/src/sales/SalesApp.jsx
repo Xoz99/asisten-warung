@@ -173,6 +173,20 @@ function Beranda({ api, admin, versi, onBuka, onCatat }) {
         <Ikon nama="catat" />
       </button>
 
+      {toko?.terhubung && tokoMauHabis(toko.toko).length > 0 && (
+        <a href="#/toko" className="sl-kartu sl-mau-habis-ringkas">
+          <b>{tokoMauHabis(toko.toko).length} toko mau habis minggu ini</b>
+          <span>
+            {tokoMauHabis(toko.toko)
+              .slice(0, 3)
+              .map((t) => t.nama)
+              .join(', ')}
+            {tokoMauHabis(toko.toko).length > 3 ? ', …' : ''}
+          </span>
+          <span className="sl-wa">Lihat & ingatkan</span>
+        </a>
+      )}
+
       <LinkKartu api={api} />
 
       <div className="sl-judul">
@@ -281,13 +295,33 @@ function LinkKartu({ api }) {
 }
 
 // ---------------- Toko ----------------
+// "Mau habis" = langganan / trial yang masa aktifnya tinggal 7 hari atau kurang. Ini yang paling perlu didatengin:
+// langganan biar diperpanjang, trial biar jadi bayar pertama.
+const HARI_MAU_HABIS = 7;
+const sisaHariAngka = (t) => Math.ceil((new Date(t) - Date.now()) / 86400000);
+export const tokoMauHabis = (toko) =>
+  (toko || [])
+    .filter((t) => ['langganan', 'trial'].includes(t.tahap) && sisaHariAngka(t.lisensi_berlaku_sampai) <= HARI_MAU_HABIS)
+    .sort((a, b) => new Date(a.lisensi_berlaku_sampai) - new Date(b.lisensi_berlaku_sampai));
+const kapanHabis = (t) => {
+  const h = sisaHariAngka(t.lisensi_berlaku_sampai);
+  const apa = t.tahap === 'trial' ? 'Trial' : 'Langganan';
+  return h <= 0 ? `${apa} habis hari ini` : h === 1 ? `${apa} habis besok` : `${apa} habis ${h} hari lagi`;
+};
+const waPemilik = (t, teks) => `https://wa.me/${t.no_hp.replace(/\D/g, '').replace(/^0/, '62')}${teks ? `?text=${encodeURIComponent(teks)}` : ''}`;
+const teksIngatkan = (t) =>
+  t.tahap === 'trial'
+    ? `Halo, ini dari Konsulin. Masa coba Asisten Warung di ${t.nama} habis ${tgl(t.lisensi_berlaku_sampai)}. Mau lanjut langganan? Saya bisa bantu.`
+    : `Halo, ini dari Konsulin. Langganan Asisten Warung di ${t.nama} habis ${tgl(t.lisensi_berlaku_sampai)}. Mau diperpanjang? Saya bisa bantu.`;
+
 function Toko({ api }) {
   const { data, error, muat } = useData(api, '/lapangan/toko');
   const [filter, setFilter] = useState('');
   if (error) return <Gagal apa="toko" pesan={error} onUlang={muat} />;
   if (!data) return <Memuat apa="toko" />;
   if (!data.terhubung) return <div className="sl-kartu sl-peringatan">Akunmu belum disambungin ke kode sales. Minta admin nyambungin dulu, nanti toko kamu muncul di sini.</div>;
-  const daftar = data.toko.filter((t) => !filter || t.tahap === filter);
+  const mauHabis = tokoMauHabis(data.toko);
+  const daftar = filter === 'mau_habis' ? mauHabis : data.toko.filter((t) => !filter || t.tahap === filter);
   return (
     <>
       <h1 className="sl-h1">Toko kamu</h1>
@@ -310,10 +344,41 @@ function Toko({ api }) {
       <p className="sl-redup" style={{ margin: '0 0 12px' }}>
         Angka pembayaran itu uang yang dibayar toko, bukan komisi.
       </p>
+      {mauHabis.length > 0 && filter === '' && (
+        <section className="sl-kartu sl-mau-habis" aria-label="Toko yang mau habis">
+          <div className="sl-baris">
+            <b>Perlu di-follow-up</b>
+            <span className="sl-hasil pikir">{mauHabis.length} mau habis</span>
+          </div>
+          <p className="sl-redup" style={{ margin: '4px 0 8px' }}>
+            Masa aktifnya tinggal {HARI_MAU_HABIS} hari atau kurang. Datengin atau chat sebelum lewat.
+          </p>
+          <ul>
+            {mauHabis.map((t) => (
+              <li key={t.id}>
+                <div style={{ minWidth: 0 }}>
+                  <b>{t.nama}</b>
+                  <span className={sisaHariAngka(t.lisensi_berlaku_sampai) <= 1 ? 'sl-mendesak' : 'sl-redup'}>{kapanHabis(t)}</span>
+                </div>
+                {t.no_hp && (
+                  <a className="sl-wa-kecil" href={waPemilik(t, teksIngatkan(t))} target="_blank" rel="noopener noreferrer" aria-label={`Ingatkan ${t.nama} lewat WhatsApp`}>
+                    Ingatkan
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       <div className="sl-chip-gulir">
         <button className={filter === '' ? 'on' : ''} onClick={() => setFilter('')}>
           Semua {data.toko.length}
         </button>
+        {mauHabis.length > 0 && (
+          <button className={filter === 'mau_habis' ? 'on' : ''} onClick={() => setFilter('mau_habis')} aria-pressed={filter === 'mau_habis'}>
+            Mau habis {mauHabis.length}
+          </button>
+        )}
         {Object.entries(STATUS_TOKO).map(([id, st]) =>
           data.ringkas[id] ? (
             <button key={id} className={filter === id ? 'on' : ''} onClick={() => setFilter(id)} aria-pressed={filter === id}>
@@ -332,14 +397,14 @@ function Toko({ api }) {
                 <b>{t.nama}</b>
                 <span className={`sl-status ${t.tahap}`}>{STATUS_TOKO[t.tahap]?.nama}</span>
               </div>
-              <span className="sl-redup">
+              <span className={mauHabis.includes(t) ? 'sl-mendesak' : 'sl-redup'}>
                 {t.tahap === 'permanen' ? 'Paket permanen, seumur hidup' : `Paket ${t.plan} · s/d ${tgl(t.lisensi_berlaku_sampai)} (${sisaHari(t.lisensi_berlaku_sampai)})`}
               </span>
               <span className="sl-redup">
                 Dibayar {rupiah(t.total_bayar)} · pakai app {t.terakhir_aktif ? waktu(t.terakhir_aktif) : 'belum pernah'}
               </span>
               {t.no_hp && (
-                <a className="sl-wa" href={`https://wa.me/${t.no_hp.replace(/\D/g, '').replace(/^0/, '62')}`} target="_blank" rel="noopener noreferrer">
+                <a className="sl-wa" href={waPemilik(t, mauHabis.includes(t) ? teksIngatkan(t) : '')} target="_blank" rel="noopener noreferrer">
                   Chat pemilik di WhatsApp
                 </a>
               )}
