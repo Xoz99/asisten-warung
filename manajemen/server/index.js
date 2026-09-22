@@ -6,6 +6,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { authRouter, requireAdmin } from './auth.js';
 import adminRoutes from './admin.routes.js';
+import aiRoutes from './ai.routes.js';
 import opsRoutes from './ops.routes.js';
 import rekrutmenRoutes, { publikRouter, DAFTAR_URL } from './rekrutmen.routes.js';
 import rekrutmenAlurRoutes, { publikAlurRouter } from './rekrutmenAlur.js';
@@ -47,6 +48,7 @@ app.use('/api/publik', publikAlurRouter);
 // File Artifact dibuka lewat link bertoken sementara (buat <img>/<video>/<iframe>), bukan token sesi.
 app.use('/api', artifactBerkas);
 app.use('/api', requireAdmin);
+app.use('/api', aiRoutes);
 app.use('/api', adminRoutes);
 app.use('/api', opsRoutes);
 app.use('/api', rekrutmenRoutes);

@@ -1,0 +1,1066 @@
+[
+  {
+    "method": "GET",
+    "path": "/tim-sales",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/tim-sales",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "PATCH",
+    "path": "/tim-sales/:id",
+    "body": [
+      "nama"
+    ],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/tim-sales/:id/cek-rekening",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/saya/profil",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "PATCH",
+    "path": "/saya/profil",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/karyawan/ringkasan",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/karyawan",
+    "body": [],
+    "query": [
+      "departemen",
+      "q",
+      "status",
+      "tipe"
+    ],
+    "petunjuk": "query status=aktif|nonaktif|keluar|semua, tipe=tetap|kontrak|probation|magang|kemitraan, q=cari nama/jabatan."
+  },
+  {
+    "method": "GET",
+    "path": "/karyawan/:id",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/karyawan",
+    "body": [
+      "orang_id",
+      "nama",
+      "email",
+      "jabatan",
+      "departemen",
+      "grade",
+      "lokasi",
+      "bank",
+      "rekening",
+      "atas_nama",
+      "npwp",
+      "bpjs_kesehatan",
+      "catatan",
+      "no_hp",
+      "tipe",
+      "tanggal_masuk",
+      "kontrak_selesai",
+      "tanggal_lahir",
+      "gaji_pokok",
+      "tunjangan_transport",
+      "tunjangan_makan",
+      "jatah_cuti",
+      "atasan_id"
+    ],
+    "query": [],
+    "petunjuk": "nama wajib untuk POST; tanggal YYYY-MM-DD; gaji/tunjangan angka rupiah. PATCH hanya kolom yang diminta."
+  },
+  {
+    "method": "PATCH",
+    "path": "/karyawan/:id",
+    "body": [
+      "alasan_keluar",
+      "status",
+      "tanggal_keluar",
+      "nama",
+      "email",
+      "jabatan",
+      "departemen",
+      "grade",
+      "lokasi",
+      "bank",
+      "rekening",
+      "atas_nama",
+      "npwp",
+      "bpjs_kesehatan",
+      "catatan",
+      "no_hp",
+      "tipe",
+      "tanggal_masuk",
+      "kontrak_selesai",
+      "tanggal_lahir",
+      "gaji_pokok",
+      "tunjangan_transport",
+      "tunjangan_makan",
+      "jatah_cuti",
+      "atasan_id"
+    ],
+    "query": [],
+    "petunjuk": "nama wajib untuk POST; tanggal YYYY-MM-DD; gaji/tunjangan angka rupiah. PATCH hanya kolom yang diminta."
+  },
+  {
+    "method": "GET",
+    "path": "/karyawan-kehadiran",
+    "body": [],
+    "query": [
+      "tanggal"
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/karyawan-kehadiran",
+    "body": [
+      "baris",
+      "tanggal"
+    ],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/karyawan-kehadiran/rekap",
+    "body": [],
+    "query": [
+      "bulan"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/karyawan-cuti",
+    "body": [],
+    "query": [
+      "status"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/karyawan-cuti",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/karyawan-cuti/:id/putus",
+    "body": [
+      "catatan",
+      "keputusan"
+    ],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/karyawan-payroll",
+    "body": [],
+    "query": [
+      "periode"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/karyawan-payroll/draf",
+    "body": [
+      "periode"
+    ],
+    "query": []
+  },
+  {
+    "method": "PATCH",
+    "path": "/karyawan-payroll/:id",
+    "body": [
+      "catatan",
+      "potongan",
+      "status"
+    ],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/karyawan-calon",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/lapangan/keberatan",
+    "body": [],
+    "query": [
+      "semua"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/lapangan/keberatan",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "PATCH",
+    "path": "/lapangan/keberatan/:id",
+    "body": [
+      "aktif",
+      "kategori"
+    ],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/lapangan/crm-toko",
+    "body": [],
+    "query": [
+      "dari",
+      "hasil",
+      "kategori",
+      "q",
+      "sales",
+      "sampai"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/lapangan/log",
+    "body": [],
+    "query": [],
+    "petunjuk": "Log kunjungan sales. hasil: berhasil, tertarik, pikir (pikir-pikir), ditolak. query: dari/sampai YYYY-MM-DD, hasil, q."
+  },
+  {
+    "method": "POST",
+    "path": "/lapangan/log",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "PATCH",
+    "path": "/lapangan/log/:id",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/lapangan/log/:id",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/lapangan/wp-sales",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/lapangan/link",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/lapangan/toko",
+    "body": [],
+    "query": [
+      "akun"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/lapangan/insight",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/lapangan/crm",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "PATCH",
+    "path": "/lapangan/crm/:id",
+    "body": [
+      "perusahaan",
+      "pic_nama",
+      "pic_jabatan",
+      "email",
+      "telepon",
+      "sumber",
+      "alamat",
+      "jenis_usaha",
+      "nilai",
+      "tahap",
+      "hasil",
+      "pemilik_id",
+      "prioritas",
+      "alasan_gagal"
+    ],
+    "query": [],
+    "petunjuk": "perusahaan wajib untuk POST; nilai angka rupiah; hasil menang/gagal/null; PATCH hanya kolom yang diminta. Cari data dulu untuk memperoleh ID dan tahap yang tersedia."
+  },
+  {
+    "method": "GET",
+    "path": "/lapangan/crm/:id/aktivitas",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/lapangan/crm/:id/aktivitas",
+    "body": [
+      "isi",
+      "jenis",
+      "selesai",
+      "teks"
+    ],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/artifact/ringkasan",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/artifact/folder",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/artifact/folder",
+    "body": [
+      "induk_id",
+      "nama"
+    ],
+    "query": []
+  },
+  {
+    "method": "PATCH",
+    "path": "/artifact/folder/:id",
+    "body": [
+      "nama"
+    ],
+    "query": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/artifact/folder/:id",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/artifact",
+    "body": [],
+    "query": [
+      "folder",
+      "mode",
+      "pemilik",
+      "q",
+      "tipe",
+      "urut"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/artifact/:id",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/artifact/catatan",
+    "body": [
+      "folder_id",
+      "isi",
+      "judul",
+      "tag",
+      "tipe"
+    ],
+    "query": []
+  },
+  {
+    "method": "PATCH",
+    "path": "/artifact/:id",
+    "body": [
+      "folder_id",
+      "isi",
+      "judul",
+      "keterangan",
+      "tag",
+      "tipe"
+    ],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/artifact/:id/versi/:versiId/pulihkan",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/artifact/:id/bintang",
+    "body": [
+      "bintang"
+    ],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/artifact/:id/sampah",
+    "body": [
+      "buang"
+    ],
+    "query": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/artifact/:id",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/artifact-sampah/kosongkan",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/komisi",
+    "body": [],
+    "query": [
+      "periode"
+    ],
+    "petunjuk": "Bagi hasil sales per bulan. query periode=YYYY-MM (default bulan ini). sales[].bruto=komisi kotor, pajak=5%, neto=yang dibayar; status: estimasi (bulan belum ditutup), ditutup (siap cair), dicairkan."
+  },
+  {
+    "method": "GET",
+    "path": "/komisi/detail",
+    "body": [],
+    "query": [
+      "periode",
+      "sales"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/komisi/tutup",
+    "body": [
+      "periode"
+    ],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/komisi/cairkan",
+    "body": [
+      "catatan",
+      "metode",
+      "periode",
+      "sales",
+      "tanggal"
+    ],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/lapangan/komisi/konfirmasi",
+    "body": [
+      "catatan",
+      "periode",
+      "status"
+    ],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/lapangan/komisi",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/dashboard",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/leads",
+    "body": [],
+    "query": [],
+    "petunjuk": "CRM. tahap: awareness, trial (Trial 7 hari), konversi, repeat_order, stuck. hasil: null=masih jalan, menang, gagal. nilai=estimasi deal rupiah. query: q (cari), tahap, status=jalan|menang|gagal|semua, semua=1 buat ambil semua baris."
+  },
+  {
+    "method": "POST",
+    "path": "/leads/massal",
+    "body": [
+      "aksi",
+      "ids",
+      "nilai"
+    ],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/leads/impor",
+    "body": [
+      "baris"
+    ],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/leads",
+    "body": [
+      "perusahaan",
+      "pic_nama",
+      "pic_jabatan",
+      "email",
+      "telepon",
+      "sumber",
+      "alamat",
+      "jenis_usaha",
+      "nilai",
+      "tahap",
+      "hasil",
+      "pemilik_id",
+      "prioritas",
+      "alasan_gagal"
+    ],
+    "query": [],
+    "petunjuk": "perusahaan wajib untuk POST; nilai angka rupiah; hasil menang/gagal/null; PATCH hanya kolom yang diminta. Cari data dulu untuk memperoleh ID dan tahap yang tersedia."
+  },
+  {
+    "method": "PATCH",
+    "path": "/leads/:id",
+    "body": [
+      "perusahaan",
+      "pic_nama",
+      "pic_jabatan",
+      "email",
+      "telepon",
+      "sumber",
+      "alamat",
+      "jenis_usaha",
+      "nilai",
+      "tahap",
+      "hasil",
+      "pemilik_id",
+      "prioritas",
+      "alasan_gagal"
+    ],
+    "query": [],
+    "petunjuk": "perusahaan wajib untuk POST; nilai angka rupiah; hasil menang/gagal/null; PATCH hanya kolom yang diminta. Cari data dulu untuk memperoleh ID dan tahap yang tersedia."
+  },
+  {
+    "method": "DELETE",
+    "path": "/leads/:id",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/leads/:id/aktivitas",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/leads/:id/aktivitas",
+    "body": [
+      "isi",
+      "jenis"
+    ],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/keuangan",
+    "body": [],
+    "query": [
+      "bulan"
+    ]
+  },
+  {
+    "method": "POST",
+    "path": "/keuangan/transaksi",
+    "body": [
+      "deskripsi",
+      "jenis",
+      "jumlah",
+      "kategori",
+      "metode",
+      "pihak",
+      "tanggal"
+    ],
+    "query": [],
+    "petunjuk": "jenis masuk/keluar, deskripsi wajib, jumlah angka rupiah positif, tanggal YYYY-MM-DD."
+  },
+  {
+    "method": "DELETE",
+    "path": "/keuangan/transaksi/:id",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/notifikasi",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/notifikasi/jumlah",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/notifikasi/baca",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/saya/aktivitas",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/rekrutmen/ringkasan",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/rekrutmen/lamaran",
+    "body": [],
+    "query": [
+      "mode",
+      "q"
+    ],
+    "petunjuk": "Daftar lamaran dengan status teknis (new, screening, screening_passed, pelajari_produk, product_test, interview, field_test_24h, closing_test, hired). Buat pertanyaan per kolom board pakai GET /rekrutmen/board. query: mode=aktif|arsip, q=cari nama/no HP."
+  },
+  {
+    "method": "POST",
+    "path": "/rekrutmen/lamaran",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/rekrutmen/lamaran/:id",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/rekrutmen/lamaran/:id/maju",
+    "body": [
+      "catatan"
+    ],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/rekrutmen/lamaran/:id/attempt",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/rekrutmen/lamaran/:id/keputusan",
+    "body": [
+      "alasan",
+      "keputusan"
+    ],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/rekrutmen/lamaran/:id/keluar",
+    "body": [
+      "alasan",
+      "status"
+    ],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/rekrutmen/lamaran/:id/lamar-ulang",
+    "body": [
+      "dropdown",
+      "s"
+    ],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/rekrutmen/lamaran/:id/followup",
+    "body": [
+      "catatan",
+      "jenis"
+    ],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/rekrutmen/lamaran/:id/catatan",
+    "body": [
+      "isi"
+    ],
+    "query": [],
+    "petunjuk": "body {isi}: salin persis kalimat catatan dari pengguna."
+  },
+  {
+    "method": "GET",
+    "path": "/rekrutmen/kampanye",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/rekrutmen/kampanye",
+    "body": [
+      "area",
+      "biaya",
+      "catatan",
+      "mulai",
+      "nama",
+      "selesai"
+    ],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/rekrutmen/kampanye/:id/titik",
+    "body": [
+      "area",
+      "biaya",
+      "deskripsi",
+      "kanal",
+      "kode"
+    ],
+    "query": []
+  },
+  {
+    "method": "PATCH",
+    "path": "/rekrutmen/titik/:id",
+    "body": [
+      "bukti_url",
+      "status"
+    ],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/saya",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/admin",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/log",
+    "body": [],
+    "query": [
+      "halaman"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/rekrutmen/board",
+    "body": [],
+    "query": [],
+    "petunjuk": "Board rekrutmen, pakai ini buat pertanyaan 'siapa di tahap/kolom X'. kandidat[].kolom: 0=Masuk, 1=Belajar & tes, 2=Interview, 3=Trial lapangan, 4=Hired (lihat juga kolom[]). keadaan.siapa: kamu=perlu aksi admin, kandidat=nunggu kandidat, jadwal=interview terjadwal; keadaan.lewat=true berarti lewat batas waktu. analisis.lolos=syarat wajib terpenuhi, analisis.skor=skor pendukung 0-100. keluar[]=kandidat yang dikeluarkan. funnel[]=jumlah yang pernah sampai tiap kolom."
+  },
+  {
+    "method": "GET",
+    "path": "/rekrutmen/lamaran/:id/alur",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/rekrutmen/lamaran/:id/loloskan",
+    "body": [
+      "materi",
+      "paksa",
+      "teks"
+    ],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/rekrutmen/massal",
+    "body": [
+      "aksi",
+      "ids"
+    ],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/rekrutmen/lamaran/:id/kuis-ulang",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/rekrutmen/lamaran/:id/maju-interview",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/rekrutmen/lamaran/:id/link-jadwal",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/rekrutmen/lamaran/:id/interview-hasil",
+    "body": [
+      "alasan",
+      "hasil",
+      "nilai"
+    ],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/rekrutmen/lamaran/:id/rekrut",
+    "body": [
+      "alasan"
+    ],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/rekrutmen/lamaran/:id/kembalikan",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/rekrutmen/materi",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/rekrutmen/materi",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "PATCH",
+    "path": "/rekrutmen/materi/:id",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/rekrutmen/materi/:id",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/rekrutmen/soal",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "PATCH",
+    "path": "/rekrutmen/soal/:id",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/rekrutmen/soal/:id",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/rekrutmen/template",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "PUT",
+    "path": "/rekrutmen/template/:kunci",
+    "body": [
+      "isi"
+    ],
+    "query": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/rekrutmen/template/:kunci",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/rekrutmen/slot",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/rekrutmen/slot",
+    "body": [
+      "durasi",
+      "lokasi",
+      "mulai",
+      "selesai",
+      "tanggal"
+    ],
+    "query": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/rekrutmen/slot/:id",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/warung-pintar/pembayaran",
+    "body": [],
+    "query": [
+      "q",
+      "status"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/warung-pintar/leads-warung",
+    "body": [],
+    "query": [
+      "q",
+      "sales",
+      "tahap"
+    ]
+  },
+  {
+    "method": "GET",
+    "path": "/warung-pintar/pelanggan/:id",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/warung-pintar/ringkasan",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/warung-pintar/sales",
+    "body": [
+      "kode",
+      "nama",
+      "noHp"
+    ],
+    "query": []
+  },
+  {
+    "method": "PATCH",
+    "path": "/warung-pintar/sales/:id",
+    "body": [
+      "aktif",
+      "nama",
+      "noHp"
+    ],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/warung-pintar/sales/:id/warung",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/warung-pintar/warung",
+    "body": [],
+    "query": [
+      "q"
+    ]
+  },
+  {
+    "method": "PUT",
+    "path": "/warung-pintar/warung/:id/sales",
+    "body": [
+      "alasan",
+      "kode"
+    ],
+    "query": []
+  },
+  {
+    "method": "GET",
+    "path": "/leads/:id/detail",
+    "body": [],
+    "query": []
+  },
+  {
+    "method": "POST",
+    "path": "/leads/:id/checklist",
+    "body": [
+      "teks"
+    ],
+    "query": []
+  },
+  {
+    "method": "PATCH",
+    "path": "/leads/:id/checklist/:cid",
+    "body": [
+      "selesai",
+      "teks"
+    ],
+    "query": []
+  },
+  {
+    "method": "DELETE",
+    "path": "/leads/:id/checklist/:cid",
+    "body": [],
+    "query": []
+  }
+]

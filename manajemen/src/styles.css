@@ -934,3 +934,33 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 .rk-pratinjau-lipat{margin-top:8px}
 .rk-pratinjau-lipat summary{cursor:pointer;font-weight:700;font-size:12px}
 .rk-pratinjau-lipat .rk-pratinjau{margin-top:6px}
+
+/* AI workspace */
+.ai-chat { max-width: 1060px; margin: 0 auto; }
+.ai-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.ai-heading h1 { margin: 8px 0; }
+.ai-heading p, .ai-info, .ai-composer small { color: #434655; }
+.ai-chat button { padding: 10px 15px; border: 2px solid #1b1b1b; background: white; color: #1b1b1b; font: inherit; cursor: pointer; }
+.ai-chat button:disabled { opacity: .5; cursor: default; }
+.ai-chat button:focus-visible, .ai-chat textarea:focus-visible { outline: 3px solid #2151da; outline-offset: 3px; }
+.ai-info { padding: 12px; background: #eeeeee; font-size: 13px; }
+.ai-messages { min-height: 320px; max-height: 58vh; overflow-y: auto; border: 2px solid #1b1b1b; padding: 20px; background: #fff; }
+.ai-welcome { padding: 24px 0; }
+.ai-suggestions, .ai-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.ai-message { padding: 16px; margin-bottom: 16px; background: #f3f3f3; overflow-wrap: anywhere; }
+.ai-message.user { background: #e9efff; margin-left: 12%; }
+.ai-message b { display: block; margin-bottom: 8px; font-size: 12px; }
+.ai-message div { white-space: pre-wrap; line-height: 1.65; }
+.ai-action { border: 2px solid #1b1b1b; border-left: 8px solid #fed01b; padding: 16px; margin: 16px 0; overflow-wrap: anywhere; }
+.ai-action pre { overflow: auto; max-height: 240px; background: #f3f3f3; padding: 12px; }
+.ai-actions button:first-child, .ai-composer button { background: #0037b0; color: white; }
+.ai-composer { margin-top: 16px; }
+.ai-composer label { display: block; font-weight: 700; margin-bottom: 8px; }
+.ai-composer textarea { box-sizing: border-box; width: 100%; resize: vertical; border: 2px solid #1b1b1b; padding: 12px; font: inherit; }
+.ai-composer > div { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 10px; }
+@media (max-width: 600px) { .ai-heading { align-items: flex-start; } .ai-messages { padding: 10px; } .ai-composer > div { align-items: flex-end; } }
+.ai-message .ai-teks{white-space:normal}
+.ai-teks p{margin:0 0 8px}
+.ai-teks p:last-child{margin-bottom:0}
+.ai-teks ul,.ai-teks ol{margin:0 0 8px;padding-left:22px}
+.ai-teks li{margin:2px 0}

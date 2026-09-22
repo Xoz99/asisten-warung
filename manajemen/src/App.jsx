@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { bacaSesi, panggil, simpanSesi } from './lib/api.js';
 import Dashboard from './halaman/Dashboard.jsx';
+import AiChat from './halaman/AiChat.jsx';
 import Leads from './halaman/Leads.jsx';
 import Keuangan from './halaman/Keuangan.jsx';
 import Notifikasi from './halaman/Notifikasi.jsx';
@@ -15,7 +16,7 @@ import DaftarPublik from './halaman/DaftarPublik.jsx';
 
 // Makalin Ops: kerangka (sidebar + topbar), login per admin, dan navigasi lewat alamat (#/leads/crm dst) biar
 // halaman yang lagi dibuka tetap kebuka pas di-refresh & bisa dibagiin linknya.
-const NAMA_HALAMAN = { dashboard: 'Dashboard', leads: 'Leads', lapangan: 'Sales Lapangan', rekrutmen: 'Rekrutmen', karyawan: 'Karyawan', artifact: 'Artifact', keuangan: 'Keuangan', notifikasi: 'Notifikasi', pengaturan: 'Pengaturan', profile: 'Profile' };
+const NAMA_HALAMAN = { ai: 'AI Chat', dashboard: 'Dashboard', leads: 'Leads', lapangan: 'Sales Lapangan', rekrutmen: 'Rekrutmen', karyawan: 'Karyawan', artifact: 'Artifact', keuangan: 'Keuangan', notifikasi: 'Notifikasi', pengaturan: 'Pengaturan', profile: 'Profile' };
 
 function bacaRute() {
   const [halaman, tab] = window.location.hash.replace(/^#\/?/, '').split('/');
@@ -146,6 +147,7 @@ export default function App() {
         <main className="adm-isi" id="isi">
           {halaman === 'lapangan' && <Lapangan key={tab} {...props} />}
           {halaman === 'dashboard' && <Dashboard {...props} />}
+          {halaman === 'ai' && <AiChat {...props} />}
           {halaman === 'leads' && <Leads key={tab} {...props} />}
           {halaman === 'rekrutmen' && <Rekrutmen key={tab} {...props} />}
           {halaman === 'karyawan' && <Karyawan key={tab} {...props} />}
@@ -167,12 +169,6 @@ function Samping({ halaman, admin, notifBaru, buka }) {
       <span>{nama}</span>
       {ekstra}
     </a>
-  );
-  const segera = (nama, anak) => (
-    <span key={nama} className={'adm-nav' + (anak ? ' anak' : '')} aria-disabled="true">
-      <span>{nama}</span>
-      <span className="adm-segera">Segera</span>
-    </span>
   );
   return (
     <aside className={'adm-samping' + (buka ? ' buka' : '')} aria-label="Menu utama">
@@ -203,7 +199,7 @@ function Samping({ halaman, admin, notifBaru, buka }) {
         </div>
         <div className="adm-nav-grup">
           {link('artifact', 'Artifact')}
-          {segera('AI Chat')}
+          {link('ai', 'AI Chat')}
         </div>
         <div className="adm-nav-grup">
           {link('notifikasi', 'Notifikasi', notifBaru > 0 ? <span className="adm-hitung">{notifBaru > 99 ? '99+' : notifBaru}</span> : null)}

@@ -63,3 +63,33 @@ langsung mutus sesinya.
 
 1. Server: bikin `server/produk/<id>/` berisi router-nya, daftarin di `server/produk/index.js`.
 2. Tampilan: bikin `src/produk/<id>/…jsx`, daftarin di `HALAMAN` di `src/App.jsx`.
+
+## AI Chat
+
+Menu **AI Chat** tersedia untuk akun admin. Atur `OPENROUTER_API_KEY` dan
+`OPENROUTER_MODEL` di `.env` server, lalu restart proses server. Key tidak memakai
+prefix `VITE_` dan tidak masuk bundle browser. Pilih model yang mendukung tools dan
+diizinkan aturan akun OpenRouter; `openrouter/free` dapat dipakai untuk akun yang
+hanya mengizinkan model gratis. Model gratis mengikuti kuota/ketersediaan provider.
+Integrasi mengikuti https://openrouter.ai/docs/guides/features/tool-calling.
+
+Agent mencari API melalui katalog `server/ai-catalog.json`, membaca data lewat
+API internal, dan menampilkan usulan perubahan dengan target serta isi data.
+Tombol **Jalankan tindakan** mengeksekusi tepat satu usulan menggunakan sesi login
+pengguna; **Batalkan** membuang usulan. Validasi dan pencatatan aktivitas tetap
+mengikuti endpoint asal. Jika respons eksekusi terputus, cek data sebelum membuat
+usulan baru karena perubahan mungkin sudah tersimpan.
+
+Cakupan katalog: dashboard, CRM/leads, sales lapangan, rekrutmen, karyawan,
+keuangan/komisi, tim sales, artifact, notifikasi, profil, dan data Warung Pintar.
+Pengelolaan kredensial, akun demo yang memuat password, dan transfer file tetap
+melalui halaman terkait. Sales tetap dibatasi ke aplikasi sales; endpoint AI ini
+khusus panel admin. Tambahkan kontrak parameter ke katalog ketika API berubah.
+
+Percakapan disimpan sementara di memori server selama 30 menit tidak aktif,
+hilang ketika server restart atau pengguna meninggalkan halaman. Untuk banyak
+instance server perlu shared session storage atau sticky session. Data yang dibaca
+agent dikirim ke OpenRouter, dengan field kredensial disaring. Chat dibatasi
+20 permintaan/menit per IP, 8 langkah alat per pesan, dan 6.000 karakter per pesan.
+
+Verifikasi: `node --test test/ai.test.js`, `npm run build`, `npm run lint`.
