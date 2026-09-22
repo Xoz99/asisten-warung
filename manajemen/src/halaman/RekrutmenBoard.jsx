@@ -1053,12 +1053,12 @@ export function KuisMateri({ api }) {
 }
 
 // ---- Template pesan WA (bisa diedit semua admin) ----
-function TemplateWa({ api, onBerubah }) {
+export function TemplateWa({ api, onBerubah }) {
   const { data, error, muat } = useData(api, '/rekrutmen/template');
   if (error) return <Gagal apa="template WA" pesan={error} onUlang={muat} />;
   if (!data) return <Memuat apa="template WA" />;
   return (
-    <section className="adm-kartu" style={{ marginTop: 16 }}>
+    <section className="adm-kartu" style={{ marginTop: 16 }} id="template-wa">
       <h2 style={{ marginTop: 0 }}>Template pesan WA</h2>
       <p className="adm-redup" style={{ marginTop: 0 }}>
         Pesan yang disiapin buat kandidat di tiap tahap. Tulisan dalam kurung kurawal kayak <span className="adm-mono">{'{nama}'}</span> otomatis diganti waktu pesan dibikin. Klik penandanya buat nyisipin.
