@@ -1,9 +1,10 @@
-// Sesi login admin manajemen: token disimpen di sessionStorage doang - tab ditutup = masuk lagi.
+// Sesi login: biasanya di sessionStorage (tab ditutup = masuk lagi, token 12 jam). Kalau "Ingat saya 30 hari"
+// dicentang, disimpen di localStorage biar tetap nyangkut walau browser ditutup (token-nya juga 30 hari).
 const KUNCI_SESI = 'konsulin_manajemen_sesi';
 
 export function bacaSesi() {
   try {
-    return JSON.parse(sessionStorage.getItem(KUNCI_SESI) || 'null');
+    return JSON.parse(sessionStorage.getItem(KUNCI_SESI) || localStorage.getItem(KUNCI_SESI) || 'null');
   } catch {
     return null;
   }
@@ -11,10 +12,11 @@ export function bacaSesi() {
 
 export function simpanSesi(sesi) {
   try {
-    if (sesi) sessionStorage.setItem(KUNCI_SESI, JSON.stringify(sesi));
-    else sessionStorage.removeItem(KUNCI_SESI);
+    sessionStorage.removeItem(KUNCI_SESI);
+    localStorage.removeItem(KUNCI_SESI);
+    if (sesi) (sesi.ingat ? localStorage : sessionStorage).setItem(KUNCI_SESI, JSON.stringify(sesi));
   } catch {
-    /* sessionStorage diblok - sesinya cuma hidup di memori */
+    /* storage diblok - sesinya cuma hidup di memori */
   }
 }
 

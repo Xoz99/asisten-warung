@@ -249,6 +249,7 @@ function Masuk({ error, onMasuk }) {
   const [perluSetup, setPerluSetup] = useState(null);
   const [isi, setIsi] = useState({ username: '', password: '', nama: '', kunciSetup: '' });
   const [lihat, setLihat] = useState(false);
+  const [ingat, setIngat] = useState(false);
   const [salah, setSalah] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -268,7 +269,7 @@ function Masuk({ error, onMasuk }) {
     setSalah('');
     setLoading(true);
     try {
-      onMasuk(await panggil(null, 'POST', perluSetup ? '/auth/setup' : '/auth/masuk', isi));
+      onMasuk(await panggil(null, 'POST', perluSetup ? '/auth/setup' : '/auth/masuk', { ...isi, ingat: !perluSetup && ingat }));
     } catch (err) {
       setSalah(err.message);
       setLoading(false);
@@ -339,6 +340,15 @@ function Masuk({ error, onMasuk }) {
                   </button>
                 </div>
               </div>
+              {!perluSetup && (
+                <label className="mk-ingat">
+                  <input type="checkbox" checked={ingat} onChange={(e) => setIngat(e.target.checked)} />
+                  <span>
+                    Ingat saya 30 hari
+                    <small>Jangan dicentang di HP / komputer yang dipakai bareng orang lain.</small>
+                  </span>
+                </label>
+              )}
               {(salah || error) && (
                 <p className="mk-error" role="alert">
                   {salah || error}

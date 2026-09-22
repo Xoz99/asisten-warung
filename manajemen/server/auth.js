@@ -10,6 +10,8 @@ import { catatLog, pastikanTabel, query } from './db.js';
 // ADMIN_KEY sekarang cuma dipakai SEKALI: bikin admin pertama.
 const RAHASIA = () => process.env.MANAJEMEN_JWT_SECRET || '';
 const SESI_JAM = 12;
+// "Ingat saya": sesi 30 hari. Tetap putus kalau password diganti / akun dinonaktifin / peran diubah (versi_sesi naik).
+const SESI_INGAT_HARI = 30;
 const POLA_USERNAME = /^[a-z0-9._-]{3,30}$/;
 const HASH_PALSU = bcrypt.hashSync('bukan-password-siapa-siapa', 10);
 
@@ -25,7 +27,8 @@ const masukLimiter = rateLimit({
 const hash = (s) => crypto.createHash('sha256').update(String(s)).digest();
 const samaAman = (a, b) => crypto.timingSafeEqual(hash(a), hash(b));
 const adminPublik = (a) => ({ id: a.id, username: a.username, nama: a.nama, peran: a.peran || 'admin' });
-const buatToken = (a) => jwt.sign({ adminId: a.id, v: a.versi_sesi }, RAHASIA(), { expiresIn: `${SESI_JAM}h` });
+const buatToken = (a, ingat = false) =>
+  jwt.sign({ adminId: a.id, v: a.versi_sesi }, RAHASIA(), { expiresIn: ingat ? `${SESI_INGAT_HARI}d` : `${SESI_JAM}h` });
 
 export function cekPassword(p) {
   return typeof p === 'string' && p.length >= 8 ? null : 'Password minimal 8 karakter';
@@ -97,7 +100,8 @@ authRouter.post('/masuk', masukLimiter, async (req, res, next) => {
     if (!a || !cocok) return res.status(401).json({ error: 'Username atau password salah' });
     if (!a.aktif) return res.status(403).json({ error: 'Akun admin ini udah dinonaktifkan' });
     await query('UPDATE mj_admin SET terakhir_masuk=now() WHERE id=$1', [a.id]);
-    res.json({ token: buatToken(a), admin: adminPublik(a) });
+    const ingat = req.body.ingat === true;
+    res.json({ token: buatToken(a, ingat), admin: adminPublik(a), ingat });
   } catch (e) {
     next(e);
   }
