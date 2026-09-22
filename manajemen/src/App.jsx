@@ -130,9 +130,7 @@ export default function App() {
           <button className="adm-menu-tombol" onClick={() => setLaciBuka(true)} aria-label="Buka menu" aria-expanded={lacibuka}>
             MENU
           </button>
-          <div className="adm-crumb">
-            Makalin Ops / <b>{NAMA_HALAMAN[halaman]}</b>
-          </div>
+          <div className="adm-crumb" />
           <a className="adm-bel" href="#/notifikasi" aria-label={notifBaru ? `Notifikasi, ${notifBaru} belum dibaca` : 'Notifikasi'}>
             <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="square">
               <path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4z" />
