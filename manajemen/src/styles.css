@@ -1204,3 +1204,5 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
   .art-grid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
 }
 @media (max-width:520px){.art-grid{grid-template-columns:minmax(0,1fr)}.art-kepala h2{font-size:20px}}
+
+.rk-kampanye-aksi{display:flex;gap:6px;margin-left:auto}

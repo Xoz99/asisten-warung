@@ -300,7 +300,7 @@ function Sumber({ api }) {
         </Kosong>
       ) : (
         data.kampanye.map((k) => (
-          <KartuKampanye key={k.id} api={api} k={k} titik={data.titik.filter((t) => t.kampanye_id === k.id)} kanal={data.kanal} linkDaftar={data.linkDaftar} onBerubah={muat} setPesan={setPesan} />
+          <KartuKampanye key={k.id} api={api} k={k} titik={data.titik.filter((t) => t.kampanye_id === k.id)} biaya={(data.biaya || []).filter((b) => b.kampanye_id === k.id)} kanal={data.kanal} linkDaftar={data.linkDaftar} onBerubah={muat} setPesan={setPesan} />
         ))
       )}
       <section className="adm-kolom" style={{ marginTop: 22 }}>
@@ -352,8 +352,9 @@ function Sumber({ api }) {
   );
 }
 
-function KartuKampanye({ api, k, titik, kanal, linkDaftar, onBerubah, setPesan }) {
-  const [f, setF] = useState({ kanal: 'FB', area: k.area ? k.area.slice(0, 3).toUpperCase() : '', deskripsi: '', biaya: '' });
+function KartuKampanye({ api, k, titik, biaya, kanal, linkDaftar, onBerubah, setPesan }) {
+  const [modal, setModal] = useState(null); // 'kampanye' | 'biaya' | {titik}
+  const [f, setF] = useState({ kanal: 'JOB', area: k.area ? k.area.slice(0, 3).toUpperCase() : '', deskripsi: '', biaya: '' });
   const [error, setError] = useState('');
   const totalBiaya = k.biaya + titik.reduce((a, t) => a + t.biaya, 0);
   const diterima = titik.reduce((a, t) => a + t.diterima, 0);
@@ -384,7 +385,16 @@ function KartuKampanye({ api, k, titik, kanal, linkDaftar, onBerubah, setPesan }
         <span className="adm-redup">
           {[k.mulai && `${tgl(k.mulai)}${k.selesai ? ` s/d ${tgl(k.selesai)}` : ''}`, `biaya ${rupiah(totalBiaya)}`, diterima && `${rupiah(totalBiaya / diterima)} per orang diterima`].filter(Boolean).join(' · ')}
         </span>
+        <span className="rk-kampanye-aksi">
+          <button className="btn kecil" onClick={() => setModal('kampanye')}>
+            Ubah
+          </button>
+          <button className="btn kecil" onClick={() => setModal('biaya')}>
+            + Biaya
+          </button>
+        </span>
       </div>
+      {k.catatan && <p className="adm-redup" style={{ margin: '0 0 10px' }}>{k.catatan}</p>}
       {error && <p className="adm-error">{error}</p>}
       {titik.length === 0 ? (
         <p className="adm-redup">Belum ada titik sebar. Tambah di bawah.</p>
@@ -408,7 +418,7 @@ function KartuKampanye({ api, k, titik, kanal, linkDaftar, onBerubah, setPesan }
             <tbody>
               {titik.map((t) => (
                 <tr key={t.id}>
-                  <td className="adm-mono">{t.kode}</td>
+                  <td className="adm-mono" style={{ whiteSpace: 'nowrap' }}>{t.kode}</td>
                   <td>
                     {kanal[t.kanal]}
                     <div className="adm-redup">{t.deskripsi || ''}</div>
@@ -438,9 +448,14 @@ function KartuKampanye({ api, k, titik, kanal, linkDaftar, onBerubah, setPesan }
                     <b>{t.diterima}</b>
                   </td>
                   <td>
-                    <button className="btn kecil" onClick={() => salin(t.kode)}>
-                      Salin link
-                    </button>
+                    <span style={{ display: 'flex', gap: 6 }}>
+                      <button className="btn kecil" onClick={() => setModal({ titik: t })}>
+                        Ubah
+                      </button>
+                      <button className="btn kecil" onClick={() => salin(t.kode)}>
+                        Salin link
+                      </button>
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -477,16 +492,204 @@ function KartuKampanye({ api, k, titik, kanal, linkDaftar, onBerubah, setPesan }
           + Titik sebar
         </button>
       </form>
+      {modal === 'kampanye' && (
+        <FormKampanye
+          awal={k}
+          onTutup={() => setModal(null)}
+          onSimpan={async (isi) => {
+            await api('PATCH', `/rekrutmen/kampanye/${k.id}`, isi);
+            setModal(null);
+            setPesan(`Kampanye ${isi.nama} diperbarui.`);
+            onBerubah();
+          }}
+        />
+      )}
+      {modal === 'biaya' && (
+        <FormBiaya
+          k={k}
+          titik={titik}
+          riwayat={biaya}
+          onTutup={() => setModal(null)}
+          onSimpan={async (isi) => {
+            await api('POST', `/rekrutmen/kampanye/${k.id}/biaya`, isi);
+            setModal(null);
+            setPesan(`Biaya ${rupiah(isi.jumlah)} ditambah ke ${isi.titik_id ? titik.find((t) => t.id === isi.titik_id)?.kode : 'biaya umum kampanye'}.`);
+            onBerubah();
+          }}
+        />
+      )}
+      {modal?.titik && (
+        <FormTitik
+          t={modal.titik}
+          kanal={kanal}
+          onTutup={() => setModal(null)}
+          onSimpan={async (isi) => {
+            await api('PATCH', `/rekrutmen/titik/${modal.titik.id}`, isi);
+            setModal(null);
+            setPesan(`Titik ${modal.titik.kode} diperbarui.`);
+            onBerubah();
+          }}
+        />
+      )}
     </section>
   );
 }
 
-function FormKampanye({ onTutup, onSimpan }) {
-  const [isi, setIsi] = useState({ nama: '', area: '', mulai: '', selesai: '', biaya: '' });
+function FormTitik({ t, kanal, onTutup, onSimpan }) {
+  const [isi, setIsi] = useState({ kanal: t.kanal, deskripsi: t.deskripsi || '', biaya: String(t.biaya || '') });
+  const [error, setError] = useState('');
+  const [sibuk, setSibuk] = useState(false);
+  return (
+    <Modal judul={`Ubah titik ${t.kode}`} onTutup={onTutup}>
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setError('');
+          setSibuk(true);
+          try {
+            await onSimpan({ kanal: isi.kanal, deskripsi: isi.deskripsi.trim(), biaya: Number(isi.biaya) || 0 });
+          } catch (err) {
+            setError(err.message);
+            setSibuk(false);
+          }
+        }}
+      >
+        <p className="adm-redup" style={{ marginTop: 0 }}>
+          Kode <b className="adm-mono">{t.kode}</b> nggak bisa diganti biar link yang udah disebar tetap kehitung.
+        </p>
+        <div className="field">
+          <label htmlFor="tt-kanal">Kanal</label>
+          <select id="tt-kanal" value={isi.kanal} onChange={(e) => setIsi((x) => ({ ...x, kanal: e.target.value }))} style={{ maxWidth: 'none', width: '100%', minHeight: 44 }}>
+            {Object.entries(kanal).map(([v, n]) => (
+              <option key={v} value={v}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="tt-desk">Nama grup / lokasi poster</label>
+          <input id="tt-desk" value={isi.deskripsi} maxLength={200} onChange={(e) => setIsi((x) => ({ ...x, deskripsi: e.target.value }))} />
+        </div>
+        <div className="field">
+          <label htmlFor="tt-biaya">Biaya total titik ini (Rp)</label>
+          <input id="tt-biaya" value={isi.biaya} inputMode="numeric" onChange={(e) => setIsi((x) => ({ ...x, biaya: e.target.value.replace(/\D/g, '') }))} placeholder="0" />
+          <small className="adm-redup">Buat koreksi angka. Kalau nambah biaya baru, pakai tombol "+ Biaya" di kampanye biar ada riwayatnya.</small>
+        </div>
+        {error && <p className="adm-error">{error}</p>}
+        <div className="adm-tombol" style={{ justifyContent: 'flex-end', marginTop: 16 }}>
+          <button type="button" className="btn" onClick={onTutup}>
+            Batal
+          </button>
+          <button type="submit" className="btn utama" disabled={sibuk}>
+            {sibuk ? 'Menyimpan…' : 'Simpan'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function FormBiaya({ k, titik, riwayat, onTutup, onSimpan }) {
+  const [isi, setIsi] = useState({ jumlah: '', titik_id: '', catatan: '' });
+  const [error, setError] = useState('');
+  const [sibuk, setSibuk] = useState(false);
+  const jumlah = Number(isi.jumlah) || 0;
+  return (
+    <Modal judul={`Tambah biaya · ${k.nama}`} onTutup={onTutup}>
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setError('');
+          setSibuk(true);
+          try {
+            await onSimpan({ jumlah, titik_id: isi.titik_id || null, catatan: isi.catatan.trim() });
+          } catch (err) {
+            setError(err.message);
+            setSibuk(false);
+          }
+        }}
+      >
+        <p className="adm-redup" style={{ marginTop: 0 }}>
+          Buat biaya yang muncul di tengah jalan: boost iklan, cetak poster lagi, bayar admin grup, dll. Angkanya ditambahin ke biaya yang udah ada.
+        </p>
+        <div className="adm-baris" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+          <div className="field">
+            <label htmlFor="bi-jumlah">Jumlah (Rp)</label>
+            <input id="bi-jumlah" value={isi.jumlah} inputMode="numeric" autoFocus onChange={(e) => setIsi((x) => ({ ...x, jumlah: e.target.value.replace(/\D/g, '') }))} placeholder="50000" />
+            {jumlah > 0 && <small className="adm-redup">{rupiah(jumlah)}</small>}
+          </div>
+          <div className="field">
+            <label htmlFor="bi-untuk">Buat</label>
+            <select id="bi-untuk" value={isi.titik_id} onChange={(e) => setIsi((x) => ({ ...x, titik_id: e.target.value }))} style={{ maxWidth: 'none', width: '100%', minHeight: 44 }}>
+              <option value="">Biaya umum kampanye</option>
+              {titik.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.kode}
+                  {t.deskripsi ? ` · ${t.deskripsi}` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="field">
+          <label htmlFor="bi-catatan">Keterangan (opsional)</label>
+          <input id="bi-catatan" value={isi.catatan} maxLength={200} onChange={(e) => setIsi((x) => ({ ...x, catatan: e.target.value }))} placeholder="Misal: boost iklan minggu ke-2" />
+        </div>
+        {error && <p className="adm-error">{error}</p>}
+        <div className="adm-tombol" style={{ justifyContent: 'flex-end', marginTop: 16 }}>
+          <button type="button" className="btn" onClick={onTutup}>
+            Batal
+          </button>
+          <button type="submit" className="btn utama" disabled={sibuk || jumlah <= 0}>
+            {sibuk ? 'Menyimpan…' : 'Tambah biaya'}
+          </button>
+        </div>
+      </form>
+      <h3 style={{ fontSize: 14, margin: '20px 0 6px' }}>Riwayat tambahan biaya</h3>
+      {riwayat.length === 0 ? (
+        <p className="adm-redup" style={{ margin: 0 }}>
+          Belum ada tambahan. Biaya awal diisi waktu kampanye & titik dibikin.
+        </p>
+      ) : (
+        <ul className="adm-daftar">
+          {riwayat.map((b) => (
+            <li key={b.id}>
+              <div>
+                <b className="p-num">+{rupiah(b.jumlah)}</b> <span className="adm-redup">{b.titik_kode || 'biaya umum'}</span>
+                {b.catatan && <div className="adm-redup">{b.catatan}</div>}
+              </div>
+              <span className="adm-redup" style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
+                {b.oleh}
+                <br />
+                {waktu(b.created_at)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Modal>
+  );
+}
+
+// Tanggal dari server (DATE -> ISO) ke format input type=date, pakai tanggal lokal biar nggak mundur sehari.
+function tglInput(v) {
+  if (!v) return '';
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return '';
+  const dua = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${dua(d.getMonth() + 1)}-${dua(d.getDate())}`;
+}
+function FormKampanye({ awal, onTutup, onSimpan }) {
+  const [isi, setIsi] = useState(
+    awal
+      ? { nama: awal.nama || '', area: awal.area || '', mulai: tglInput(awal.mulai), selesai: tglInput(awal.selesai), biaya: String(awal.biaya || ''), catatan: awal.catatan || '' }
+      : { nama: '', area: '', mulai: '', selesai: '', biaya: '', catatan: '' }
+  );
   const [error, setError] = useState('');
   const ubah = (k) => (e) => setIsi((x) => ({ ...x, [k]: e.target.value }));
   return (
-    <Modal judul="Kampanye baru" onTutup={onTutup}>
+    <Modal judul={awal ? `Ubah kampanye` : 'Kampanye baru'} onTutup={onTutup}>
       <form
         onSubmit={async (e) => {
           e.preventDefault();
@@ -519,13 +722,17 @@ function FormKampanye({ onTutup, onSimpan }) {
             <input id="kp-biaya" value={isi.biaya} onChange={ubah('biaya')} inputMode="numeric" placeholder="0" />
           </div>
         </div>
+        <div className="field">
+          <label htmlFor="kp-catatan">Catatan (opsional)</label>
+          <input id="kp-catatan" value={isi.catatan} maxLength={300} onChange={ubah('catatan')} placeholder="Target, PIC, dll" />
+        </div>
         {error && <p className="adm-error">{error}</p>}
         <div className="adm-tombol" style={{ justifyContent: 'flex-end', marginTop: 16 }}>
           <button type="button" className="btn" onClick={onTutup}>
             Batal
           </button>
           <button type="submit" className="btn utama" disabled={!isi.nama.trim()}>
-            Simpan kampanye
+            {awal ? 'Simpan perubahan' : 'Simpan kampanye'}
           </button>
         </div>
       </form>

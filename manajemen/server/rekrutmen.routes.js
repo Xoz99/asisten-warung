@@ -22,7 +22,18 @@ export const KELUAR = ['rejected', 'withdrawn', 'no_response', 'on_hold', 'talen
 const TAHAP_DENGAN_TES = ['product_test', 'interview', 'field_test_24h', 'closing_test'];
 const HARI_NO_RESPONSE = 3; // D-32
 export const HARI_CLOSING_TEST = 6; // D-33
-const KANAL = { FB: 'Grup Facebook', WA: 'Komunitas WhatsApp', PST: 'Poster QR', IG: 'Instagram', WEB: 'Halaman sendiri', REF: 'Referral', LAIN: 'Lainnya' };
+const KANAL = {
+  JOB: 'Job portal',
+  SLS: 'Sales warung',
+  FB: 'Grup Facebook',
+  OJOL: 'Komunitas ojol',
+  WA: 'Komunitas WhatsApp',
+  PST: 'Poster QR',
+  IG: 'Instagram',
+  WEB: 'Halaman sendiri',
+  REF: 'Referral',
+  LAIN: 'Lainnya',
+};
 // Pilihan "Tahu Konsulin dari mana?" - sumber keyakinan RENDAH (D-72), dilaporkan terpisah.
 export const DROPDOWN_SUMBER = ['Facebook', 'WhatsApp', 'Instagram', 'TikTok', 'Poster', 'Teman / keluarga', 'Lainnya'];
 
@@ -51,6 +62,14 @@ export function pastikanTabelRekrutmen() {
         biaya NUMERIC NOT NULL DEFAULT 0,
         status TEXT NOT NULL DEFAULT 'queued', -- queued | ready | posted | failed | skipped | expired (§7.5)
         bukti_url TEXT, diposting_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT now()
+      )`);
+      // Biaya yang ditambah di tengah kampanye (boost iklan, cetak poster lagi, dll) - riwayatnya disimpan.
+      await query(`CREATE TABLE IF NOT EXISTS mj_rek_biaya (
+        id BIGSERIAL PRIMARY KEY,
+        kampanye_id UUID NOT NULL REFERENCES mj_rek_kampanye(id) ON DELETE CASCADE,
+        titik_id UUID REFERENCES mj_rek_titik(id) ON DELETE SET NULL,
+        jumlah NUMERIC NOT NULL, catatan TEXT, oleh TEXT,
         created_at TIMESTAMPTZ DEFAULT now()
       )`);
       await query(`CREATE TABLE IF NOT EXISTS mj_orang (
@@ -717,7 +736,11 @@ router.get('/rekrutmen/kampanye', async (req, res, next) => {
     const { rows: referral } = await query(
       `SELECT count(*)::int AS pelamar, count(*) FILTER (WHERE status='hired')::int AS diterima FROM mj_lamaran WHERE referrer_orang_id IS NOT NULL`
     );
-    res.json({ kampanye, titik, rendah, referral: referral[0], kanal: KANAL, linkDaftar: DAFTAR_URL });
+    const { rows: biaya } = await query(
+      `SELECT b.id, b.kampanye_id, b.jumlah::float AS jumlah, b.catatan, b.oleh, b.created_at, t.kode AS titik_kode
+       FROM mj_rek_biaya b LEFT JOIN mj_rek_titik t ON t.id = b.titik_id ORDER BY b.created_at DESC LIMIT 300`
+    );
+    res.json({ kampanye, titik, biaya, rendah, referral: referral[0], kanal: KANAL, linkDaftar: DAFTAR_URL });
   } catch (e) {
     next(e);
   }
@@ -734,6 +757,65 @@ router.post('/rekrutmen/kampanye', async (req, res, next) => {
     ]);
     await catatLog(req, 'rekrutmen.kampanye.tambah', { nama, biaya });
     res.status(201).json(rows[0]);
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Ubah detail kampanye (nama, area, tanggal, biaya umum, catatan). Field yang nggak dikirim nggak diubah.
+router.patch('/rekrutmen/kampanye/:id', async (req, res, next) => {
+  try {
+    if (!POLA_UUID.test(req.params.id)) throw salah('Kampanye tidak ditemukan', 404);
+    const b = req.body || {};
+    const tgl = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(v || '') ? v : null);
+    const ubah = {};
+    if (b.nama !== undefined) {
+      ubah.nama = teks(b.nama, 100);
+      if (!ubah.nama) throw salah('Nama kampanye wajib diisi');
+    }
+    if (b.area !== undefined) ubah.area = teks(b.area, 60) || null;
+    if (b.mulai !== undefined) ubah.mulai = tgl(b.mulai);
+    if (b.selesai !== undefined) ubah.selesai = tgl(b.selesai);
+    if (b.catatan !== undefined) ubah.catatan = teks(b.catatan, 300) || null;
+    if (b.biaya !== undefined) ubah.biaya = Math.max(0, Math.round(Number(b.biaya) || 0));
+    if (ubah.mulai && ubah.selesai && ubah.selesai < ubah.mulai) throw salah('Tanggal selesai nggak boleh sebelum tanggal mulai');
+    const kolom = Object.keys(ubah);
+    if (!kolom.length) throw salah('Nggak ada yang diubah');
+    const { rows } = await query(`UPDATE mj_rek_kampanye SET ${kolom.map((k, i) => `${k}=$${i + 2}`).join(', ')} WHERE id=$1 RETURNING nama`, [req.params.id, ...kolom.map((k) => ubah[k])]);
+    if (!rows.length) throw salah('Kampanye tidak ditemukan', 404);
+    await catatLog(req, 'rekrutmen.kampanye.ubah', { nama: rows[0].nama, diubah: kolom.join(', ') });
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Tambah biaya di tengah jalan: ke biaya umum kampanye atau ke satu titik sebar. Tercatat di riwayat biaya.
+router.post('/rekrutmen/kampanye/:id/biaya', async (req, res, next) => {
+  try {
+    if (!POLA_UUID.test(req.params.id)) throw salah('Kampanye tidak ditemukan', 404);
+    const jumlah = Math.round(Number(req.body.jumlah) || 0);
+    if (jumlah <= 0) throw salah('Jumlah biaya wajib lebih dari 0');
+    if (jumlah > 1e10) throw salah('Jumlah biaya kebesaran');
+    const titikId = req.body.titik_id ? String(req.body.titik_id) : null;
+    if (titikId && !POLA_UUID.test(titikId)) throw salah('Titik sebar nggak ditemukan');
+    const catatan = teks(req.body.catatan, 200) || null;
+    const hasil = await transaksi(async (c) => {
+      const { rows: k } = await c.query('SELECT nama FROM mj_rek_kampanye WHERE id=$1 FOR UPDATE', [req.params.id]);
+      if (!k.length) throw salah('Kampanye tidak ditemukan', 404);
+      let kode = null;
+      if (titikId) {
+        const { rows: t } = await c.query('UPDATE mj_rek_titik SET biaya = biaya + $3 WHERE id=$1 AND kampanye_id=$2 RETURNING kode', [titikId, req.params.id, jumlah]);
+        if (!t.length) throw salah('Titik sebar nggak ada di kampanye ini');
+        kode = t[0].kode;
+      } else {
+        await c.query('UPDATE mj_rek_kampanye SET biaya = biaya + $2 WHERE id=$1', [req.params.id, jumlah]);
+      }
+      await c.query('INSERT INTO mj_rek_biaya (kampanye_id, titik_id, jumlah, catatan, oleh) VALUES ($1,$2,$3,$4,$5)', [req.params.id, titikId, jumlah, catatan, req.admin.nama]);
+      return { nama: k[0].nama, kode };
+    });
+    await catatLog(req, 'rekrutmen.kampanye.biaya', { kampanye: hasil.nama, ...(hasil.kode ? { titik: hasil.kode } : {}), jumlah, ...(catatan ? { catatan } : {}) });
+    res.status(201).json({ ok: true });
   } catch (e) {
     next(e);
   }
@@ -766,6 +848,23 @@ router.post('/rekrutmen/kampanye/:id/titik', async (req, res, next) => {
 router.patch('/rekrutmen/titik/:id', async (req, res, next) => {
   try {
     if (!POLA_UUID.test(req.params.id)) throw salah('Titik tidak ditemukan', 404);
+    // Ubah detail titik (kanal, tempat, biaya). Kode sengaja nggak bisa diganti: link ?s= yang udah disebar tetap jalan.
+    if (req.body.status === undefined) {
+      const b = req.body || {};
+      const ubah = {};
+      if (b.kanal !== undefined) {
+        if (!KANAL[b.kanal]) throw salah('Kanal nggak dikenal');
+        ubah.kanal = b.kanal;
+      }
+      if (b.deskripsi !== undefined) ubah.deskripsi = teks(b.deskripsi, 200) || null;
+      if (b.biaya !== undefined) ubah.biaya = Math.max(0, Math.round(Number(b.biaya) || 0));
+      const kolom = Object.keys(ubah);
+      if (!kolom.length) throw salah('Nggak ada yang diubah');
+      const { rows } = await query(`UPDATE mj_rek_titik SET ${kolom.map((k, i) => `${k}=$${i + 2}`).join(', ')} WHERE id=$1 RETURNING kode`, [req.params.id, ...kolom.map((k) => ubah[k])]);
+      if (!rows.length) throw salah('Titik tidak ditemukan', 404);
+      await catatLog(req, 'rekrutmen.titik.ubah', { kode: rows[0].kode, diubah: kolom.join(', ') });
+      return res.json({ ok: true });
+    }
     const status = ['queued', 'ready', 'posted', 'failed', 'skipped', 'expired'].includes(req.body.status) ? req.body.status : null;
     if (!status) throw salah('Status nggak dikenal');
     const bukti = teks(req.body.bukti_url, 500);
