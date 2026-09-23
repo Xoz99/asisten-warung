@@ -49,6 +49,10 @@ export default function SheetKatalog({ onClose }) {
 
   const dipilih = Object.values(pilihan);
   const kurangHarga = dipilih.filter((x) => !(+x.harga > 0)).length;
+  // Stok diisi tapi modal kosong = HPP rata-rata & untungnya ngaco (lihat masuk-stok di backend). Stok kosong boleh
+  // tanpa modal: nanti keisi pas catat belanja pertama.
+  const kurangModal = dipilih.filter((x) => +x.stok > 0 && !(+x.modal > 0)).length;
+  const kurang = kurangHarga + kurangModal;
   const kategoriUrut = useMemo(
     () => [...data.kategori].sort((a, b) => (a.kategori === 'lainnya') - (b.kategori === 'lainnya') || b.n - a.n),
     [data.kategori]
@@ -58,19 +62,19 @@ export default function SheetKatalog({ onClose }) {
     setPilihan((p) => {
       const x = { ...p };
       if (x[b.id]) delete x[b.id];
-      else x[b.id] = { b, harga: b.harga?.tengah ? String(b.harga.tengah) : '', stok: '' };
+      else x[b.id] = { b, harga: b.harga?.tengah ? String(b.harga.tengah) : '', modal: '', stok: '' };
       return x;
     });
   const ubah = (id, k, v) => setPilihan((p) => ({ ...p, [id]: { ...p[id], [k]: v.replace(/\D/g, '').slice(0, 9) } }));
 
   const tambah = async () => {
-    if (!dipilih.length || kurangHarga) return;
+    if (!dipilih.length || kurang) return;
     setSimpan(true);
     try {
-      const r = await api.katalog.tambah(dipilih.map((x) => ({ id: x.b.id, harga: +x.harga, stok: +x.stok || 0 })));
+      const r = await api.katalog.tambah(dipilih.map((x) => ({ id: x.b.id, harga: +x.harga, modal: +x.modal || 0, stok: +x.stok || 0 })));
       await refreshData();
       toast(
-        `<b>${r.ditambah} barang</b> masuk ke Stok${r.dilewati ? ` (${r.dilewati} udah ada, dilewati)` : ''}. Stok awalnya bisa diisi pas belanja.`
+        `<b>${r.ditambah} barang</b> masuk ke Stok${r.dilewati ? ` (${r.dilewati} udah ada, dilewati)` : ''}. Barang yang stoknya kosong, modalnya keisi pas catat belanja.`
       );
       onClose();
     } catch (e) {
@@ -152,12 +156,28 @@ export default function SheetKatalog({ onClose }) {
                       </div>
                     </label>
                     <label>
-                      <span>Stok (boleh kosong)</span>
+                      <span>Modal / HPP</span>
+                      <div className={'kat-rp' + (+x.stok > 0 && !(+x.modal > 0) ? ' kurang' : '')}>
+                        <i>Rp</i>
+                        <input inputMode="numeric" value={x.modal} onChange={(e) => ubah(b.id, 'modal', e.target.value)} placeholder={+x.stok > 0 ? 'wajib' : 'nanti'} />
+                      </div>
+                    </label>
+                    <label>
+                      <span>Stok</span>
                       <div className="kat-rp">
                         <input inputMode="numeric" value={x.stok} onChange={(e) => ubah(b.id, 'stok', e.target.value)} placeholder="0" />
                         <i>{b.satuan}</i>
                       </div>
                     </label>
+                    <p className="kat-catatan">
+                      {+x.modal > 0 && +x.harga > 0
+                        ? +x.harga > +x.modal
+                          ? `Untung ${rupiah(x.harga - x.modal)} per ${b.satuan}`
+                          : 'Harga jual di bawah modal - rugi'
+                        : +x.stok > 0
+                          ? 'Stok diisi, modal per ' + b.satuan + ' wajib diisi biar untungnya bener'
+                          : 'Modal boleh kosong - keisi otomatis pas kamu catat belanja barang ini'}
+                    </p>
                   </div>
                 )}
               </div>
@@ -189,8 +209,12 @@ export default function SheetKatalog({ onClose }) {
         </div>
 
         <div className="kat-bawah">
-          {kurangHarga > 0 && <p>{kurangHarga} barang belum ada harga jualnya</p>}
-          <button className="btn utama" style={{ width: '100%' }} disabled={!dipilih.length || kurangHarga > 0 || simpan} onClick={tambah}>
+          {kurang > 0 && (
+            <p>
+              {[kurangHarga && `${kurangHarga} barang belum ada harga jualnya`, kurangModal && `${kurangModal} barang stoknya diisi tapi modalnya belum`].filter(Boolean).join(' · ')}
+            </p>
+          )}
+          <button className="btn utama" style={{ width: '100%' }} disabled={!dipilih.length || kurang > 0 || simpan} onClick={tambah}>
             {simpan ? 'Menyimpan…' : dipilih.length ? `Tambah ${dipilih.length} barang ke Stok` : 'Pilih barang dulu'}
           </button>
         </div>

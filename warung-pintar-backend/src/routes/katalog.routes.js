@@ -96,7 +96,7 @@ router.get('/barcode/:kode', async (req, res, next) => {
   }
 });
 
-// Tambah banyak barang sekaligus dari katalog ke stok warung ini. items: [{ id, harga?, stok? }]
+// Tambah banyak barang sekaligus dari katalog ke stok warung ini. items: [{ id, harga?, modal?, stok? }]
 router.post('/tambah', async (req, res, next) => {
   try {
     const items = Array.isArray(req.body.items) ? req.body.items.slice(0, 300) : [];
@@ -115,9 +115,11 @@ router.post('/tambah', async (req, res, next) => {
       }
       const x = pilihan[b.id] || {};
       const { rows } = await query(
-        `INSERT INTO produk (warung_id, nama, kategori, barcode, harga, stok, satuan, isi_kemasan, nama_kemasan, foto_url)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
-        [req.warungId, b.nama, b.kategori, b.barcode, Math.min(angka(x.harga), 1e9), Math.min(angka(x.stok), 1e6), b.satuan, b.isi_kemasan || 1, b.nama_kemasan, fotoTampil(b)]
+        // modal = HPP per satuan. Boleh 0 kalau stoknya 0 (keisi otomatis pas catat belanja pertama); app nolak
+        // stok > 0 tanpa modal, biar rata-rata HPP & laporan untungnya nggak ngaco.
+        `INSERT INTO produk (warung_id, nama, kategori, barcode, harga, modal, stok, satuan, isi_kemasan, nama_kemasan, foto_url)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+        [req.warungId, b.nama, b.kategori, b.barcode, Math.min(angka(x.harga), 1e9), Math.min(angka(x.modal), 1e9), Math.min(angka(x.stok), 1e6), b.satuan, b.isi_kemasan || 1, b.nama_kemasan, fotoTampil(b)]
       );
       punya.add(b.kunci);
       dibuat.push(rows[0].id);

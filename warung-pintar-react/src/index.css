@@ -1128,13 +1128,15 @@ body{background:#E9E9E6}
 .kat-cek{flex:none;min-width:30px;height:30px;padding:0 6px;border-radius:10px;border:var(--tepi);display:grid;place-items:center;font-weight:800;font-size:13px;color:var(--abu)}
 .kat-item.kat-on .kat-cek{background:var(--ink);color:var(--aksen);border-color:var(--ink);font-size:16px}
 .kat-item.punya .kat-cek{border-style:dashed;font-size:11px}
-.kat-isian{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 12px 12px}
+.kat-isian{display:grid;grid-template-columns:1.1fr 1.1fr .9fr;gap:8px;padding:0 12px 12px}
+.kat-catatan{grid-column:1 / -1;margin:0 !important;font-size:12px !important;color:var(--abu);font-weight:600}
+.kat-rp.kurang{border-color:#DC2626}
 .kat-isian label{display:flex;flex-direction:column;gap:4px;min-width:0}
 .kat-isian label>span{font-size:12px;font-weight:700;color:var(--abu)}
 .kat-rp{display:flex;align-items:center;gap:6px;border:1.5px solid var(--garis);border-radius:12px;padding:0 10px;background:var(--bg)}
 .kat-rp:focus-within{border-color:var(--ink)}
 .kat-rp i{font-style:normal;font-weight:700;color:var(--abu);font-size:14px}
-.kat-rp input{flex:1;min-width:0;border:0;background:none;outline:none;font:inherit;font-size:16px;font-weight:700;color:var(--ink);padding:10px 0}
+.kat-rp input{flex:1;min-width:0;width:100%;border:0;background:none;outline:none;font:inherit;font-size:16px;font-weight:700;color:var(--ink);padding:10px 0}
 .kat-sumber{font-size:12px !important;margin:16px 0 0 !important;line-height:1.5}
 .kat-sumber a{color:var(--ink);font-weight:700}
 .kat-bawah{border-top:var(--tepi);margin:0 -18px;padding:12px 18px calc(12px + env(safe-area-inset-bottom));background:var(--surface)}
