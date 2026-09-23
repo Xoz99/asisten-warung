@@ -613,13 +613,51 @@ function KartuKampanye({ api, k, titik, biaya, kanal, linkDaftar, onBerubah, set
   );
 }
 
+// QR dengan logo Konsulin di tengah. Pakai koreksi error level H (tahan ~30% bagian ketutup), logonya cuma ~20% lebar QR
+// plus bingkai putih, jadi masih kebaca kamera HP biasa.
+let logoKonsulin = null;
+function muatLogo() {
+  if (!logoKonsulin) {
+    logoKonsulin = new Promise((ok, gagal) => {
+      const img = new Image();
+      img.onload = () => ok(img);
+      img.onerror = () => {
+        logoKonsulin = null;
+        gagal(new Error('Logo nggak kebaca'));
+      };
+      img.src = '/logo-konsulin.png';
+    });
+  }
+  return logoKonsulin;
+}
+async function qrDenganLogo(link, ukuran) {
+  const c = document.createElement('canvas');
+  await QRCode.toCanvas(c, link, { width: ukuran, margin: 2, errorCorrectionLevel: 'H' });
+  try {
+    const logo = await muatLogo();
+    const x = c.getContext('2d');
+    const bingkai = Math.round(c.width * 0.24);
+    const sisi = Math.round(c.width * 0.18);
+    const b0 = Math.round((c.width - bingkai) / 2);
+    const r = Math.round(bingkai * 0.18);
+    x.fillStyle = '#ffffff';
+    x.beginPath();
+    x.roundRect ? x.roundRect(b0, b0, bingkai, bingkai, r) : x.rect(b0, b0, bingkai, bingkai);
+    x.fill();
+    x.drawImage(logo, Math.round((c.width - sisi) / 2), Math.round((c.height - sisi) / 2), sisi, sisi);
+  } catch {
+    /* logo gagal dimuat - QR polos tetap bisa dipakai */
+  }
+  return c.toDataURL('image/png');
+}
+
 // Link daftar + QR per titik sebar. QR bisa diunduh versi polos atau versi siap tempel (ada kode & keterangan) buat poster.
 function ModalLink({ t, k, kanal, link, onTutup, onSalin }) {
   const [qr, setQr] = useState(null);
   const [error, setError] = useState('');
   useEffect(() => {
     let batal = false;
-    QRCode.toDataURL(link, { width: 480, margin: 2, errorCorrectionLevel: 'M' })
+    qrDenganLogo(link, 600)
       .then((u) => !batal && setQr(u))
       .catch(() => !batal && setQr(false));
     return () => {
@@ -638,7 +676,7 @@ function ModalLink({ t, k, kanal, link, onTutup, onSalin }) {
     setError('');
     try {
       const img = new Image();
-      img.src = await QRCode.toDataURL(link, { width: 900, margin: 1, errorCorrectionLevel: 'M' });
+      img.src = await qrDenganLogo(link, 900);
       await img.decode();
       const c = document.createElement('canvas');
       c.width = 1080;
