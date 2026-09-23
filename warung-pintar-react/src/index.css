@@ -1101,3 +1101,49 @@ body{background:#E9E9E6}
 .pilih-wajah-baris{display:flex;align-items:center;gap:12px;padding:8px 10px;border:1px solid var(--garis);border-radius:14px;background:var(--surface);color:var(--ink);font:inherit;font-weight:700;cursor:pointer;text-align:left}
 .pilih-wajah-baris:active{transform:scale(.98)}
 .pilih-wajah-baris .ava{width:40px;height:40px;border-radius:12px;flex:none;font-size:14px}
+
+/* ---------- Ambil dari katalog ---------- */
+.kat-sheet{padding:0;align-items:stretch}
+.kat-panel{max-width:520px;max-height:100%;height:100%;border-radius:0;display:flex;flex-direction:column;padding:18px 18px 0;margin:0 auto;overflow:hidden}
+@media (min-width:560px){.kat-sheet{padding:18px}.kat-panel{border-radius:var(--rbig);height:auto;max-height:100%}}
+.kat-kepala{display:flex;align-items:flex-start;gap:12px}
+.kat-kepala>div{flex:1;min-width:0}
+.kat-kepala h3{font-size:24px}
+.kat-kepala p{margin:6px 0 0;font-size:15px}
+.kat-tutup{width:44px;height:44px;flex:none;border-radius:14px;border:var(--tepi);background:var(--bg);color:var(--ink);display:grid;place-items:center;cursor:pointer}
+.kat-tutup svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round}
+.kat-daftar{flex:1;overflow-y:auto;margin:12px -18px 0;padding:0 18px 12px;scrollbar-width:none}
+.kat-daftar::-webkit-scrollbar{display:none}
+.kat-item{border:var(--tepi);border-radius:var(--r);margin-top:10px;background:var(--surface);overflow:hidden}
+.kat-item.kat-on{border-color:var(--ink);box-shadow:0 0 0 2px var(--ink) inset}
+.kat-item.punya{opacity:.55}
+.kat-baris{display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;background:none;border:0;font:inherit;color:var(--ink);text-align:left;cursor:pointer;min-height:64px}
+.kat-baris[disabled]{cursor:default}
+.kat-foto{width:46px;height:46px;flex:none;border-radius:12px;background:var(--bg);overflow:hidden;display:grid;place-items:center;position:relative}
+.kat-foto img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#fff}
+.kat-foto i{font-style:normal;font-weight:800;font-size:18px;color:var(--abu)}
+.kat-teks{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.kat-teks b{font-size:15px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.kat-teks span{font-size:13px;color:var(--abu);font-weight:600}
+.kat-cek{flex:none;min-width:30px;height:30px;padding:0 6px;border-radius:10px;border:var(--tepi);display:grid;place-items:center;font-weight:800;font-size:13px;color:var(--abu)}
+.kat-item.kat-on .kat-cek{background:var(--ink);color:var(--aksen);border-color:var(--ink);font-size:16px}
+.kat-item.punya .kat-cek{border-style:dashed;font-size:11px}
+.kat-isian{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 12px 12px}
+.kat-isian label{display:flex;flex-direction:column;gap:4px;min-width:0}
+.kat-isian label>span{font-size:12px;font-weight:700;color:var(--abu)}
+.kat-rp{display:flex;align-items:center;gap:6px;border:1.5px solid var(--garis);border-radius:12px;padding:0 10px;background:var(--bg)}
+.kat-rp:focus-within{border-color:var(--ink)}
+.kat-rp i{font-style:normal;font-weight:700;color:var(--abu);font-size:14px}
+.kat-rp input{flex:1;min-width:0;border:0;background:none;outline:none;font:inherit;font-size:16px;font-weight:700;color:var(--ink);padding:10px 0}
+.kat-sumber{font-size:12px !important;margin:16px 0 0 !important;line-height:1.5}
+.kat-sumber a{color:var(--ink);font-weight:700}
+.kat-bawah{border-top:var(--tepi);margin:0 -18px;padding:12px 18px calc(12px + env(safe-area-inset-bottom));background:var(--surface)}
+.kat-bawah p{margin:0 0 8px !important;font-size:13px !important;text-align:center;color:var(--abu)}
+.scan.katalog{background:var(--aksen);color:#0A0A0A}
+.scan.katalog .kotak{background:#0A0A0A;color:var(--aksen)}
+
+.saklar{flex:none;width:48px;height:28px;border-radius:999px;background:var(--garis);border:var(--tepi);position:relative;transition:background .15s}
+.saklar i{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+.saklar.on{background:var(--ink)}
+.saklar.on i{transform:translateX(20px);background:var(--aksen)}
+@media (prefers-reduced-motion:reduce){.saklar,.saklar i{transition:none}}

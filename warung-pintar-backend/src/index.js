@@ -32,6 +32,7 @@ import koperasiRoutes from './routes/koperasi.routes.js';
 import langgananRoutes from './routes/langganan.routes.js';
 import tukarRoutes from './routes/tukar.routes.js';
 import komunitasRoutes from './routes/komunitas.routes.js';
+import katalogRoutes from './routes/katalog.routes.js';
 
 const app = express();
 // Berapa lapis proxy di depan server ini (ngrok/nginx/Cloudflare) - dibaca dari TRUST_PROXY.
@@ -88,6 +89,7 @@ app.use('/api/koperasi', koperasiRoutes);
 app.use('/api/langganan', langgananRoutes);
 app.use('/api/tukar', tukarRoutes);
 app.use('/api/komunitas', komunitasRoutes);
+app.use('/api/katalog', katalogRoutes);
 
 // ---- Melayani frontend (produksi) ----
 // Di server, Node ini sekalian nyajiin hasil build React - jadi frontend & API satu origin, satu

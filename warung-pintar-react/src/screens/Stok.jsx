@@ -13,6 +13,7 @@ import { bukaKamera, tutupKamera, jepretFrame, keWebp } from '../lib/kamera';
 import { ambilEmbedding } from '../lib/visualScan';
 import { useModelVisual } from '../lib/useModelVisual';
 import { FORMAT_RETAIL, ambilCanvasROI, buatDekoderZxing, mulaiScanBarcode as mulaiScanBarcodeShared } from '../lib/barcodeScan';
+import SheetKatalog from '../components/SheetKatalog.jsx';
 
 // Barang yang cuma beda ukuran/varian tapi merek sama (misal "Aqua 600ml" & "Aqua 1500ml") bisa
 // dikasih "grup" yang sama (lihat form daftar barang / opname) biar ditampilin sekelompok di sini,
@@ -75,6 +76,16 @@ export default function Stok() {
   const [opnameProduk, setOpnameProduk] = useState(null);
   const [pinCallback, setPinCallback] = useState(null);
   const [tambahVarianGrup, setTambahVarianGrup] = useState(null); // {nama, contoh} - kartu grup mana yang lagi nambah varian baru
+  // Katalog barang bersama. Dibuka otomatis kalau datang dari kartu "Langkah awal" di Beranda (flag sekali pakai).
+  const [katalogBuka, setKatalogBuka] = useState(() => {
+    try {
+      const ada = sessionStorage.getItem('wp_buka_katalog') === '1';
+      sessionStorage.removeItem('wp_buka_katalog');
+      return ada;
+    } catch {
+      return false;
+    }
+  });
 
   // Akun demo (buat presentasi sales) nggak pakai PIN - PIN-nya emang nggak bisa dibikin/diganti di akun demo,
   // jadi kalau tetap diminta, sales mentok di "Bikin PIN pemilik". lisensi.demo ikut dicek buat sesi login lama.
@@ -97,6 +108,18 @@ export default function Stok() {
         <p className="p-sub">
           {S.produk.length} jenis barang · {jumlahKritis} hampir habis · tap barang untuk opname
         </p>
+      </div>
+
+      <div className="scan katalog" onClick={() => setKatalogBuka(true)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setKatalogBuka(true)}>
+        <div className="kotak">
+          <svg viewBox="0 0 24 24">
+            <path d="M4 5h16M4 12h16M4 19h10M18 17l2 2 3-4" />
+          </svg>
+        </div>
+        <div>
+          <b>Ambil dari katalog</b>
+          <span>{S.produk.length ? 'Centang barang lain yang kamu jual' : 'Nggak perlu ngetik - centang aja barang yang kamu jual'}</span>
+        </div>
       </div>
 
       <div className="scan-grid">
@@ -195,6 +218,7 @@ export default function Stok() {
         ))}
       </div>
 
+      {katalogBuka && <SheetKatalog onClose={() => setKatalogBuka(false)} />}
       {barcodeMode && <SheetBarcode mode={barcodeMode} onClose={() => setBarcodeMode(null)} onKelola={(p) => mintaPin(() => setOpnameProduk(p))} />}
       {opnameProduk && <SheetOpname produk={opnameProduk} onClose={() => setOpnameProduk(null)} />}
       {tambahVarianGrup && (
@@ -381,6 +405,9 @@ function SheetBarcode({ mode, onClose, onKelola }) {
   // alur 3 pilihan harga di bawah. null = lagi nampilin daftar hasil biasa.
   const [refTerpilih, setRefTerpilih] = useState(null);
   const opsiHargaRef = useRef(null);
+  const [dariKatalog, setDariKatalog] = useState(null); // barang katalog yang cocok sama barcode baru ini
+  const [kategoriKatalog, setKategoriKatalog] = useState(null);
+  const [fotoKatalog, setFotoKatalog] = useState(null);
 
   // Sheet "barang belum terdaftar" itu panjang (foto barang segede layar di atas), jadi 3 pilihan
   // harga yang baru muncul itu posisinya di BAWAH lipatan - kalau nggak digeser sendiri, dari
@@ -411,6 +438,21 @@ function SheetBarcode({ mode, onClose, onKelola }) {
       if (e.status === 404) {
         setBarcodeBaru(kode);
         setStep('baru');
+        // Barang belum ada di stok warung ini - coba cari di katalog bersama (termasuk Open Food Facts) biar
+        // nama/satuan/kisaran harganya langsung keisi. Gagal / nggak ketemu = form tetap kosong kayak biasa.
+        api.katalog
+          .barcode(kode)
+          .then((b) => {
+            if (matiRef.current) return;
+            setNamaBaru((n) => n || b.nama);
+            setSatuanBaru(b.satuan || 'pcs');
+            setIsiKemasanBaru(b.isi_kemasan || 1);
+            setKategoriKatalog(b.kategori || null);
+            if (b.harga?.tengah) setHargaBaru((h) => h || b.harga.tengah);
+            if (b.foto_url) setFotoKatalog(b.foto_url);
+            setDariKatalog(b);
+          })
+          .catch(() => {});
       } else {
         // e.status cuma keisi kalau backend beneran ngebales (lihat req() di lib/api.js) — kalau
         // gagal manggil server sama sekali (jaringan kedip, server lokal belom nyala/lagi restart,
@@ -774,7 +816,8 @@ function SheetBarcode({ mode, onClose, onKelola }) {
         isiKemasan: +isiKemasanBaru || 1,
         namaKemasan: +isiKemasanBaru > 1 ? namaKemasanBaru.trim() || null : null,
         grup: grupBaru.trim() || null,
-        fotoUrl: fotoProdukBaru || undefined,
+        fotoUrl: fotoProdukBaru || fotoKatalog || undefined,
+        kategori: kategoriKatalog || undefined,
       });
       // Dulu cuma mode foto - foto 3 sisi yang dijepret dari mode barcode kebuang diam-diam.
       if (refFotos.length) {
@@ -1042,10 +1085,18 @@ function SheetBarcode({ mode, onClose, onKelola }) {
           <div style={{ textAlign: 'left' }}>
             <h3 style={{ textAlign: 'center' }}>Barang belum terdaftar</h3>
             {mode === 'barcode' ? (
-              <div className="kode-barcode">
-                <span>Kode barcode</span>
-                <b>{barcodeBaru}</b>
-              </div>
+              <>
+                <div className="kode-barcode">
+                  <span>Kode barcode</span>
+                  <b>{barcodeBaru}</b>
+                </div>
+                {dariKatalog && (
+                  <p className="p-sub" style={{ textAlign: 'center', marginTop: 8 }}>
+                    Ketemu di katalog: <b style={{ color: 'var(--ink)' }}>{dariKatalog.nama}</b>. Nama{dariKatalog.harga ? ' & harga' : ''} udah keisi, cek dulu ya.
+                    {dariKatalog.harga && ` Warung lain jual ${rupiah(dariKatalog.harga.bawah)}–${rupiah(dariKatalog.harga.atas)}.`}
+                  </p>
+                )}
+              </>
             ) : (
               <p style={{ textAlign: 'center' }}>Isi datanya buat didaftarkan</p>
             )}

@@ -4,6 +4,7 @@ import { opsiHargaJual } from '../utils/hargaJual.js';
 import { query } from '../db.js';
 import { produkSetelahMasuk } from '../services/voice.service.js';
 import { cariReferensiProdukGemini } from '../services/gemini.service.js';
+import { catatKontribusi } from '../services/katalog.service.js';
 import { cariReferensiProdukOpenRouter } from '../services/openrouter.service.js';
 import { cobaGeminiLaluOpenRouter } from '../utils/aiFallback.js';
 
@@ -128,6 +129,7 @@ router.post('/', async (req, res, next) => {
         fotoUrl || null,
       ]
     );
+    setImmediate(() => catatKontribusi(rows[0].id)); // katalog bersama - nggak nahan respons
     res.status(201).json(rows[0]);
   } catch (e) {
     next(e);
@@ -178,6 +180,7 @@ router.put('/:id', async (req, res, next) => {
       [nama, kategori, barcode, harga, modal, lakuPerHari, satuan, isiKemasan, namaKemasan, grup, fotoUrl, ikon, req.params.id, req.warungId]
     );
     if (!rows.length) return res.status(404).json({ error: 'Produk tidak ditemukan' });
+    setImmediate(() => catatKontribusi(rows[0].id));
     res.json(rows[0]);
   } catch (e) {
     next(e);
@@ -198,6 +201,7 @@ router.delete('/:id', async (req, res, next) => {
       req.warungId,
     ]);
     if (!rows.length) return res.status(404).json({ error: 'Produk tidak ditemukan' });
+    setImmediate(() => catatKontribusi(rows[0].id)); // produk nonaktif -> kontribusinya dicabut
     res.json({ ok: true });
   } catch (e) {
     next(e);
@@ -258,6 +262,7 @@ router.post('/:id/opname', async (req, res, next) => {
       hargaBaru,
       p.id,
     ]);
+    if (harga != null) setImmediate(() => catatKontribusi(p.id)); // harga berubah -> kisaran katalog ikut
     res.json(rows[0]);
   } catch (e) {
     next(e);

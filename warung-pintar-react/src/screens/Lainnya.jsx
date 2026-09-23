@@ -110,6 +110,7 @@ export default function Lainnya() {
       <p className="p-sec">Aplikasi</p>
       <BarisPasangApp />
       <BarisIzinMedia />
+      <BarisBagikanKatalog />
 
       <p className="p-sec">Langganan</p>
       <SectionLangganan />
@@ -878,6 +879,59 @@ const KUNCI_IZIN_MEDIA = 'warungpintar_izin_media_v1';
 // getUserMedia-nya minta video + audio BARENGAN dalam satu panggilan, bukan dua panggilan
 // terpisah: Chrome nampilin SATU dialog buat dua-duanya kalau dimintanya sekaligus. Dua panggilan
 // = dua dialog beruntun, dan yang kedua paling sering keburu ditutup.
+// Saklar Katalog Barang Bersama. Nyala (bawaan) = nama/barcode/satuan barang warung ini ikut bantu ngisi katalog buat
+// warung lain, dan harganya ikut dihitung ke kisaran gabungan (minimal 5 warung, nggak pernah per warung). Stok & modal
+// nggak pernah dibagi. Dimatiin = semua data warung ini langsung dicabut dari katalog.
+function BarisBagikanKatalog() {
+  const { toast } = useApp();
+  const [bagikan, setBagikan] = useState(null);
+  const [sibuk, setSibuk] = useState(false);
+  useEffect(() => {
+    let batal = false;
+    api.katalog.pengaturan().then((r) => !batal && setBagikan(r.bagikan), () => {});
+    return () => {
+      batal = true;
+    };
+  }, []);
+  const ganti = async () => {
+    if (bagikan === null || sibuk) return;
+    setSibuk(true);
+    try {
+      const r = await api.katalog.setBagikan(!bagikan);
+      setBagikan(r.bagikan);
+      toast(r.bagikan ? 'Barangmu ikut bantu ngisi katalog warung lain. Makasih!' : 'Barangmu nggak dibagikan lagi ke katalog.');
+    } catch (e) {
+      toast(escapeHtml(e.message || 'Gagal nyimpen, coba lagi'));
+    } finally {
+      setSibuk(false);
+    }
+  };
+  return (
+    <div className="menu">
+      <button className="mrow" onClick={ganti} disabled={bagikan === null || sibuk} role="switch" aria-checked={!!bagikan}>
+        <span className="ic">
+          <svg viewBox="0 0 24 24">
+            <path d="M4 5h16M4 12h16M4 19h10" />
+          </svg>
+        </span>
+        <span className="tx">
+          <b>Bagikan barang ke katalog</b>
+          <span>
+            {bagikan === null
+              ? 'Memuat…'
+              : bagikan
+                ? 'Nyala - nama barang & kisaran harga bantu warung lain. Stok & modal nggak pernah dibagi.'
+                : 'Mati - barangmu nggak ikut ke katalog bersama'}
+          </span>
+        </span>
+        <span className={'saklar' + (bagikan ? ' on' : '')} aria-hidden="true">
+          <i />
+        </span>
+      </button>
+    </div>
+  );
+}
+
 function BarisIzinMedia() {
   const { toast, openIzin } = useApp();
   const [status, setStatus] = useState(() => {

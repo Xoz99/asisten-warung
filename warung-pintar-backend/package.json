@@ -9,6 +9,7 @@
     "start": "node src/index.js",
     "migrate": "node src/migrate.js",
     "seed:demo": "node src/seedDemo.js",
+    "impor:katalog": "node src/imporKatalogOff.js",
     "test:security": "node --test test/security.test.js"
   },
   "dependencies": {

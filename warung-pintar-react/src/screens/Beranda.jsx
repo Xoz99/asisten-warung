@@ -146,13 +146,16 @@ export default function Beranda() {
     langkahAwal.push({
       k: 'barang',
       judul: 'Masukin barang daganganmu',
-      ket:
-        profil?.barcode === 'banyak'
-          ? 'Scan barcode-nya satu-satu pakai kamera - paling cepet'
-          : profil?.barcode === 'jarang'
-            ? 'Foto bungkusnya atau ketik manual, nggak perlu barcode'
-            : 'Scan barcode, atau foto kalau barangnya nggak ada barcode',
-      aksi: () => goTo('s-stok'),
+      ket: 'Ambil dari katalog - centang barang yang kamu jual, nggak perlu ngetik satu-satu',
+      aksi: () => {
+        // Stok baca flag ini sekali waktu dibuka, terus langsung buka layar katalog.
+        try {
+          sessionStorage.setItem('wp_buka_katalog', '1');
+        } catch {
+          /* storage diblok - tetap ke Stok, katalog dibuka manual */
+        }
+        goTo('s-stok');
+      },
     });
   }
   if (!S.transaksi.length) {

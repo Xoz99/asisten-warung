@@ -124,6 +124,16 @@ export const api = {
     kosongkan: () => post('/api/penjaga/kosongkan'),
   },
 
+  // Katalog Barang Bersama (Open Food Facts + barang yang dipakai banyak warung) - buat nambah barang tanpa ngetik.
+  katalog: {
+    list: ({ q = '', kategori = '', limit = 60, offset = 0 } = {}) =>
+      get(`/api/katalog?${new URLSearchParams({ ...(q ? { q } : {}), ...(kategori ? { kategori } : {}), limit, offset })}`),
+    barcode: (kode) => get(`/api/katalog/barcode/${encodeURIComponent(kode)}`),
+    tambah: (items) => post('/api/katalog/tambah', { items }),
+    pengaturan: () => get('/api/katalog/pengaturan'),
+    setBagikan: (bagikan) => put('/api/katalog/pengaturan', { bagikan }),
+  },
+
   produk: {
     list: () => get('/api/produk'),
     tambah: (data) => post('/api/produk', data),
