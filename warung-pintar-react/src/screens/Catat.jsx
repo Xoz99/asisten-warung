@@ -948,7 +948,23 @@ function SheetVisual({ onClose }) {
   const barcodeKetemu = async (kode) => {
     try {
       const p = await api.produk.barcode(kode);
-      setHasil([{ produk: p, skor: 1 }]);
+      // Endpoint barcode balikin baris mentah (foto_url, harga string) - disamain bentuknya sama hasil /scan/visual
+      // (fotoUrl dst). Dulu fotonya nggak pernah kebaca & yang tampil selalu ikon.
+      setHasil([
+        {
+          produk: {
+            ...p,
+            harga: Number(p.harga),
+            modal: Number(p.modal),
+            fotoUrl: p.foto_url || null,
+            satuan: p.satuan || 'pcs',
+            isiKemasan: Number(p.isi_kemasan) || 1,
+            namaKemasan: p.nama_kemasan || null,
+            grup: p.grup || null,
+          },
+          skor: 1,
+        },
+      ]);
       setSumberHasil('barcode');
       setStatus('hasil');
     } catch (e) {
