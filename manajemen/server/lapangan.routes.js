@@ -301,6 +301,29 @@ function filterLog(req) {
   return { where: syarat.length ? 'WHERE ' + syarat.join(' AND ') : '', nilai };
 }
 
+// Peta kunjungan: titik GPS tiap log (filter sama kayak daftar log; akun sales cuma lihat punyanya sendiri) + ringkasan
+// per sales. Log tanpa GPS (data lama) nggak ikut, tapi jumlahnya dikasih tau.
+router.get('/lapangan/peta', async (req, res, next) => {
+  try {
+    const { where, nilai } = filterLog(req);
+    const sambung = where ? `${where} AND` : 'WHERE';
+    const [{ rows: titik }, { rows: tanpa }, { rows: sales }] = await Promise.all([
+      query(
+        `SELECT l.id, l.nomor, l.lat, l.lng, l.akurasi_m, l.id_kunjungan, l.hasil, l.kategori, l.tanggal::text AS tanggal, l.sales_id, ad.nama AS sales_nama
+         ${DARI_LOG} ${sambung} l.lat IS NOT NULL AND l.lng IS NOT NULL ORDER BY l.tanggal DESC, l.created_at DESC LIMIT 3000`,
+        nilai
+      ),
+      query(`SELECT count(*)::int AS n ${DARI_LOG} ${sambung} (l.lat IS NULL OR l.lng IS NULL)`, nilai),
+      req.admin.peran === 'sales'
+        ? Promise.resolve({ rows: [{ id: req.admin.id, nama: req.admin.nama }] })
+        : query("SELECT id, nama FROM mj_admin WHERE peran='sales' OR id IN (SELECT DISTINCT sales_id FROM mj_lapangan_log) ORDER BY nama"),
+    ]);
+    res.json({ titik, tanpaGps: tanpa[0].n, sales });
+  } catch (e) {
+    next(e);
+  }
+});
+
 router.get('/lapangan/log', async (req, res, next) => {
   try {
     const { where, nilai } = filterLog(req);

@@ -26,6 +26,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.1.0",
+    "leaflet": "^1.9.4",
     "oxlint": "^1.79.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
