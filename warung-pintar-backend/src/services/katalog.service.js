@@ -9,7 +9,9 @@ import { query } from '../db.js';
 //  - 'warung' : dari barang yang ditambah warung pengguna. Baru masuk katalog kalau minimal
 //               MIN_WARUNG_KATALOG warung BERBEDA punya barang yang sama (barcode sama / nama sama) - biar
 //               salah ketik atau barang pribadi satu orang nggak kesebar.
-//  - 'tim'    : diisi/dirapiin tim lewat Makalin (nanti).
+//  - 'obf' / 'opf' : Open Beauty Facts (sabun, sampo, pasta gigi) & Open Products Facts (barang non-makanan lain) -
+//               saudara OFF, lisensi sama. Rokok nggak ada di ketiganya.
+//  - 'tim'    : diisi/dirapiin tim lewat Makalin (Katalog barang), termasuk draf yang baru tampil setelah disetujui.
 //
 // Yang dibagi CUMA identitas barang (nama, barcode, kategori, satuan, isi kemasan, foto). Stok, modal, dan harga
 // satu warung tertentu nggak pernah keluar. Saran harga cuma berupa kisaran gabungan (persentil 25-75) dari
@@ -58,6 +60,8 @@ export function pastikanTabelKatalog() {
       )`);
       await query('CREATE INDEX IF NOT EXISTS idx_katalog_kontribusi_kunci ON katalog_kontribusi (kunci)');
       await query('ALTER TABLE warung ADD COLUMN IF NOT EXISTS bagikan_katalog BOOLEAN NOT NULL DEFAULT true');
+      // draf = diusulkan (daftar susunan tim / impor CSV), belum tampil ke warung sampai disetujui di Makalin.
+      await query('ALTER TABLE katalog_barang ADD COLUMN IF NOT EXISTS draf BOOLEAN NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS diubah_oleh TEXT');
     })().catch((e) => {
       siap = null;
       throw e;
@@ -112,7 +116,8 @@ export function kategoriDariTag(tags = [], nama = '') {
 }
 
 // Satu produk Open Food Facts -> baris katalog. null kalau datanya terlalu kosong buat dipakai.
-export function dariOff(p) {
+export const SUMBER_TERBUKA = ['off', 'obf', 'opf'];
+export function dariOff(p, { sumber = 'off', kategoriBawaan = 'lainnya' } = {}) {
   const kode = p?.code && gtinValid(p.code) ? normalBarcode(p.code) : null;
   const namaDasar = String(p?.product_name_id || p?.product_name || '').trim();
   if (!kode || !namaDasar || namaDasar.length < 2 || produkTes(namaDasar)) return null;
@@ -132,7 +137,11 @@ export function dariOff(p) {
     barcode: kode,
     nama,
     merek,
-    kategori: kategoriDariTag(p.categories_tags || [], nama),
+    kategori: (() => {
+      const k = kategoriDariTag(p.categories_tags || [], nama);
+      return k === 'lainnya' ? kategoriBawaan : k;
+    })(),
+    sumber,
     ukuran,
     foto_url: typeof p.image_front_small_url === 'string' && p.image_front_small_url.startsWith('https://') ? p.image_front_small_url : null,
     // Barang lokal (barcode 899 = GS1 Indonesia) diprioritasin di daftar populer ketimbang barang impor.
@@ -144,37 +153,51 @@ export function dariOff(p) {
 export async function simpanDariOff(b) {
   const { rows } = await query(
     `INSERT INTO katalog_barang (kunci, barcode, nama, merek, kategori, ukuran, foto_url, sumber, populer)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,'off',$8)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$9,$8)
      ON CONFLICT (kunci) DO UPDATE SET nama=EXCLUDED.nama, merek=EXCLUDED.merek, kategori=EXCLUDED.kategori, ukuran=EXCLUDED.ukuran,
-       foto_url=COALESCE(EXCLUDED.foto_url, katalog_barang.foto_url), populer=EXCLUDED.populer, updated_at=now()
-       WHERE katalog_barang.sumber = 'off'
+       foto_url=COALESCE(EXCLUDED.foto_url, katalog_barang.foto_url), populer=EXCLUDED.populer, sumber=EXCLUDED.sumber, updated_at=now()
+       WHERE katalog_barang.sumber IN ('off','obf','opf')
      RETURNING *`,
-    [b.kunci, b.barcode, b.nama, b.merek, b.kategori, b.ukuran, b.foto_url, b.populer]
+    [b.kunci, b.barcode, b.nama, b.merek, b.kategori, b.ukuran, b.foto_url, b.populer, b.sumber || 'off']
   );
   return rows[0] || null;
 }
 
+export const SUMBER_API = [
+  { sumber: 'off', host: 'world.openfoodfacts.org', kategoriBawaan: 'lainnya' },
+  { sumber: 'obf', host: 'world.openbeautyfacts.org', kategoriBawaan: 'kebersihan' },
+  { sumber: 'opf', host: 'world.openproductsfacts.org', kategoriBawaan: 'lainnya' },
+];
+
 // Cari satu barcode langsung ke Open Food Facts (dipakai kalau barcode yang discan belum ada di katalog).
 export async function cariBarcodeOff(barcode) {
-  if (!gtinValid(barcode) && !gtinValid(String(barcode).padStart(13, '0'))) return null;
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 4000);
-  try {
-    const f = 'code,product_name,product_name_id,brands,quantity,categories_tags,image_front_small_url,unique_scans_n';
-    const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json?fields=${f}`, {
-      headers: { 'User-Agent': UA },
-      signal: ctrl.signal,
-    });
-    if (!res.ok) return null;
-    const j = await res.json();
-    if (j.status !== 1 || !j.product) return null;
-    const b = dariOff({ ...j.product, code: j.product.code || barcode });
-    return b ? await simpanDariOff(b) : null;
-  } catch {
-    return null; // OFF lambat / mati - nggak apa-apa, user isi manual
-  } finally {
-    clearTimeout(t);
+  const b = String(barcode || '');
+  if (!gtinValid(b) && !(b.length >= 8 && gtinValid(b.padStart(13, '0')))) return null;
+  // Makanan dulu (paling banyak), baru kosmetik/kebersihan, baru barang lain. Total dibatasi ~6 detik.
+  const f = 'code,product_name,product_name_id,brands,quantity,categories_tags,image_front_small_url,unique_scans_n';
+  const batas = Date.now() + 6000;
+  for (const s of SUMBER_API) {
+    const sisa = batas - Date.now();
+    if (sisa < 500) break;
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), Math.min(3500, sisa));
+    try {
+      const res = await fetch(`https://${s.host}/api/v2/product/${encodeURIComponent(barcode)}.json?fields=${f}`, {
+        headers: { 'User-Agent': UA },
+        signal: ctrl.signal,
+      });
+      if (!res.ok) continue;
+      const j = await res.json();
+      if (j.status !== 1 || !j.product) continue;
+      const b = dariOff({ ...j.product, code: j.product.code || barcode }, s);
+      if (b) return await simpanDariOff(b);
+    } catch {
+      /* sumber ini lambat / mati - coba yang berikutnya, gagal semua = user isi manual */
+    } finally {
+      clearTimeout(t);
+    }
   }
+  return null;
 }
 
 // Catat / perbarui kontribusi satu produk warung, lalu naikin ke katalog kalau udah dipakai cukup banyak warung.

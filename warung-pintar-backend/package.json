@@ -10,6 +10,7 @@
     "migrate": "node src/migrate.js",
     "seed:demo": "node src/seedDemo.js",
     "impor:katalog": "node src/imporKatalogOff.js",
+    "draf:katalog": "node src/katalogDraf.js",
     "test:security": "node --test test/security.test.js"
   },
   "dependencies": {

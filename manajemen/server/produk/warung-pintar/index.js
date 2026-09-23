@@ -4,6 +4,7 @@ import salesRoutes from './sales.routes.js';
 import akunDemoRoutes from './akunDemo.routes.js';
 import pembayaranRoutes from './pembayaran.routes.js';
 import leadsWarungRoutes from './leadsWarung.routes.js';
+import katalogRoutes from './katalog.routes.js';
 
 // Semua API manajemen buat Warung Pintar (dipasang di /api/warung-pintar).
 const router = Router();
@@ -19,4 +20,5 @@ router.use(salesRoutes);
 router.use(akunDemoRoutes);
 router.use(pembayaranRoutes);
 router.use(leadsWarungRoutes);
+router.use(katalogRoutes);
 export default router;

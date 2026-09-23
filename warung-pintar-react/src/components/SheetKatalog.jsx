@@ -173,8 +173,16 @@ export default function SheetKatalog({ onClose }) {
             Sebagian data barang dari{' '}
             <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener noreferrer">
               Open Food Facts
+            </a>
+            ,{' '}
+            <a href="https://world.openbeautyfacts.org" target="_blank" rel="noopener noreferrer">
+              Open Beauty Facts
             </a>{' '}
-            (lisensi ODbL) dan barang yang dipakai banyak warung. Harga & stok warungmu nggak pernah dibagikan.
+            &amp;{' '}
+            <a href="https://world.openproductsfacts.org" target="_blank" rel="noopener noreferrer">
+              Open Products Facts
+            </a>{' '}
+            (lisensi ODbL), plus barang yang dipakai banyak warung. Harga & stok warungmu nggak pernah dibagikan.
           </p>
         </div>
 

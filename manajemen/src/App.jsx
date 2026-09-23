@@ -14,10 +14,11 @@ import Lapangan from './halaman/Lapangan.jsx';
 import SalesApp from './sales/SalesApp.jsx';
 import DaftarPublik from './halaman/DaftarPublik.jsx';
 import FotoProfil from './komponen/FotoProfil.jsx';
+import Katalog from './halaman/Katalog.jsx';
 
 // Makalin Ops: kerangka (sidebar + topbar), login per admin, dan navigasi lewat alamat (#/leads/crm dst) biar
 // halaman yang lagi dibuka tetap kebuka pas di-refresh & bisa dibagiin linknya.
-const NAMA_HALAMAN = { ai: 'AI Chat', dashboard: 'Dashboard', leads: 'Leads', lapangan: 'Sales Lapangan', rekrutmen: 'Rekrutmen', karyawan: 'Karyawan', artifact: 'Artifact', keuangan: 'Keuangan', notifikasi: 'Notifikasi', pengaturan: 'Pengaturan', profile: 'Profile' };
+const NAMA_HALAMAN = { ai: 'AI Chat', dashboard: 'Dashboard', leads: 'Leads', lapangan: 'Sales Lapangan', katalog: 'Katalog barang', rekrutmen: 'Rekrutmen', karyawan: 'Karyawan', artifact: 'Artifact', keuangan: 'Keuangan', notifikasi: 'Notifikasi', pengaturan: 'Pengaturan', profile: 'Profile' };
 
 function bacaRute() {
   const [halaman, tab] = window.location.hash.replace(/^#\/?/, '').split('/');
@@ -173,6 +174,7 @@ export default function App() {
           {halaman === 'dashboard' && <Dashboard {...props} />}
           {halaman === 'ai' && <AiChat {...props} />}
           {halaman === 'leads' && <Leads key={tab} {...props} />}
+          {halaman === 'katalog' && <Katalog key={tab} {...props} />}
           {halaman === 'rekrutmen' && <Rekrutmen key={tab} {...props} />}
           {halaman === 'karyawan' && <Karyawan key={tab} {...props} />}
           {halaman === 'artifact' && <Artifact {...props} />}
@@ -210,6 +212,7 @@ function Samping({ halaman, admin, foto, notifBaru, buka }) {
           {link('dashboard', 'Dashboard')}
           {link('leads', 'Leads')}
           {link('lapangan', 'Sales Lapangan')}
+          {link('katalog', 'Katalog barang')}
           <span className="adm-nav-produk" style={{ marginTop: 8 }}>
             HR
           </span>

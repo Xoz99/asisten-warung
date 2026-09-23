@@ -1261,3 +1261,25 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
   .pt-peta{height:60dvh;min-height:320px}
   .pt-samping{max-height:none;min-height:0}
 }
+
+/* ---------- Katalog barang (Warung Pintar) ---------- */
+.kt-atas{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.kt-angka{display:flex;gap:8px;flex-wrap:wrap}
+.kt-angka span{border:var(--garis-tipis);background:var(--putih);padding:6px 12px;font-size:13px;font-weight:600}
+.kt-angka b{font-size:18px;margin-right:4px}
+.kt-angka .kt-perlu{background:var(--kuning)}
+.kt-alat{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.kt-alat input{flex:1;min-width:200px;max-width:none}
+.kt-alat select{min-height:44px}
+.kt-massal{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--kuning);border:var(--garis-tipis);padding:8px 12px;margin-bottom:10px;position:sticky;top:10px;z-index:3}
+.kt-massal b{margin-right:auto}
+.kt-tabel td{vertical-align:middle}
+.kt-barang{display:flex;align-items:center;gap:10px;min-width:220px}
+.kt-barang>span:last-child{display:flex;flex-direction:column;min-width:0}
+.kt-barang b{overflow-wrap:anywhere}
+.kt-foto{position:relative;width:40px;height:40px;flex:none;border:var(--garis-tipis);background:var(--kertas);display:grid;place-items:center;overflow:hidden}
+.kt-foto i{font-style:normal;font-weight:700;color:var(--redup)}
+.kt-foto img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#fff}
+.kt-aksi{display:flex;gap:6px;justify-content:flex-end}
+.kt-aksi .btn{white-space:nowrap}
+.kt-cek{display:flex;align-items:center;gap:8px;margin-top:14px;font-weight:600;font-size:14px;cursor:pointer}

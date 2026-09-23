@@ -38,6 +38,8 @@ app.use('/api/lapangan', express.json({ limit: '13mb' }));
 app.use(['/api/tim-sales', '/api/saya/foto', /^\/api\/karyawan\/[^/]+\/foto$/], express.json({ limit: '2mb' }));
 // Foto warung di detail lead (maks 1,5 MB -> base64 ~2 MB).
 app.use(['/api/leads', '/api/lapangan/crm'], express.json({ limit: '3mb' }));
+// Impor CSV katalog barang (sampai 2.000 baris, di-parse di browser).
+app.use('/api/warung-pintar/katalog/impor', express.json({ limit: '2mb' }));
 app.use(express.json({ limit: '100kb' }));
 
 app.get('/health', (req, res) => res.json({ ok: true }));
