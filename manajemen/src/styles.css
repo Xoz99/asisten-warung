@@ -1153,9 +1153,9 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 }
 
 /* foto karyawan di laci detail */
-.kr-foto{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none;margin-top:10px}
+.kr-foto{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none;margin-top:4px;padding-bottom:6px}
 .kr-foto-ganti{position:relative;cursor:pointer;display:block;border-radius:50%}
 .kr-foto-ganti .foto-profil{border-width:3px}
-.kr-foto-ganti span{position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);background:var(--kuning);border:2px solid var(--hitam);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:1px 6px;white-space:nowrap}
+.kr-foto-ganti .kr-foto-label{position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);background:var(--kuning);border:2px solid var(--hitam);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:1px 6px;white-space:nowrap}
 .kr-foto-ganti:hover .foto-profil{filter:brightness(.92)}
 .kr-foto-hapus{margin-top:8px;background:none;border:0;padding:0;font-size:11px;font-weight:700;color:var(--merah);text-decoration:underline;cursor:pointer}

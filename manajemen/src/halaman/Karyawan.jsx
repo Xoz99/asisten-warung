@@ -1376,7 +1376,7 @@ function FotoKaryawan({ api, k, onBerubah }) {
     <div className="kr-foto">
       <label className="kr-foto-ganti" aria-label={`Ganti foto ${k.nama}`} title="Ganti foto">
         <FotoProfil src={`/api/karyawan/${k.id}/foto`} ada={ada} nama={k.nama} ukuran={72} versi={versi} />
-        <span>{sibuk ? '…' : ada ? 'Ganti' : '+ Foto'}</span>
+        <span className="kr-foto-label">{sibuk ? '…' : ada ? 'Ganti' : '+ Foto'}</span>
         <input
           type="file"
           accept="image/*"
