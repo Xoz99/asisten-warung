@@ -36,7 +36,7 @@ router.get('/perlu-referensi', async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT p.id, p.foto_url FROM produk p
-       WHERE p.warung_id=$1 AND p.aktif AND p.foto_url LIKE 'https://%'
+       WHERE p.warung_id=$1 AND p.aktif AND (p.foto_url LIKE 'https://%' OR p.foto_url LIKE '/katalog-foto/%')
          AND NOT EXISTS (SELECT 1 FROM produk_referensi_visual r WHERE r.produk_id = p.id)
        ORDER BY p.created_at DESC LIMIT 100`,
       [req.warungId]

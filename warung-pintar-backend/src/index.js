@@ -33,6 +33,7 @@ import langgananRoutes from './routes/langganan.routes.js';
 import tukarRoutes from './routes/tukar.routes.js';
 import komunitasRoutes from './routes/komunitas.routes.js';
 import katalogRoutes from './routes/katalog.routes.js';
+import { DIR_FOTO_KATALOG } from './services/katalog.service.js';
 
 const app = express();
 // Berapa lapis proxy di depan server ini (ngrok/nginx/Cloudflare) - dibaca dari TRUST_PROXY.
@@ -57,6 +58,10 @@ app.use(express.json({ limit: '2mb' }));
 app.use(morgan('dev'));
 
 app.get('/health', (req, res) => res.json({ ok: true, waktu: new Date().toISOString() }));
+// Foto katalog barang yang udah diunduh ke server sendiri (lihat simpanFotoKatalog di katalog.service.js). Publik
+// (foto kemasan produk, bukan data warung) & nama filenya hash - aman di-cache lama. File nggak ada = 404, jangan
+// nyasar ke index.html.
+app.use('/katalog-foto', express.static(DIR_FOTO_KATALOG, { index: false, maxAge: '365d', immutable: true, fallthrough: false }));
 
 app.use('/api/auth', authRoutes);
 // webhook Midtrans — publik (bukan pelanggan yang manggil), diamankan pakai verifikasi signature, bukan JWT

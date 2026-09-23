@@ -1,3 +1,8 @@
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { query } from '../db.js';
 
 // Katalog Barang Bersama: daftar barang siap pakai buat warung baru, biar nggak ngetik satu-satu.
@@ -62,6 +67,8 @@ export function pastikanTabelKatalog() {
       await query('ALTER TABLE warung ADD COLUMN IF NOT EXISTS bagikan_katalog BOOLEAN NOT NULL DEFAULT true');
       // draf = diusulkan (daftar susunan tim / impor CSV), belum tampil ke warung sampai disetujui di Makalin.
       await query('ALTER TABLE katalog_barang ADD COLUMN IF NOT EXISTS draf BOOLEAN NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS diubah_oleh TEXT');
+      // Nama file foto katalog yang udah diunduh ke server sendiri (lihat simpanFotoKatalog).
+      await query('ALTER TABLE katalog_barang ADD COLUMN IF NOT EXISTS foto_lokal TEXT');
     })().catch((e) => {
       siap = null;
       throw e;
@@ -264,4 +271,57 @@ export async function kisaranHarga(kunciList) {
   // Dibulatkan ke Rp500 biar enak diucapin & nggak bisa dipakai nebak harga satu warung persis.
   const bulat = (n) => Math.round(Number(n) / 500) * 500;
   return Object.fromEntries(rows.map((r) => [r.kunci, { bawah: bulat(r.bawah), tengah: bulat(r.tengah), atas: bulat(r.atas), warung: r.warung }]));
+}
+
+// ---------------- Foto katalog disimpan di server sendiri ----------------
+// Foto dari Open Food Facts dkk dulu ditampilin langsung dari server mereka (Prancis) - lambat dari Indonesia dan
+// sering timeout, hasilnya kotak foto hitam di app. Sekarang tiap foto diunduh SEKALI ke disk server ini lalu
+// disajikan dari /katalog-foto/<file> (domain sendiri, di-cache browser lama). Foto OFF berlisensi terbuka
+// (CC BY-SA), boleh disimpan ulang asal sumbernya disebut - atribusinya ada di layar katalog.
+export const DIR_FOTO_KATALOG = path.resolve(
+  process.env.KATALOG_FOTO_DIR || path.join(path.dirname(fileURLToPath(import.meta.url)), '../../data/katalog-foto')
+);
+export const URL_FOTO_KATALOG = '/katalog-foto/';
+const MAKS_FOTO = 1_500_000;
+const EKSTENSI_FOTO = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+export const fotoTampil = (b) => (b.foto_lokal ? URL_FOTO_KATALOG + b.foto_lokal : b.foto_url || null);
+
+// Unduh foto satu barang katalog (kalau belum), simpan ke disk, dan ganti link foto di barang warung yang masih
+// nunjuk ke server luar. Balikin link lokal, atau null kalau fotonya gagal diambil.
+export async function simpanFotoKatalog(b, { timeoutMs = 25000 } = {}) {
+  if (!b?.foto_url || !/^https:\/\//.test(b.foto_url)) return null;
+  if (b.foto_lokal && existsSync(path.join(DIR_FOTO_KATALOG, b.foto_lokal))) return URL_FOTO_KATALOG + b.foto_lokal;
+  const res = await fetch(b.foto_url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(timeoutMs), redirect: 'follow' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const jenis = (res.headers.get('content-type') || '').split(';')[0].trim();
+  const ext = EKSTENSI_FOTO[jenis];
+  if (!ext) throw new Error(`Bukan gambar (${jenis || '?'})`);
+  const isi = Buffer.from(await res.arrayBuffer());
+  if (!isi.length || isi.length > MAKS_FOTO) throw new Error('Ukuran foto nggak wajar');
+  mkdirSync(DIR_FOTO_KATALOG, { recursive: true });
+  const nama = `${createHash('sha1').update(b.kunci).digest('hex').slice(0, 24)}.${ext}`;
+  await writeFile(path.join(DIR_FOTO_KATALOG, nama), isi);
+  await query('UPDATE katalog_barang SET foto_lokal=$2 WHERE id=$1', [b.id, nama]);
+  await query('UPDATE produk SET foto_url=$2 WHERE foto_url=$1', [b.foto_url, URL_FOTO_KATALOG + nama]);
+  return URL_FOTO_KATALOG + nama;
+}
+
+// Antrean unduh di belakang (satu-satu) buat barang yang baru diambil warung dari katalog.
+const antreFoto = [];
+let antreJalan = false;
+export function antreFotoKatalog(daftar) {
+  for (const b of daftar) if (b?.foto_url && !b.foto_lokal && !antreFoto.some((x) => x.id === b.id)) antreFoto.push(b);
+  if (antreJalan) return;
+  antreJalan = true;
+  (async () => {
+    while (antreFoto.length) {
+      const b = antreFoto.shift();
+      try {
+        await simpanFotoKatalog(b);
+      } catch (e) {
+        console.warn(`[katalog] foto ${b.nama} belum bisa diunduh: ${e.message}`);
+      }
+    }
+    antreJalan = false;
+  })();
 }

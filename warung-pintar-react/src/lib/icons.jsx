@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { IKON_PRODUK, cariProduk, ikonValid, tebakIkon } from './ikonProduk';
 
@@ -28,7 +29,9 @@ export const PRODUCT_ICONS = {
 // dikasih, ikon diambil dari data barang (S.produk, dicari lewat id): pilihan pemilik -> ditebak dari nama barang.
 export function ProductIcon({ id, foto, ikon, className = 'emo picon produk-ikon' }) {
   const { S } = useApp();
-  if (foto) return <img className={className} src={foto} alt="" style={{ objectFit: 'cover' }} />;
+  // Foto yang gagal dimuat (mis. link ke server luar yang lagi down) jatuh ke ikon barang - dulu jadi kotak hitam.
+  const [fotoGagal, setFotoGagal] = useState(null);
+  if (foto && fotoGagal !== foto) return <img className={className} src={foto} alt="" style={{ objectFit: 'cover' }} onError={() => setFotoGagal(foto)} />;
   const p = cariProduk(S?.produk, id);
   const pilihan = ikon !== undefined ? ikon : p?.ikon;
   const kunci = ikonValid(pilihan) ? pilihan : PRODUCT_ICONS[id] ? null : p ? tebakIkon(p.nama, p.kat) : 'default';

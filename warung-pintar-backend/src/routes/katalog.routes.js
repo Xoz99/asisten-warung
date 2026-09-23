@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { query } from '../db.js';
-import { catatKontribusi, cariBarcodeOff, kisaranHarga, kunciBarang, normalNama, pastikanTabelKatalog } from '../services/katalog.service.js';
+import { antreFotoKatalog, catatKontribusi, cariBarcodeOff, fotoTampil, kisaranHarga, kunciBarang, normalNama, pastikanTabelKatalog } from '../services/katalog.service.js';
 
 // Katalog Barang Bersama - lihat penjelasan lengkap di services/katalog.service.js.
 const router = Router();
@@ -13,7 +13,7 @@ router.use(async (req, res, next) => {
   }
 });
 
-const KOLOM = 'id, kunci, barcode, nama, merek, kategori, satuan, isi_kemasan, nama_kemasan, ukuran, foto_url, sumber';
+const KOLOM = 'id, kunci, barcode, nama, merek, kategori, satuan, isi_kemasan, nama_kemasan, ukuran, foto_url, foto_lokal, sumber';
 
 // Barang milik warung ini (aktif), buat nandain "udah punya" di katalog & nolak dobel waktu nambah.
 async function punyaWarung(warungId) {
@@ -30,7 +30,8 @@ async function punyaWarung(warungId) {
 const sudahPunya = (punya, b) => punya.has(b.kunci) || punya.has('n:' + normalNama(b.nama));
 async function lengkapi(warungId, daftar) {
   const [punya, harga] = await Promise.all([punyaWarung(warungId), kisaranHarga(daftar.map((b) => b.kunci))]);
-  return daftar.map((b) => ({ ...b, sudahPunya: sudahPunya(punya, b), harga: harga[b.kunci] || null }));
+  // foto_url yang dikirim ke app = foto di server sendiri kalau udah diunduh, kalau belum link aslinya.
+  return daftar.map(({ foto_lokal, ...b }) => ({ ...b, foto_url: fotoTampil({ ...b, foto_lokal }), sudahPunya: sudahPunya(punya, b), harga: harga[b.kunci] || null }));
 }
 
 // Daftar katalog: tanpa q = barang terpopuler (buat layar "pilih barang yang kamu jual"), dengan q = pencarian.
@@ -87,6 +88,7 @@ router.get('/barcode/:kode', async (req, res, next) => {
       rows = b ? (await query(`SELECT ${KOLOM} FROM katalog_barang WHERE id=$1 AND aktif`, [b.id])).rows : [];
     }
     if (!rows.length) return res.status(404).json({ error: 'Barcode ini belum ada di katalog' });
+    if (rows[0].foto_url && !rows[0].foto_lokal) antreFotoKatalog([rows[0]]);
     const [hasil] = await lengkapi(req.warungId, [rows[0]]);
     res.json(hasil);
   } catch (e) {
@@ -115,11 +117,13 @@ router.post('/tambah', async (req, res, next) => {
       const { rows } = await query(
         `INSERT INTO produk (warung_id, nama, kategori, barcode, harga, stok, satuan, isi_kemasan, nama_kemasan, foto_url)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
-        [req.warungId, b.nama, b.kategori, b.barcode, Math.min(angka(x.harga), 1e9), Math.min(angka(x.stok), 1e6), b.satuan, b.isi_kemasan || 1, b.nama_kemasan, b.foto_url]
+        [req.warungId, b.nama, b.kategori, b.barcode, Math.min(angka(x.harga), 1e9), Math.min(angka(x.stok), 1e6), b.satuan, b.isi_kemasan || 1, b.nama_kemasan, fotoTampil(b)]
       );
       punya.add(b.kunci);
       dibuat.push(rows[0].id);
     }
+    // Foto yang belum ada di server sendiri diunduh di belakang; begitu selesai, link foto barang warung ikut diganti.
+    antreFotoKatalog(barang.filter((b) => b.foto_url && !b.foto_lokal));
     // Kontribusi ke katalog dijalanin belakangan - nggak perlu bikin user nunggu.
     setImmediate(() => dibuat.reduce((p, id) => p.then(() => catatKontribusi(id)), Promise.resolve()));
     res.status(201).json({ ditambah: dibuat.length, dilewati });

@@ -17,6 +17,7 @@
     "impor:katalog:terverifikasi": "node src/imporKatalogTerverifikasi.js",
     "draf:katalog": "node src/katalogDraf.js",
     "kontribusi:katalog": "node src/kontribusiKatalog.js",
+    "foto:katalog": "node src/fotoKatalog.js",
     "test:security": "node --test test/security.test.js"
   },
   "dependencies": {

@@ -4,3 +4,4 @@ node_modules
 # Hasil scrape/impor katalog mentah & ekspor - dibikin ulang di tiap mesin, bukan kode
 data/impor-katalog/
 data/katalog-publik.json
+data/katalog-foto/
