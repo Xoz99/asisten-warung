@@ -75,67 +75,55 @@ export default function Artifact({ api, tab }) {
   const judulLokasi = lokasi === 'semua' ? 'Semua artifact' : lokasi === 'bintang' ? 'Bintang' : lokasi === 'sampah' ? 'Sampah' : folderSekarang?.nama || 'Folder';
 
   return (
-    <div onDragEnter={onDragEnter} onDragLeave={onDragLeave} onDragOver={(e) => adaFile(e) && e.preventDefault()} onDrop={onDrop}>
-      <header className="adm-art-kepala">
-        <div>
-          <h1 className="sr-only">Artifact</h1>
-          <div className="adm-tombol" style={{ marginTop: 0 }}>
-            <button className="btn" onClick={() => setModal({ jenis: 'folder', induk: folderAktif })}>
-              Buat folder
-            </button>
-            <button className="btn" onClick={() => setModal({ jenis: 'catatan', awal: { folder_id: folderAktif } })}>
+    <div className="art" onDragEnter={onDragEnter} onDragLeave={onDragLeave} onDragOver={(e) => adaFile(e) && e.preventDefault()} onDrop={onDrop}>
+      <h1 className="sr-only">Artifact</h1>
+      <aside className="art-samping" aria-label="Folder & aksi">
+        <div className="art-aksi">
+          <button className="btn utama" onClick={() => setModal({ jenis: 'unggah', files: [] })}>
+            + Unggah file
+          </button>
+          <div>
+            <button className="btn kecil" onClick={() => setModal({ jenis: 'catatan', awal: { folder_id: folderAktif } })}>
               Catatan baru
             </button>
-            <button className="btn utama" onClick={() => setModal({ jenis: 'unggah', files: [] })}>
-              + Unggah file
-            </button>
-          </div>
-        </div>
-        <Kapasitas r={r} />
-      </header>
-
-      {pesan && (
-        <p className={pesan.startsWith('Gagal') ? 'adm-error' : 'adm-ok'} role="status">
-          {pesan}
-        </p>
-      )}
-
-      <div className="adm-art">
-        <aside className="adm-kartu adm-art-pohon" aria-label="Folder">
-          <div className="adm-kartu-kepala" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <b>Folder</b>
-            <button className="btn kecil" onClick={() => setModal({ jenis: 'folder', induk: null })}>
+            <button className="btn kecil" onClick={() => setModal({ jenis: 'folder', induk: folderAktif })}>
               + Folder
             </button>
           </div>
-          {errPohon ? (
-            <Gagal apa="folder" pesan={errPohon} onUlang={muatPohon} />
-          ) : !pohon ? (
-            <Memuat apa="folder" />
-          ) : (
-            <Pohon pohon={pohon} lokasi={lokasi} />
-          )}
-        </aside>
+        </div>
+        {errPohon ? (
+          <Gagal apa="folder" pesan={errPohon} onUlang={muatPohon} />
+        ) : !pohon ? (
+          <Memuat apa="folder" />
+        ) : (
+          <Pohon pohon={pohon} lokasi={lokasi} />
+        )}
+        <Kapasitas r={r} />
+      </aside>
 
-        <section style={{ minWidth: 0 }}>
-          <Isi
-            key={lokasi}
-            api={api}
-            lokasi={lokasi}
-            judul={judulLokasi}
-            folder={folderSekarang}
-            pohon={pohon}
-            pemilik={r?.pemilik || []}
-            versi={versi}
-            onBuka={setDipilih}
-            onBerubah={segarkan}
-            setPesan={setPesan}
-            onUnggah={() => setModal({ jenis: 'unggah', files: [] })}
-            onCatatan={() => setModal({ jenis: 'catatan', awal: { folder_id: folderAktif } })}
-            onFolder={(x) => setModal({ jenis: 'folder', ...x })}
-          />
-        </section>
-      </div>
+      <section className="art-utama">
+        {pesan && (
+          <p className={pesan.startsWith('Gagal') ? 'adm-error' : 'adm-ok'} role="status" style={{ margin: '0 0 10px' }}>
+            {pesan}
+          </p>
+        )}
+        <Isi
+          key={lokasi}
+          api={api}
+          lokasi={lokasi}
+          judul={judulLokasi}
+          folder={folderSekarang}
+          pohon={pohon}
+          pemilik={r?.pemilik || []}
+          versi={versi}
+          onBuka={setDipilih}
+          onBerubah={segarkan}
+          setPesan={setPesan}
+          onUnggah={() => setModal({ jenis: 'unggah', files: [] })}
+          onCatatan={() => setModal({ jenis: 'catatan', awal: { folder_id: folderAktif } })}
+          onFolder={(x) => setModal({ jenis: 'folder', ...x })}
+        />
+      </section>
 
       {seret && (
         <div className="adm-art-seret" aria-hidden="true">
@@ -205,69 +193,39 @@ export default function Artifact({ api, tab }) {
   );
 }
 
-// Kartu kapasitas: donut disk server (Artifact / lainnya / sisa) + jumlah per tipe. Angka disk dibaca dari server.
+// Kapasitas penyimpanan, versi ramping buat sidebar: satu batang (artifact / kepakai lainnya / sisa) + angka ringkas.
 function Kapasitas({ r }) {
-  if (!r) return <div className="adm-kartu adm-art-kapasitas"><Memuat apa="kapasitas" /></div>;
+  if (!r) return null;
   const d = r.disk;
-  const R = 42;
-  const K = 2 * Math.PI * R;
-  const pArt = d ? r.terpakai / d.total : 0;
-  const pLain = d ? Math.max(0, d.terpakai - r.terpakai) / d.total : 0;
   const persen = d ? Math.round((d.terpakai / d.total) * 100) : null;
-  // Potongan artifact dikasih minimal 1% biar kelihatan kalau isinya masih kecil banget dibanding disk.
-  const busur = (p) => (p > 0 ? Math.max(p, 0.01) * K : 0);
+  const pArt = d ? Math.max(1, Math.round((r.terpakai / d.total) * 100)) : 0;
+  const pLain = d ? Math.max(0, persen - pArt) : 0;
+  const jumlah = Object.entries(TIPE).map(([id, t]) => `${r.perTipe[id] || 0} ${t.nama.toLowerCase()}`);
   return (
-    <section className="adm-kartu adm-art-kapasitas" aria-label="Kapasitas penyimpanan">
-      <div className="adm-art-donut">
-        <svg viewBox="0 0 100 100" role="img" aria-label={d ? `Disk server ${persen} persen terpakai. Artifact ${ukuranFile(r.terpakai)}, sisa ${ukuranFile(d.sisa)}.` : 'Kapasitas disk nggak kebaca'}>
-          <circle cx="50" cy="50" r={R} fill="none" stroke="#E4E4E7" strokeWidth="14" />
-          {d && (
-            <>
-              <circle cx="50" cy="50" r={R} fill="none" stroke="#3F3F46" strokeWidth="14" strokeDasharray={`${pLain * K} ${K}`} transform="rotate(-90 50 50)" />
-              <circle
-                cx="50"
-                cy="50"
-                r={R}
-                fill="none"
-                stroke="var(--biru)"
-                strokeWidth="14"
-                strokeDasharray={`${busur(pArt)} ${K}`}
-                strokeDashoffset={-pLain * K}
-                transform="rotate(-90 50 50)"
-              />
-            </>
-          )}
-        </svg>
-        <div className="adm-art-donut-tengah">
-          <b className="p-num" style={persen > 90 ? { color: 'var(--merah)' } : undefined}>
-            {d ? `${persen}%` : '?'}
-          </b>
-          <span>terpakai</span>
-        </div>
-      </div>
-      <div style={{ minWidth: 0 }}>
+    <section className="art-disk" aria-label="Kapasitas penyimpanan">
+      <div className="art-disk-atas">
         <span className="adm-label">Disk server</span>
-        {d ? (
-          <ul className="adm-art-legenda">
-            <li>
-              <i style={{ background: 'var(--biru)' }} /> Artifact <b className="p-num">{ukuranFile(r.terpakai)}</b>
-            </li>
-            <li>
-              <i style={{ background: '#3F3F46' }} /> Lainnya <b className="p-num">{ukuranFile(Math.max(0, d.terpakai - r.terpakai))}</b>
-            </li>
-            <li>
-              <i style={{ background: '#E4E4E7' }} /> Sisa <b className="p-num" style={persen > 90 ? { color: 'var(--merah)' } : undefined}>{ukuranFile(d.sisa)}</b>
-            </li>
-          </ul>
-        ) : (
-          <p className="adm-redup" style={{ margin: '4px 0' }}>Kapasitas disk nggak kebaca. Artifact pakai {ukuranFile(r.terpakai)}.</p>
-        )}
-        <p className="adm-art-jumlah">
-          {r.folder} folder · {Object.entries(TIPE)
-            .map(([id, t]) => `${r.perTipe[id] || 0} ${t.nama.toLowerCase()}`)
-            .join(' · ')}
-        </p>
+        <b className="p-num" style={persen > 90 ? { color: 'var(--merah)' } : undefined}>
+          {d ? `${persen}% kepakai` : '?'}
+        </b>
       </div>
+      <div className="art-disk-bar" role="img" aria-label={d ? `Disk ${persen} persen kepakai. Artifact ${ukuranFile(r.terpakai)}, sisa ${ukuranFile(d.sisa)}.` : 'Kapasitas disk nggak kebaca'}>
+        <i style={{ width: `${pArt}%`, background: 'var(--biru)' }} />
+        <i style={{ width: `${pLain}%`, background: '#3F3F46' }} />
+      </div>
+      <ul className="art-disk-baris">
+        <li>
+          <i style={{ background: 'var(--biru)' }} /> Artifact <b className="p-num">{ukuranFile(r.terpakai)}</b>
+        </li>
+        {d && (
+          <li>
+            <i style={{ background: '#E4E4E7' }} /> Sisa <b className="p-num" style={persen > 90 ? { color: 'var(--merah)' } : undefined}>{ukuranFile(d.sisa)}</b>
+          </li>
+        )}
+      </ul>
+      <p className="art-disk-jumlah">
+        {r.folder} folder · {jumlah.join(' · ')}
+      </p>
     </section>
   );
 }
@@ -280,21 +238,20 @@ function Pohon({ pohon, lokasi }) {
     return m;
   }, [pohon]);
   const item = (href, nama, jumlah, aktif, dalam = 0) => (
-    <a key={href} href={href} className={'adm-art-simpul' + (aktif ? ' on' : '')} style={{ paddingLeft: 10 + dalam * 16 }} aria-current={aktif ? 'page' : undefined}>
+    <a key={href} href={href} className={'art-simpul' + (aktif ? ' on' : '')} style={dalam ? { paddingLeft: 10 + dalam * 14 } : undefined} aria-current={aktif ? 'page' : undefined}>
       <span>{dalam > 0 ? '↳ ' : ''}{nama}</span>
-      <span className="adm-redup p-num">{jumlah}</span>
+      <span className="art-jumlah p-num">{jumlah}</span>
     </a>
   );
   const cabang = (f, dalam) => [item(`#/artifact/${f.id}`, f.nama, f.jumlah, lokasi === f.id, dalam), ...(anak[f.id] || []).map((x) => cabang(x, dalam + 1))];
   return (
-    <nav>
+    <nav className="art-nav">
       {item('#/artifact', 'Semua artifact', pohon.semua, lokasi === 'semua')}
+      {item('#/artifact/bintang', 'Bintang', pohon.bintang, lokasi === 'bintang')}
+      {item('#/artifact/sampah', 'Sampah', pohon.sampah, lokasi === 'sampah')}
+      <p className="adm-label art-nav-label">Folder</p>
       {(anak.akar || []).map((f) => cabang(f, 0))}
-      {!pohon.folder.length && <p className="adm-redup" style={{ padding: '6px 10px', margin: 0 }}>Belum ada folder.</p>}
-      <div style={{ borderTop: 'var(--garis-tipis)', marginTop: 8, paddingTop: 8 }}>
-        {item('#/artifact/bintang', 'Bintang', pohon.bintang, lokasi === 'bintang')}
-        {item('#/artifact/sampah', 'Sampah', pohon.sampah, lokasi === 'sampah')}
-      </div>
+      {!pohon.folder.length && <p className="adm-redup art-nav-kosong">Belum ada folder. Bikin folder biar gampang nyarinya.</p>}
     </nav>
   );
 }
@@ -337,55 +294,52 @@ function Isi({ api, lokasi, judul, folder, pohon, pemilik, versi, onBuka, onBeru
 
   return (
     <>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
-        <h2 style={{ margin: 0, fontSize: 22, marginRight: 'auto', overflowWrap: 'anywhere' }}>
-          {induk && (
+      <header className="art-kepala">
+        <div className="art-judul">
+          <nav className="art-jejak" aria-label="Lokasi">
+            <a href="#/artifact">Artifact</a>
+            {induk && (
+              <>
+                <span aria-hidden="true">/</span>
+                <a href={`#/artifact/${induk.id}`}>{induk.nama}</a>
+              </>
+            )}
+          </nav>
+          <h2>{judul}</h2>
+          <p className="adm-redup">{data ? `${data.length}${data.length === 500 ? '+' : ''} item` : 'Memuat…'}{folder?.jumlah ? ` · ${folder.jumlah} di folder ini` : ''}</p>
+        </div>
+        <div className="adm-tombol" style={{ marginTop: 0 }}>
+          {folder && (
             <>
-              <a href={`#/artifact/${induk.id}`} className="adm-redup" style={{ fontSize: 16 }}>
-                {induk.nama}
-              </a>{' '}
-              <span className="adm-redup" style={{ fontSize: 16 }}>/</span>{' '}
+              <button className="btn kecil" onClick={() => onFolder({ induk: folder.id })}>
+                + Subfolder
+              </button>
+              <button className="btn kecil" onClick={() => onFolder({ awal: folder })}>
+                Ganti nama
+              </button>
+              <button className="btn kecil bahaya" onClick={() => setHapusFolder(true)}>
+                Hapus folder
+              </button>
             </>
           )}
-          {judul}
-        </h2>
-        {folder && (
-          <>
-            <button className="btn kecil" onClick={() => onFolder({ induk: folder.id })}>
-              + Subfolder
+          {lokasi === 'sampah' && data?.length > 0 && (
+            <button className="btn kecil bahaya" onClick={() => setKosongkan(true)}>
+              Kosongkan sampah
             </button>
-            <button className="btn kecil" onClick={() => onFolder({ awal: folder })}>
-              Ganti nama
-            </button>
-            <button className="btn kecil bahaya" onClick={() => setHapusFolder(true)}>
-              Hapus folder
-            </button>
-          </>
-        )}
-        {lokasi === 'sampah' && data?.length > 0 && (
-          <button className="btn kecil bahaya" onClick={() => setKosongkan(true)}>
-            Kosongkan sampah
-          </button>
-        )}
-      </div>
-
-      <section className="adm-kartu" style={{ marginBottom: 12, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div className="adm-toggle-tampil" role="group" aria-label="Tampilan">
-          {['grid', 'daftar'].map((v) => (
-            <button key={v} className={tampilan === v ? 'on' : ''} onClick={() => gantiTampilan(v)} aria-pressed={tampilan === v}>
-              {v}
-            </button>
-          ))}
+          )}
         </div>
+      </header>
+
+      <div className="art-alat">
         <form
-          style={{ flex: 1, minWidth: 180, display: 'flex' }}
+          className="art-cari"
           onSubmit={(e) => {
             e.preventDefault();
             ubah('q', ketik.trim());
           }}
         >
-          <input value={ketik} onChange={(e) => setKetik(e.target.value)} placeholder="Cari judul, nama file, tag, isi catatan" aria-label="Cari artifact" style={{ flex: 1, minWidth: 0, maxWidth: 'none' }} />
-          <button className="btn" type="submit" style={{ flexShrink: 0 }}>
+          <input value={ketik} onChange={(e) => setKetik(e.target.value)} placeholder="Cari judul, nama file, tag, isi catatan" aria-label="Cari artifact" />
+          <button className="btn kecil" type="submit">
             Cari
           </button>
         </form>
@@ -410,7 +364,14 @@ function Isi({ api, lokasi, judul, folder, pohon, pemilik, versi, onBuka, onBeru
           <option value="nama">Nama A-Z</option>
           <option value="ukuran">Ukuran terbesar</option>
         </select>
-      </section>
+        <div className="art-tampil" role="group" aria-label="Tampilan">
+          {[['grid', 'Grid'], ['daftar', 'Daftar']].map(([v, n]) => (
+            <button key={v} className={tampilan === v ? 'on' : ''} onClick={() => gantiTampilan(v)} aria-pressed={tampilan === v}>
+              {n}
+            </button>
+          ))}
+        </div>
+      </div>
       {adaFilter && (
         <div className="adm-chip-filter">
           {f.q && (
@@ -460,34 +421,32 @@ function Isi({ api, lokasi, judul, folder, pohon, pemilik, versi, onBuka, onBeru
           </Kosong>
         )
       ) : tampilan === 'grid' ? (
-        <div className="adm-art-grid">
+        <div className="art-grid">
           {data.map((a) => (
-            <article key={a.id} className="adm-kartu adm-art-kartu">
-              <div className="adm-art-kartu-atas">
-                <span className={`adm-chip ${TIPE[a.tipe].warna}`}>{TIPE[a.tipe].nama}</span>
-                {lokasi !== 'sampah' && (
-                  <button className="adm-art-bintang" onClick={() => bintang(a)} aria-pressed={a.bintang} aria-label={a.bintang ? `Hapus bintang ${a.judul}` : `Bintangi ${a.judul}`}>
-                    {a.bintang ? '★' : '☆'}
-                  </button>
-                )}
-              </div>
-              <button className="adm-art-kartu-isi" onClick={() => onBuka(a.id)}>
-                <span className="adm-art-format" aria-hidden="true">
+            <article key={a.id} className="art-kartu">
+              <button className="art-kartu-isi" onClick={() => onBuka(a.id)}>
+                <span className={`art-format ${TIPE[a.tipe].warna}`} aria-hidden="true">
                   {a.tipe === 'catatan' || (a.tipe === 'sop' && !a.nama_file) ? 'MD' : ekstensi(a.nama_file) || '?'}
                 </span>
-                <b>{a.judul}</b>
-                <span className="adm-redup">
-                  {a.nama_file ? ukuranFile(a.ukuran) : `${Math.max(1, Math.ceil((a.panjang_isi || 0) / 1200))} menit baca`} · v{a.versi || 1}
-                  {mode !== 'folder' && a.folder_nama ? ` · ${a.folder_nama}` : ''}
+                <span className="art-kartu-teks">
+                  <b>{a.judul}</b>
+                  <span className="art-kartu-meta">
+                    {TIPE[a.tipe].nama} · {a.nama_file ? ukuranFile(a.ukuran) : `${Math.max(1, Math.ceil((a.panjang_isi || 0) / 1200))} menit baca`} · v{a.versi || 1}
+                  </span>
+                  {mode !== 'folder' && a.folder_nama && <span className="art-kartu-folder">{a.folder_nama}</span>}
                 </span>
               </button>
-              <div className="adm-art-kartu-bawah">
+              {lokasi !== 'sampah' && (
+                <button className="art-bintang" onClick={() => bintang(a)} aria-pressed={a.bintang} aria-label={a.bintang ? `Hapus bintang ${a.judul}` : `Bintangi ${a.judul}`}>
+                  {a.bintang ? '★' : '☆'}
+                </button>
+              )}
+              <div className="art-kartu-bawah">
                 <span className="adm-inisial kecil" aria-hidden="true">
                   {inisial(a.pemilik_nama)}
                 </span>
-                <span className="adm-redup" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {a.pemilik_nama || 'Admin dihapus'} · {tgl(a.diubah_at)}
-                </span>
+                <span className="adm-redup">{a.pemilik_nama || 'Admin dihapus'}</span>
+                <span className="adm-redup art-kartu-tgl">{tgl(a.diubah_at)}</span>
               </div>
             </article>
           ))}
