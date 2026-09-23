@@ -11,6 +11,7 @@
     "seed:demo": "node src/seedDemo.js",
     "impor:katalog": "node src/imporKatalogOff.js",
     "draf:katalog": "node src/katalogDraf.js",
+    "kontribusi:katalog": "node src/kontribusiKatalog.js",
     "test:security": "node --test test/security.test.js"
   },
   "dependencies": {
