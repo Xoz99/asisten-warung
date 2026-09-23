@@ -39,14 +39,16 @@ router.get('/', async (req, res, next) => {
     const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 60) : '';
     const kategori = typeof req.query.kategori === 'string' ? req.query.kategori.trim().slice(0, 40) : '';
     const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 60));
-    const offset = Math.min(5000, Math.max(0, Number(req.query.offset) || 0));
+    const offset = Math.min(1000000, Math.max(0, Math.floor(Number(req.query.offset) || 0)));
     const syarat = ['aktif'];
     const nilai = [];
     if (q) {
       // Tiap kata harus ada (urutan bebas): "goreng indomie" ketemu "Indomie Mi Goreng".
       for (const kata of normalNama(q).split(' ').filter(Boolean).slice(0, 6)) {
         nilai.push('%' + kata + '%');
-        syarat.push(`(lower(nama) LIKE $${nilai.length} OR barcode LIKE $${nilai.length})`);
+        // "silverqueen 82g" juga cocok dengan "Silver Queen ... 82 g".
+        syarat.push(`(lower(nama) LIKE $${nilai.length} OR barcode LIKE $${nilai.length}
+          OR regexp_replace(lower(nama), '[^a-z0-9]', '', 'g') LIKE $${nilai.length})`);
       }
     }
     if (kategori) {
@@ -54,8 +56,15 @@ router.get('/', async (req, res, next) => {
       syarat.push(`kategori = $${nilai.length}`);
     }
     nilai.push(limit, offset);
+    // Barang yang namanya sama (beda cuma huruf besar/kecil, spasi, tanda baca - mis. "Aqua 330 Ml" vs "Aqua 330ml",
+    // biasanya barang sama dengan barcode beda negara/kemasan) cuma ditampilin sekali: yang ada fotonya & paling
+    // populer. Baris lainnya tetap ada di database, jadi scan barcode-nya tetap ketemu.
     const { rows } = await query(
-      `SELECT ${KOLOM} FROM katalog_barang WHERE ${syarat.join(' AND ')}
+      `SELECT * FROM (
+         SELECT DISTINCT ON (regexp_replace(lower(nama), '[^a-z0-9]', '', 'g')) ${KOLOM}, populer
+         FROM katalog_barang WHERE ${syarat.join(' AND ')}
+         ORDER BY regexp_replace(lower(nama), '[^a-z0-9]', '', 'g'), (foto_url IS NOT NULL) DESC, populer DESC, (barcode LIKE '899%') DESC
+       ) t
        ORDER BY populer DESC, (foto_url IS NOT NULL) DESC, nama LIMIT $${nilai.length - 1} OFFSET $${nilai.length}`,
       nilai
     );

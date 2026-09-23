@@ -182,7 +182,9 @@ export default function SheetKatalog({ onClose }) {
             <a href="https://world.openproductsfacts.org" target="_blank" rel="noopener noreferrer">
               Open Products Facts
             </a>{' '}
-            (lisensi ODbL), plus barang yang dipakai banyak warung. Harga & stok warungmu nggak pernah dibagikan.
+            (lisensi ODbL), katalog publik{' '}
+            <a href="https://order.lottemart.co.id" target="_blank" rel="noopener noreferrer">Lotte Grosir</a>
+            , serta barang yang diverifikasi tim atau dipakai banyak warung. Harga & stok warungmu nggak pernah dibagikan.
           </p>
         </div>
 

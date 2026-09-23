@@ -155,3 +155,80 @@ src/
   utils/                cosine.js (cosine similarity buat scan visual & wajah)
   routes/                *.routes.js per fitur
 ```
+# Impor halaman produk marketplace / retail
+
+### Katalog Lotte Grosir (sitemap publik, sudah diuji)
+
+`npm run impor:katalog:lotte -- --simpan --max-pages=1500` menemukan URL produk
+sendiri dari sitemap toko Jatake. Tanpa `--simpan`, hanya membuat snapshot
+pratinjau. Produk pada detail dan rekomendasi halaman dibaca dari JSON halaman,
+bukan ditebak dari URL. Jeda bawaan 1,2 detik; `--jeda-ms=500` membatasi maksimal
+dua permintaan per detik. HTTP 403/429 menghentikan proses.
+Produk tidak aktif, elektronik/perabot besar, dan nama duplikat dilewati.
+Barang baru langsung aktif dengan sumber **Lotte Grosir**. SKU internal Lotte
+tidak dijadikan barcode; barcode, harga, stok, foto, dan merek yang belum jelas
+tidak diisi. Ukuran hanya diambil jika tercantum di nama, bukan dari berat kirim.
+Kemasan multipack tetap merupakan satu produk sesuai nama: `isi_kemasan=1`
+tidak berarti otomatis dikonversi menjadi satuan kecil.
+
+Tabel `katalog_impor_sumber` menyimpan ID produk sumber, URL produk, halaman
+bukti, dan waktu pengambilan. Snapshot JSONL dan laporan ada di
+`data/impor-katalog/`. `lotte-halaman.json` menyimpan halaman selesai untuk
+melanjutkan run berikutnya. Impor ulang tidak menimpa barang lama. Pencocokan
+nama hanya menangani ejaan/spasi/satuan tertentu; nama berbeda tanpa barcode
+masih mungkin merupakan barang yang sama.
+
+Setelah impor, `node src/rapikanImporLotte.js` menerapkan perbaikan satuan barang
+bertanda `/KG` dan kategori pada snapshot yang tersedia. Nama yang sudah diedit
+tim tidak disentuh. `node src/verifikasiKatalog.js` mengecek pencarian 82 g,
+paginasi di atas 5.000 barang, serta kelengkapan catatan sumber Lotte.
+`node src/eksporKatalogPublik.js` membuat `data/katalog-publik.json` berisi
+identitas barang aktif saja untuk pemindahan data; ini **bukan deploy otomatis**.
+
+`npm run impor:katalog:terverifikasi` memasukkan tambahan yang sudah diperiksa
+dari `data/katalog-terverifikasi.json`, termasuk SilverQueen 82 g. Data ini
+tidak memakai SKU atau nomor BPOM sebagai barcode.
+
+Untuk melengkapi katalog otomatis tanpa daftar URL, jalankan
+`npm run impor:katalog:indonesia`. Sumbernya Open Food Facts, dengan pencarian
+barcode berawalan 899 (alokasi GS1 Indonesia), termasuk produk yang belum diberi
+tag negara Indonesia. Awalan barcode tidak menjamin lokasi produksi atau
+ketersediaan barang di setiap warung. Nama dan digit cek GTIN wajib valid.
+Produk baru langsung aktif; kunci yang sudah ada tidak diubah, termasuk draf
+dan produk nonaktif. Stok dan harga warung tidak diisi oleh proses ini.
+Snapshot barang baru serta laporan jumlah disimpan di `data/impor-katalog/`.
+Data Open Food Facts tetap mengikuti lisensi ODbL dan atribusi yang sudah
+ditampilkan di katalog aplikasi. Proses ini mengakses jaringan dan database
+yang ditentukan oleh `DATABASE_URL`.
+
+Tambahan sumber non-makanan bisa dijalankan dengan
+`npm run impor:katalog:indonesia -- --sumber=obf` atau `--sumber=opf`.
+Keduanya memakai facet barcode EAN-13 Indonesia di situs masing-masing.
+Jumlah akhir diverifikasi lewat database; skrip tidak menjamin 100.000 barang
+Indonesia dan tidak menggandakan varian agar memenuhi target jumlah.
+
+`npm run scrape:katalog -- urls.txt` membaca daftar URL produk publik (satu URL
+per baris, baris `#` diabaikan) dan mencetak pratinjau JSON tanpa menulis database.
+Tambahkan `--simpan` untuk memasukkan hasil sebagai **draf** ke katalog bersama:
+
+```sh
+npm run scrape:katalog -- urls.txt --simpan
+```
+
+Jalankan dari direktori backend dengan `DATABASE_URL` yang sesuai. Review dan
+setujui hasil di Makalin > Katalog barang > Draf. Filter sumber mendukung
+Tokopedia, Shopee, Alfagift, dan Klik Indogrosir. URL asal dan waktu pengambilan
+tercatat di `diubah_oleh` saat impor; pengeditan/review tim dapat menggantinya.
+
+Dukungan awal hanya **Product JSON-LD pada HTML publik**, bukan crawler seluruh
+situs, API privat, atau browser yang menjalankan JavaScript. Belum diverifikasi
+terhadap halaman produk live keempat sumber; jika situs tidak menyertakan JSON-LD,
+meminta login, atau memblokir akses, URL dilaporkan gagal (exit code 1), bukan
+dianggap berhasil. Daftar URL perlu disiapkan sendiri. Tidak ada bypass CAPTCHA.
+
+Maksimal 500 URL per proses, jeda 2 detik, timeout 20 detik per request, batas HTML
+5 MB. Hanya domain HTTPS yang didaftarkan yang diterima, termasuk saat redirect.
+Impor ulang melewati kunci barcode/nama yang sudah ada tanpa menimpa hasil review.
+Nama berbeda tanpa barcode masih mungkin merupakan barang yang sama: cek draf.
+SKU bukan barcode; barcode hanya diambil dari GTIN valid. Harga, foto, stok,
+dan isi kemasan tidak diimpor karena belum ada pemetaan yang terverifikasi.

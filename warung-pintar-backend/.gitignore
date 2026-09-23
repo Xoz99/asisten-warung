@@ -1,2 +1,6 @@
 node_modules
 .env
+
+# Hasil scrape/impor katalog mentah & ekspor - dibikin ulang di tiap mesin, bukan kode
+data/impor-katalog/
+data/katalog-publik.json

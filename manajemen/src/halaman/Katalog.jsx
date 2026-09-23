@@ -11,7 +11,7 @@ const TABS = [
   { id: 'nonaktif', nama: 'Nonaktif' },
   { id: 'usulan', nama: 'Usulan dari warung' },
 ];
-const SUMBER = { off: 'Open Food Facts', obf: 'Open Beauty Facts', opf: 'Open Products Facts', warung: 'Dari warung', tim: 'Tim' };
+const SUMBER = { lotte: 'Lotte Grosir', tokopedia: 'Tokopedia', shopee: 'Shopee', alfagift: 'Alfagift', klikindogrosir: 'Klik Indogrosir', off: 'Open Food Facts', obf: 'Open Beauty Facts', opf: 'Open Products Facts', warung: 'Dari warung', tim: 'Tim' };
 const namaKat = (k) => (k ? k.charAt(0).toUpperCase() + k.slice(1) : '-');
 
 export default function Katalog({ apiProduk, tab }) {

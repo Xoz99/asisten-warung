@@ -115,7 +115,7 @@ router.get('/katalog', async (req, res, next) => {
     const q = teks(req.query.q, 60);
     if (q) for (const kata of normalNama(q).split(' ').filter(Boolean).slice(0, 6)) tambah("(lower(k.nama) LIKE ? OR COALESCE(k.barcode,'') LIKE ? OR lower(COALESCE(k.merek,'')) LIKE ?)", `%${kata}%`);
     if (KATEGORI_KATALOG.includes(req.query.kategori)) tambah('k.kategori = ?', req.query.kategori);
-    if (['off', 'obf', 'opf', 'warung', 'tim'].includes(req.query.sumber)) tambah('k.sumber = ?', req.query.sumber);
+    if (['off', 'obf', 'opf', 'warung', 'tim', 'tokopedia', 'shopee', 'alfagift', 'klikindogrosir', 'lotte'].includes(req.query.sumber)) tambah('k.sumber = ?', req.query.sumber);
     const where = syarat.length ? 'WHERE ' + syarat.join(' AND ') : '';
     const [{ rows }, { rows: n }, { rows: ring }] = await Promise.all([
       query(

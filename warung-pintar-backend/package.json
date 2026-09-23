@@ -9,7 +9,12 @@
     "start": "node src/index.js",
     "migrate": "node src/migrate.js",
     "seed:demo": "node src/seedDemo.js",
+    "scrape:katalog": "node src/scrapeKatalog.js",
     "impor:katalog": "node src/imporKatalogOff.js",
+    "impor:katalog:indonesia": "node src/imporKatalogIndonesia.js",
+    "impor:katalog:lotte": "node src/imporKatalogLotte.js",
+    "impor:katalog:sayurbox": "node src/imporKatalogSayurbox.js",
+    "impor:katalog:terverifikasi": "node src/imporKatalogTerverifikasi.js",
     "draf:katalog": "node src/katalogDraf.js",
     "kontribusi:katalog": "node src/kontribusiKatalog.js",
     "test:security": "node --test test/security.test.js"

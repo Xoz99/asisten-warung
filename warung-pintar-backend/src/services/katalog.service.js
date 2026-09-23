@@ -101,16 +101,16 @@ const ATURAN_KATEGORI = [
   ['rokok', /cigarette|tobacco|\brokok\b|kretek|gudang garam|sampoerna|djarum|\bsurya\b|marlboro|dunhill|\bla bold\b/],
   ['mie instan', /instant-noodle|noodle|\bmie\b|\bmi\b|ramen|bihun|soun|indomie|sarimi|supermi|sedaap|pop mie/],
   ['susu', /milk|\bsusu\b|dairies|dairy|yogh?urt|creamer|kental manis|\bskm\b|keju|cheese|butter|mentega/],
-  ['bumbu', /sauce|condiment|seasoning|spice|kecap|sambal|saos|saus|bumbu|\bsalt\b|garam|vinegar|cuka|kaldu|stock|masako|royco|terasi|mayones|mayonnaise/],
+  ['bumbu', /sauce|condiment|seasoning|spice|kecap|sambal|saos|saus|bumbu|\bsalt\b|garam|vinegar|cuka|kaldu|stock|masako|royco|terasi|mayones|mayonnaise|\bkari\b|koepoe|ladaku|merica|ketumbar|penyedap|micin|\bmsg\b/],
   ['minuman', /beverage|drink|water|\btea\b|\bteh\b|coffee|\bkopi\b|juice|\bjus\b|isotonik|isotonic|soda|minuman|syrup|sirup|air mineral|energy|pocari|aqua\b|le mineral|pucuk|fruit tea|sprite|coca cola|fanta|good day|kapal api|nescafe|milo|ale ale|floridina|you c 1000|mizone/],
   ['snack', /snack|biscuit|biskuit|cracker|chip|wafer|cookie|candy|confection|chocolate|cokelat|coklat|cake|crisps|permen|keripik|kripik|pudding|puding|jelly|jeli|roti|bread|wafel|brownie|kacang|mentos|kopiko|relaxa|beng beng|chitato|\btaro\b|qtela|oreo|nabati|tango|silverqueen|momogi|chiki/],
   ['sembako', /\brice\b|beras|sugar|\bgula\b|\boil\b|minyak|flour|tepung|\begg\b|telur|cereal|oat|margarin|sarden|sardine|kornet|corned/],
-  ['kebersihan', /soap|shampoo|sampo|detergent|deterjen|toothpaste|pasta gigi|sabun|hygiene|tissue|tisu|pembersih|rinso|so klin|sunlight|lifebuoy|pepsodent|ciptadent|molto|wipol|harpic|downy/],
+  ['kebersihan', /soap|shampoo|sampo|detergent|deterjen|toothpaste|pasta gigi|sabun|hygiene|tissue|tisu|pembersih|rinso|so klin|sunlight|lifebuoy|pepsodent|ciptadent|molto|wipol|harpic|downy|karbol|supersol|so klin|pewangi|pelembut|pemutih|bayclin|baygon|hit\b|kamper|sabun|shampoo/],
 ];
 export function kategoriDariTag(tags = [], nama = '') {
   const t = tags.join(' ').toLowerCase().replace(/-/g, ' ');
   for (const [kat, pola] of ATURAN_KATEGORI) if (pola.test(t)) return kat;
-  const n = String(nama).toLowerCase();
+  const n = String(nama).toLowerCase().replace(/[-_/]+/g, ' ');
   for (const [kat, pola] of ATURAN_KATEGORI) if (pola.test(n)) return kat;
   return 'lainnya';
 }
