@@ -22,7 +22,9 @@ import { PRODUK } from './produk/index.js';
 // SENGAJA terpisah dari aplikasi produk (warung-pintar-*): proses, port, dan domain sendiri.
 const app = express();
 app.set('trust proxy', Number(process.env.TRUST_PROXY || 0));
-app.use(helmet({ contentSecurityPolicy: false }));
+// Referrer: cuma asal situs (tanpa path/hash) yang dikirim ke luar. Server peta OpenStreetMap nolak permintaan tile
+// tanpa Referer (kebijakan pemakaian tile mereka), jadi bawaan helmet "no-referrer" bikin petanya diblok.
+app.use(helmet({ contentSecurityPolicy: false, referrerPolicy: { policy: 'strict-origin-when-cross-origin' } }));
 // Halaman internal - jangan sampai keindeks mesin pencari.
 app.use((req, res, next) => {
   res.setHeader('X-Robots-Tag', 'noindex, nofollow');

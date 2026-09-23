@@ -57,6 +57,7 @@ export default function PetaLapangan({ api, sales }) {
     const p = L.map(wadah.current, { zoomControl: true, attributionControl: true }).setView(PUSAT_AWAL, 11);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
+      referrerPolicy: 'strict-origin-when-cross-origin', // wajib ada Referer, lihat catatan di server/index.js
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
     }).addTo(p);
     lapisan.current = L.layerGroup().addTo(p);
