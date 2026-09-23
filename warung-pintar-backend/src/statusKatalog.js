@@ -14,9 +14,13 @@ const batang = (a, b, lebar = 24) => {
   const isi = b ? Math.min(lebar, Math.round((a / b) * lebar)) : 0;
   return '[' + '#'.repeat(isi) + '.'.repeat(lebar - isi) + ']';
 };
-const jalan = (pola) => {
+// Cuma proses NODE yang lagi ngejalanin skrip itu yang dihitung - bukan shell induk (`sh -c '... Lotte && Sayurbox'`)
+// yang teks perintahnya kebetulan nyebut nama skripnya (dulu bikin dua-duanya kelihatan "JALAN").
+const jalan = (skrip) => {
   try {
-    return execSync(`pgrep -f "${pola}"`, { encoding: 'utf8' }).trim().split('\n').filter(Boolean).length > 0;
+    return execSync('ps -eo comm=,args=', { encoding: 'utf8' })
+      .split('\n')
+      .some((b) => /^node\s/.test(b.trim()) && b.includes(skrip));
   } catch {
     return false;
   }
@@ -83,6 +87,8 @@ async function tampil() {
     console.log(`          ${batang(diperiksa, total)} ${angka(diperiksa)}/${angka(total)} URL diperiksa (${persen(diperiksa, total)})${sumber === 'lotte' ? ' - bisa beres sebelum 100%' : ''}`);
     console.log(`          putaran ini: ${angka(l.halaman)} halaman, ${angka(l.masuk)} masuk, ${angka(l.duplikat)} dobel, ${angka(l.ditolak)} ditolak${l.segar !== undefined ? `, ${angka(l.segar)} barang segar` : ''}, ${l.gagal?.length || 0} gagal`);
     console.log(`          laporan terakhir ditulis ${lalu(l._diubah)}${l.sisa_url !== undefined ? ` · sisa URL: ${angka(l.sisa_url)}` : ''}`);
+    if (nyala && Date.now() - l._diubah > 30 * 60000) console.log('          ⚠ prosesnya ada tapi laporan nggak update >30 menit - kemungkinan macet, cek: tail -c 600 scrape.log');
+    if (!nyala && l.sisa_url > 0 && l.halaman >= 5000) console.log('          ⚠ berhenti karena batas --max-pages, sisa URL-nya belum habis - jalanin lagi');
   }
 
   console.log('\n--- Foto di server sendiri ---');
