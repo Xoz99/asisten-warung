@@ -1,6 +1,20 @@
+import { createHash } from 'node:crypto';
+import { mkdirSync, rmSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Router } from 'express';
 import { catatLog } from '../../db.js';
+import { bacaFoto } from '../../lapangan.routes.js';
 import { query } from './db.js';
+
+// Folder foto katalog milik warung-pintar-backend (disajikan app warung di /katalog-foto/). Makalin & backend jalan
+// di VPS yang sama, jadi foto yang diupload tim di sini ditulis langsung ke folder itu. Bisa diganti lewat
+// WP_KATALOG_FOTO_DIR kalau struktur foldernya beda.
+export const DIR_FOTO_KATALOG = path.resolve(
+  process.env.WP_KATALOG_FOTO_DIR ||
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '../../../../warung-pintar-backend/data/katalog-foto')
+);
 
 // Katalog Barang Bersama Warung Pintar (tabel katalog_barang di database warung-pintar-backend): tim ngerapiin isi
 // katalog di sini - tambah barang (rokok & barang lokal yang nggak ada di Open Food Facts), setujui draf, ubah nama/
@@ -48,7 +62,7 @@ function pastikanTabel() {
         kunci TEXT NOT NULL, nama TEXT NOT NULL, barcode TEXT, kategori TEXT, satuan TEXT, isi_kemasan INTEGER,
         harga NUMERIC NOT NULL DEFAULT 0, updated_at TIMESTAMPTZ DEFAULT now()
       )`);
-      await query('ALTER TABLE katalog_barang ADD COLUMN IF NOT EXISTS draf BOOLEAN NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS diubah_oleh TEXT');
+      await query('ALTER TABLE katalog_barang ADD COLUMN IF NOT EXISTS draf BOOLEAN NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS diubah_oleh TEXT, ADD COLUMN IF NOT EXISTS foto_lokal TEXT');
     })().catch((e) => {
       siap = null;
       throw e;
@@ -95,7 +109,7 @@ function bersihkan(b, sebagian = false) {
   return x;
 }
 
-const KOLOM = `k.id, k.kunci, k.barcode, k.nama, k.merek, k.kategori, k.satuan, k.isi_kemasan, k.nama_kemasan, k.ukuran, k.foto_url,
+const KOLOM = `k.id, k.kunci, k.barcode, k.nama, k.merek, k.kategori, k.satuan, k.isi_kemasan, k.nama_kemasan, k.ukuran, k.foto_url, k.foto_lokal,
   k.sumber, k.aktif, k.draf, k.diubah_oleh, k.updated_at,
   (SELECT count(DISTINCT c.warung_id)::int FROM katalog_kontribusi c WHERE c.kunci = k.kunci) AS dipakai_warung`;
 
@@ -115,17 +129,23 @@ router.get('/katalog', async (req, res, next) => {
     const q = teks(req.query.q, 60);
     if (q) for (const kata of normalNama(q).split(' ').filter(Boolean).slice(0, 6)) tambah("(lower(k.nama) LIKE ? OR COALESCE(k.barcode,'') LIKE ? OR lower(COALESCE(k.merek,'')) LIKE ?)", `%${kata}%`);
     if (KATEGORI_KATALOG.includes(req.query.kategori)) tambah('k.kategori = ?', req.query.kategori);
-    if (['off', 'obf', 'opf', 'warung', 'tim', 'tokopedia', 'shopee', 'alfagift', 'klikindogrosir', 'lotte'].includes(req.query.sumber)) tambah('k.sumber = ?', req.query.sumber);
+    if (['off', 'obf', 'opf', 'warung', 'tim', 'tokopedia', 'shopee', 'alfagift', 'klikindogrosir', 'lotte', 'sayurbox'].includes(req.query.sumber)) tambah('k.sumber = ?', req.query.sumber);
+    const tanpaFoto = req.query.foto === 'belum';
+    if (tanpaFoto) syarat.push('k.foto_url IS NULL AND k.foto_lokal IS NULL');
+    else if (req.query.foto === 'ada') syarat.push('(k.foto_url IS NOT NULL OR k.foto_lokal IS NOT NULL)');
     const where = syarat.length ? 'WHERE ' + syarat.join(' AND ') : '';
     const [{ rows }, { rows: n }, { rows: ring }] = await Promise.all([
       query(
-        `SELECT ${KOLOM} FROM katalog_barang k ${where} ORDER BY k.draf DESC, k.populer DESC, k.nama LIMIT ${PER_HALAMAN} OFFSET ${(halaman - 1) * PER_HALAMAN}`,
+        // "Belum ada foto": yang paling banyak dipakai warung duluan, biar yang penting difoto dulu.
+        `SELECT ${KOLOM} FROM katalog_barang k ${where}
+         ORDER BY ${tanpaFoto ? 'dipakai_warung DESC, ' : ''}k.draf DESC, k.populer DESC, k.nama LIMIT ${PER_HALAMAN} OFFSET ${(halaman - 1) * PER_HALAMAN}`,
         nilai
       ),
       query(`SELECT count(*)::int AS n FROM katalog_barang k ${where}`, nilai),
       query(`SELECT count(*) FILTER (WHERE aktif)::int AS aktif, count(*) FILTER (WHERE draf)::int AS draf,
                     count(*) FILTER (WHERE NOT aktif AND NOT draf)::int AS nonaktif,
-                    count(*) FILTER (WHERE aktif AND kategori='rokok')::int AS rokok
+                    count(*) FILTER (WHERE aktif AND kategori='rokok')::int AS rokok,
+                    count(*) FILTER (WHERE aktif AND foto_url IS NULL AND foto_lokal IS NULL)::int AS tanpa_foto
              FROM katalog_barang`),
     ]);
     res.json({ items: rows, total: n[0].n, halaman, perHalaman: PER_HALAMAN, ringkasan: ring[0], kategori: KATEGORI_KATALOG });
@@ -177,6 +197,33 @@ router.patch('/katalog/:id', async (req, res, next) => {
     }
     await catatLog(req, 'wp.katalog.ubah', { nama: x.nama || lama[0].nama, diubah: kolom.filter((k) => k !== 'kunci').join(', ') });
     res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Upload foto barang dari tim (buat barang yang nggak punya foto, mis. dari Lotte/Sayurbox/rokok). Foto udah dikecilin
+// di browser (WEBP/JPEG). Disimpan ke folder foto katalog; app warung langsung pakai buat tampilan & scan foto.
+router.put('/katalog/:id/foto', async (req, res, next) => {
+  try {
+    if (!POLA_UUID.test(req.params.id)) throw salah('Barang nggak ditemukan', 404);
+    const f = bacaFoto(req.body.foto);
+    if (f.buf.length > 1_500_000) throw salah('Foto maksimal 1,5 MB');
+    const { rows } = await query('SELECT kunci, nama, foto_lokal FROM katalog_barang WHERE id=$1', [req.params.id]);
+    if (!rows.length) throw salah('Barang nggak ditemukan', 404);
+    mkdirSync(DIR_FOTO_KATALOG, { recursive: true });
+    // Nama file ada cap waktunya: foto lama & baru beda nama, jadi cache browser (1 tahun) nggak nyangkut di foto lama.
+    const nama = `${createHash('sha1').update(rows[0].kunci).digest('hex').slice(0, 20)}-t${Date.now().toString(36)}.${f.ext}`;
+    await writeFile(path.join(DIR_FOTO_KATALOG, nama), f.buf);
+    await query("UPDATE katalog_barang SET foto_lokal=$2, sumber=CASE WHEN sumber IN ('off','obf','opf') THEN 'tim' ELSE sumber END, diubah_oleh=$3, updated_at=now() WHERE id=$1", [
+      req.params.id,
+      nama,
+      req.admin.nama,
+    ]);
+    // File foto lama yang diupload tim sebelumnya dibuang (foto hasil unduhan otomatis dibiarin).
+    if (rows[0].foto_lokal && /-t[0-9a-z]+\.(webp|jpg|png)$/.test(rows[0].foto_lokal)) rmSync(path.join(DIR_FOTO_KATALOG, path.basename(rows[0].foto_lokal)), { force: true });
+    await catatLog(req, 'wp.katalog.foto', { nama: rows[0].nama });
+    res.json({ ok: true, foto_lokal: nama });
   } catch (e) {
     next(e);
   }

@@ -17,6 +17,7 @@ import komisiRoutes from './komisi.routes.js';
 import timRoutes from './tim.routes.js';
 import leadDetailRoutes from './leadDetail.routes.js';
 import { PRODUK } from './produk/index.js';
+import { DIR_FOTO_KATALOG } from './produk/warung-pintar/katalog.routes.js';
 
 // Server aplikasi manajemen Konsulin: API /api/* (wajib login admin, lihat auth.js) + nyajiin hasil build tampilannya (dist/).
 // SENGAJA terpisah dari aplikasi produk (warung-pintar-*): proses, port, dan domain sendiri.
@@ -40,6 +41,8 @@ app.use(['/api/tim-sales', '/api/saya/foto', /^\/api\/karyawan\/[^/]+\/foto$/], 
 app.use(['/api/leads', '/api/lapangan/crm'], express.json({ limit: '3mb' }));
 // Impor CSV katalog barang (sampai 2.000 baris, di-parse di browser).
 app.use('/api/warung-pintar/katalog/impor', express.json({ limit: '2mb' }));
+// Upload foto barang katalog (udah dikecilin di browser, maks 1,5 MB -> base64 ~2 MB).
+app.use(/^\/api\/warung-pintar\/katalog\/[^/]+\/foto$/, express.json({ limit: '3mb' }));
 app.use(express.json({ limit: '100kb' }));
 
 app.get('/health', (req, res) => res.json({ ok: true }));
@@ -70,6 +73,8 @@ for (const p of PRODUK) {
   if (p.aktif) app.use('/api/' + p.id, p.router);
 }
 app.use('/api', (req, res) => res.status(404).json({ error: 'Tidak ditemukan' }));
+// Foto katalog Warung Pintar (folder yang sama dengan yang disajikan app warung) - buat pratinjau di halaman Katalog.
+app.use('/katalog-foto', express.static(DIR_FOTO_KATALOG, { index: false, maxAge: '365d', immutable: true, fallthrough: false }));
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.resolve(__dirname, '../dist');

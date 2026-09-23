@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { waktu } from '../lib/format.js';
 import { Gagal, Kosong, Memuat, Modal, Tabs } from '../komponen/Ui.jsx';
+import { keWebp } from '../lib/gambar.js';
 
 // Katalog Barang Bersama Warung Pintar: isi katalog yang dipakai warung buat "Ambil dari katalog". Di sini tim
 // nambah barang yang nggak ada di database terbuka (rokok, barang lokal/curah), nyetujuin draf, ngerapiin nama/
@@ -13,6 +14,8 @@ const TABS = [
 ];
 const SUMBER = { lotte: 'Lotte Grosir', tokopedia: 'Tokopedia', shopee: 'Shopee', alfagift: 'Alfagift', klikindogrosir: 'Klik Indogrosir', off: 'Open Food Facts', obf: 'Open Beauty Facts', opf: 'Open Products Facts', warung: 'Dari warung', tim: 'Tim' };
 const namaKat = (k) => (k ? k.charAt(0).toUpperCase() + k.slice(1) : '-');
+// Foto yang udah ada di server sendiri (unduhan otomatis / upload tim) didahulukan ketimbang link server luar.
+const fotoBarang = (b) => (b.foto_lokal ? `/katalog-foto/${b.foto_lokal}` : b.foto_url || null);
 
 export default function Katalog({ apiProduk, tab }) {
   if (!apiProduk) {
@@ -25,7 +28,7 @@ export default function Katalog({ apiProduk, tab }) {
 
 function IsiKatalog({ api, tab }) {
   const aktif = TABS.some((t) => t.id === tab) ? tab : 'draf';
-  const [f, setF] = useState({ q: '', kategori: '', sumber: '' });
+  const [f, setF] = useState({ q: '', kategori: '', sumber: '', foto: '' });
   const [ketik, setKetik] = useState('');
   const [halaman, setHalaman] = useState(1);
   const [data, setData] = useState(null);
@@ -90,6 +93,18 @@ function IsiKatalog({ api, tab }) {
           <span>
             <b className="p-num">{r ? r.rokok : '…'}</b> rokok aktif
           </span>
+          <button
+            type="button"
+            className={'kt-angka-tombol' + (f.foto === 'belum' ? ' on' : '')}
+            onClick={() => {
+              setF((x) => ({ ...x, foto: x.foto === 'belum' ? '' : 'belum' }));
+              setHalaman(1);
+              if (aktif !== 'aktif') window.location.hash = '#/katalog/aktif';
+            }}
+            title="Tampilkan barang aktif yang belum ada fotonya"
+          >
+            <b className="p-num">{r ? (r.tanpa_foto ?? 0).toLocaleString('id-ID') : '…'}</b> belum ada foto
+          </button>
         </div>
         <div className="adm-tombol" style={{ marginTop: 0 }}>
           <button className="btn" onClick={() => setModal({ jenis: 'impor' })}>
@@ -123,6 +138,11 @@ function IsiKatalog({ api, tab }) {
                   {namaKat(k)}
                 </option>
               ))}
+            </select>
+            <select value={f.foto} onChange={(e) => (setF((x) => ({ ...x, foto: e.target.value })), setHalaman(1))} aria-label="Foto">
+              <option value="">Semua (foto)</option>
+              <option value="belum">Belum ada foto</option>
+              <option value="ada">Ada foto</option>
             </select>
             <select value={f.sumber} onChange={(e) => (setF((x) => ({ ...x, sumber: e.target.value })), setHalaman(1))} aria-label="Sumber">
               <option value="">Semua sumber</option>
@@ -209,7 +229,7 @@ function IsiKatalog({ api, tab }) {
                         <div className="kt-barang">
                           <span className="kt-foto" aria-hidden="true">
                             <i>{b.nama.charAt(0)}</i>
-                            {b.foto_url && <img src={b.foto_url} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+                            {fotoBarang(b) && <img key={fotoBarang(b)} src={fotoBarang(b)} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(e) => (e.currentTarget.style.display = 'none')} />}
                           </span>
                           <span>
                             <b>{b.nama}</b>
@@ -230,6 +250,7 @@ function IsiKatalog({ api, tab }) {
                       <td className="kanan p-num">{b.dipakai_warung ? `${b.dipakai_warung} warung` : '-'}</td>
                       <td>
                         <span className="kt-aksi">
+                          <UploadFoto api={api} b={b} ada={Boolean(fotoBarang(b))} onSelesai={(t) => (setPesan(t), segarkan())} />
                           <button className="btn kecil" onClick={() => setModal({ jenis: 'form', awal: b })}>
                             Ubah
                           </button>
@@ -306,6 +327,36 @@ function IsiKatalog({ api, tab }) {
         />
       )}
     </>
+  );
+}
+
+// Upload foto satu barang katalog: dikecilin di browser dulu (maks 800px WEBP/JPEG), lalu disimpan ke server.
+function UploadFoto({ api, b, ada, onSelesai }) {
+  const [sibuk, setSibuk] = useState(false);
+  return (
+    <label className={'btn kecil' + (ada ? '' : ' utama') + (sibuk ? ' kt-sibuk' : '')} title={ada ? 'Ganti foto barang ini' : 'Upload foto barang ini'}>
+      {sibuk ? 'Upload…' : ada ? 'Ganti foto' : '+ Foto'}
+      <input
+        type="file"
+        accept="image/*"
+        hidden
+        disabled={sibuk}
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (!file) return;
+          setSibuk(true);
+          try {
+            await api('PUT', `/katalog/${b.id}/foto`, { foto: await keWebp(file, 800, 0.85) });
+            onSelesai(`Foto ${b.nama} disimpan - langsung kepakai di app warung.`);
+          } catch (err) {
+            onSelesai('Gagal upload foto: ' + err.message);
+          } finally {
+            setSibuk(false);
+          }
+        }}
+      />
+    </label>
   );
 }
 

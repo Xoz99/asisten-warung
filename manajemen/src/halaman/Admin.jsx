@@ -64,6 +64,7 @@ export const NAMA_AKSI = {
   'wp.katalog.status': 'ubah status barang katalog',
   'wp.katalog.hapus': 'hapus draf katalog',
   'wp.katalog.impor': 'impor CSV katalog',
+  'wp.katalog.foto': 'upload foto barang katalog',
   'hr.kehadiran.simpan': 'nyatet kehadiran',
   'hr.cuti.ajukan': 'nyatet pengajuan cuti',
   'hr.cuti.putus': 'mutusin pengajuan cuti',
