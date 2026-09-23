@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { rupiah, tampilHp, tgl, waktu, waktuRelatif } from '../lib/format.js';
 import { Gagal, Kosong, Memuat, Modal, Tabs, useData } from '../komponen/Ui.jsx';
 import { bukaFile } from '../lib/api.js';
+import QRCode from 'qrcode';
 import Board, { DetailKandidat, Ketersediaan, KuisMateri } from './RekrutmenBoard.jsx';
 
 // Rekrutmen Sales Partner (PRD v0.2 §7-10). Tahap nggak boleh dilompati; tahap bertes majunya lewat hasil tes.
@@ -303,6 +304,7 @@ function Sumber({ api }) {
           <KartuKampanye key={k.id} api={api} k={k} titik={data.titik.filter((t) => t.kampanye_id === k.id)} biaya={(data.biaya || []).filter((b) => b.kampanye_id === k.id)} kanal={data.kanal} linkDaftar={data.linkDaftar} onBerubah={muat} setPesan={setPesan} />
         ))
       )}
+      {data.arsip?.length > 0 && <KampanyeArsip api={api} arsip={data.arsip} onBerubah={muat} setPesan={setPesan} />}
       <section className="adm-kolom" style={{ marginTop: 22 }}>
         <div className="adm-kartu">
           <div className="adm-kartu-kepala kuning">
@@ -352,14 +354,60 @@ function Sumber({ api }) {
   );
 }
 
+// Kampanye yang lagi dilipat diingat per browser, biar pas balik ke tab ini susunannya sama.
+const KUNCI_LIPAT = 'makalin_kampanye_lipat';
+function bacaLipat() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(KUNCI_LIPAT) || '[]'));
+  } catch {
+    return new Set();
+  }
+}
+function simpanLipat(id, lipat) {
+  try {
+    const x = bacaLipat();
+    if (lipat) x.add(id);
+    else x.delete(id);
+    localStorage.setItem(KUNCI_LIPAT, JSON.stringify([...x].slice(-200)));
+  } catch {
+    /* storage diblok - cukup di memori */
+  }
+}
+
 function KartuKampanye({ api, k, titik, biaya, kanal, linkDaftar, onBerubah, setPesan }) {
   const [modal, setModal] = useState(null); // 'kampanye' | 'biaya' | {titik}
+  const [buka, setBuka] = useState(() => !bacaLipat().has(k.id));
+  const pelamar = titik.reduce((a, t) => a + t.pelamar, 0);
+  const lipat = () => {
+    simpanLipat(k.id, buka);
+    setBuka(!buka);
+  };
+  const jalan = async (fn, ok) => {
+    setError('');
+    try {
+      await fn();
+      setPesan(ok);
+      onBerubah();
+    } catch (e) {
+      setError(e.message);
+      setBuka(true);
+    }
+  };
+  const arsipkan = () =>
+    window.confirm(`Arsipkan kampanye ${k.nama}? Datanya tetap kesimpen dan link titiknya tetap jalan, cuma disembunyiin dari daftar.`) &&
+    jalan(() => api('PATCH', `/rekrutmen/kampanye/${k.id}`, { arsip: true }), `Kampanye ${k.nama} diarsipkan.`);
+  const hapus = () =>
+    window.confirm(`Hapus kampanye ${k.nama} beserta ${titik.length} titik sebar dan riwayat biayanya? Nggak bisa dibalikin.`) &&
+    jalan(() => api('DELETE', `/rekrutmen/kampanye/${k.id}`), `Kampanye ${k.nama} dihapus.`);
+  const hapusTitik = (t) =>
+    window.confirm(`Hapus titik ${t.kode}? Link ?s=${t.kode} nggak kehitung lagi.`) && jalan(() => api('DELETE', `/rekrutmen/titik/${t.id}`), `Titik ${t.kode} dihapus.`);
   const [f, setF] = useState({ kanal: 'JOB', area: k.area ? k.area.slice(0, 3).toUpperCase() : '', deskripsi: '', biaya: '' });
   const [error, setError] = useState('');
   const totalBiaya = k.biaya + titik.reduce((a, t) => a + t.biaya, 0);
   const diterima = titik.reduce((a, t) => a + t.diterima, 0);
+  const linkTitik = (kode) => `${linkDaftar || window.location.origin + '/daftar'}?s=${kode}`;
   const salin = (kode) => {
-    const link = `${linkDaftar || window.location.origin + '/daftar'}?s=${kode}`;
+    const link = linkTitik(kode);
     navigator.clipboard?.writeText(link).then(() => setPesan(`Link ${kode} disalin: ${link}`), () => window.prompt('Salin link ini:', link));
   };
   const ubahStatus = async (t, status) => {
@@ -377,14 +425,27 @@ function KartuKampanye({ api, k, titik, biaya, kanal, linkDaftar, onBerubah, set
     }
   };
   return (
-    <section className="adm-kartu" style={{ marginBottom: 18 }}>
+    <section className={'adm-kartu rk-kampanye' + (buka ? '' : ' lipat')} style={{ marginBottom: 18 }}>
       <div className="adm-kartu-kepala hitam">
-        <h2>
-          {k.nama} {k.area ? `· ${k.area}` : ''}
-        </h2>
-        <span className="adm-redup">
-          {[k.mulai && `${tgl(k.mulai)}${k.selesai ? ` s/d ${tgl(k.selesai)}` : ''}`, `biaya ${rupiah(totalBiaya)}`, diterima && `${rupiah(totalBiaya / diterima)} per orang diterima`].filter(Boolean).join(' · ')}
-        </span>
+        <button type="button" className="rk-kampanye-lipat" onClick={lipat} aria-expanded={buka} aria-controls={`kp-${k.id}`}>
+          <span className="rk-panah" aria-hidden="true">▾</span>
+          <span className="rk-kampanye-judul">
+            <b>
+              {k.nama} {k.area ? `· ${k.area}` : ''}
+            </b>
+            <span className="adm-redup">
+              {[
+                k.mulai && `${tgl(k.mulai)}${k.selesai ? ` s/d ${tgl(k.selesai)}` : ''}`,
+                `${titik.length} titik`,
+                `${pelamar} pelamar`,
+                `biaya ${rupiah(totalBiaya)}`,
+                diterima && `${rupiah(totalBiaya / diterima)} per orang diterima`,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
+          </span>
+        </button>
         <span className="rk-kampanye-aksi">
           <button className="btn kecil" onClick={() => setModal('kampanye')}>
             Ubah
@@ -392,8 +453,18 @@ function KartuKampanye({ api, k, titik, biaya, kanal, linkDaftar, onBerubah, set
           <button className="btn kecil" onClick={() => setModal('biaya')}>
             + Biaya
           </button>
+          {pelamar ? (
+            <button className="btn kecil" onClick={arsipkan} title="Kampanye yang udah bawa pelamar diarsipkan, bukan dihapus">
+              Arsipkan
+            </button>
+          ) : (
+            <button className="btn kecil bahaya" onClick={hapus}>
+              Hapus
+            </button>
+          )}
         </span>
       </div>
+      <div id={`kp-${k.id}`} className="rk-kampanye-isi" hidden={!buka}>
       {k.catatan && <p className="adm-redup" style={{ margin: '0 0 10px' }}>{k.catatan}</p>}
       {error && <p className="adm-error">{error}</p>}
       {titik.length === 0 ? (
@@ -452,9 +523,14 @@ function KartuKampanye({ api, k, titik, biaya, kanal, linkDaftar, onBerubah, set
                       <button className="btn kecil" onClick={() => setModal({ titik: t })}>
                         Ubah
                       </button>
-                      <button className="btn kecil" onClick={() => salin(t.kode)}>
-                        Salin link
+                      <button className="btn kecil" onClick={() => setModal({ link: t })}>
+                        Link & QR
                       </button>
+                      {!t.pelamar && (
+                        <button className="btn kecil bahaya" onClick={() => hapusTitik(t)} aria-label={`Hapus titik ${t.kode}`}>
+                          Hapus
+                        </button>
+                      )}
                     </span>
                   </td>
                 </tr>
@@ -492,6 +568,7 @@ function KartuKampanye({ api, k, titik, biaya, kanal, linkDaftar, onBerubah, set
           + Titik sebar
         </button>
       </form>
+      </div>
       {modal === 'kampanye' && (
         <FormKampanye
           awal={k}
@@ -518,6 +595,7 @@ function KartuKampanye({ api, k, titik, biaya, kanal, linkDaftar, onBerubah, set
           }}
         />
       )}
+      {modal?.link && <ModalLink t={modal.link} k={k} kanal={kanal} link={linkTitik(modal.link.kode)} onTutup={() => setModal(null)} onSalin={() => salin(modal.link.kode)} />}
       {modal?.titik && (
         <FormTitik
           t={modal.titik}
@@ -530,6 +608,153 @@ function KartuKampanye({ api, k, titik, biaya, kanal, linkDaftar, onBerubah, set
             onBerubah();
           }}
         />
+      )}
+    </section>
+  );
+}
+
+// Link daftar + QR per titik sebar. QR bisa diunduh versi polos atau versi siap tempel (ada kode & keterangan) buat poster.
+function ModalLink({ t, k, kanal, link, onTutup, onSalin }) {
+  const [qr, setQr] = useState(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let batal = false;
+    QRCode.toDataURL(link, { width: 480, margin: 2, errorCorrectionLevel: 'M' })
+      .then((u) => !batal && setQr(u))
+      .catch(() => !batal && setQr(false));
+    return () => {
+      batal = true;
+    };
+  }, [link]);
+  const unduh = (url, nama) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nama;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+  const unduhPoster = async () => {
+    setError('');
+    try {
+      const img = new Image();
+      img.src = await QRCode.toDataURL(link, { width: 900, margin: 1, errorCorrectionLevel: 'M' });
+      await img.decode();
+      const c = document.createElement('canvas');
+      c.width = 1080;
+      c.height = 1350;
+      const x = c.getContext('2d');
+      x.fillStyle = '#ffffff';
+      x.fillRect(0, 0, c.width, c.height);
+      x.fillStyle = '#111111';
+      x.textAlign = 'center';
+      x.font = 'bold 64px system-ui, sans-serif';
+      x.fillText('Lowongan Sales Partner', 540, 120);
+      x.font = '40px system-ui, sans-serif';
+      x.fillText('Scan buat daftar - Konsulin', 540, 180);
+      x.drawImage(img, 90, 230, 900, 900);
+      x.font = 'bold 48px ui-monospace, Menlo, monospace';
+      x.fillText(t.kode, 540, 1220);
+      x.font = '30px system-ui, sans-serif';
+      x.fillStyle = '#52525B';
+      x.fillText(link.replace(/^https?:\/\//, ''), 540, 1280);
+      unduh(c.toDataURL('image/png'), `poster-${t.kode}.png`);
+    } catch {
+      setError('Poster gagal dibikin. Unduh QR polos aja.');
+    }
+  };
+  const bisaBagikan = typeof navigator !== 'undefined' && Boolean(navigator.share);
+  return (
+    <Modal judul={`Link & QR · ${t.kode}`} onTutup={onTutup}>
+      <p className="adm-redup" style={{ marginTop: 0 }}>
+        {k.nama} · {kanal[t.kanal]}
+        {t.deskripsi ? ` · ${t.deskripsi}` : ''}. Semua yang daftar lewat link atau QR ini kehitung ke titik {t.kode}.
+      </p>
+      <div className="rk-link-qr">
+        <div className="rk-qr">{qr ? <img src={qr} alt={`QR link daftar ${t.kode}`} /> : qr === false ? <span className="adm-error">QR gagal dibikin</span> : <span className="adm-redup">Bikin QR…</span>}</div>
+        <div className="rk-link-isi">
+          <label className="adm-label" htmlFor="rk-link" style={{ fontSize: 11 }}>
+            Link daftar
+          </label>
+          <input id="rk-link" className="adm-input adm-mono" readOnly value={link} onFocus={(e) => e.target.select()} />
+          <div className="adm-tombol">
+            <button className="btn kecil utama" onClick={onSalin}>
+              Salin link
+            </button>
+            {bisaBagikan && (
+              <button className="btn kecil" onClick={() => navigator.share({ title: 'Lowongan Sales Partner Konsulin', url: link }).catch(() => {})}>
+                Bagikan
+              </button>
+            )}
+            <a className="btn kecil" href={link} target="_blank" rel="noopener noreferrer">
+              Buka
+            </a>
+          </div>
+          <div className="adm-tombol">
+            <button className="btn kecil" disabled={!qr} onClick={() => unduh(qr, `qr-${t.kode}.png`)}>
+              Unduh QR
+            </button>
+            <button className="btn kecil" disabled={!qr} onClick={unduhPoster}>
+              Unduh QR siap poster
+            </button>
+          </div>
+          {error && <p className="adm-error">{error}</p>}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function KampanyeArsip({ api, arsip, onBerubah, setPesan }) {
+  const [buka, setBuka] = useState(false);
+  const [error, setError] = useState('');
+  const jalan = async (fn, ok) => {
+    setError('');
+    try {
+      await fn();
+      setPesan(ok);
+      onBerubah();
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+  return (
+    <section className="adm-kartu" style={{ marginBottom: 18 }}>
+      <button type="button" className="rk-arsip-lipat" onClick={() => setBuka(!buka)} aria-expanded={buka}>
+        <span className={'rk-panah' + (buka ? '' : ' tutup')} aria-hidden="true">▾</span>
+        <b>Kampanye diarsipkan</b> <span className="adm-redup">({arsip.length})</span>
+      </button>
+      {buka && (
+        <>
+          {error && <p className="adm-error">{error}</p>}
+          <ul className="adm-daftar">
+            {arsip.map((k) => (
+              <li key={k.id}>
+                <div>
+                  <b>
+                    {k.nama} {k.area ? `· ${k.area}` : ''}
+                  </b>
+                  <div className="adm-redup">
+                    {k.jumlah_titik} titik · {k.pelamar} pelamar · biaya {rupiah(k.total_biaya)}
+                  </div>
+                </div>
+                <span style={{ display: 'flex', gap: 6 }}>
+                  <button className="btn kecil" onClick={() => jalan(() => api('PATCH', `/rekrutmen/kampanye/${k.id}`, { arsip: false }), `Kampanye ${k.nama} dipulihkan.`)}>
+                    Pulihkan
+                  </button>
+                  {!k.pelamar && (
+                    <button
+                      className="btn kecil bahaya"
+                      onClick={() => window.confirm(`Hapus kampanye ${k.nama} permanen?`) && jalan(() => api('DELETE', `/rekrutmen/kampanye/${k.id}`), `Kampanye ${k.nama} dihapus.`)}
+                    >
+                      Hapus
+                    </button>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </section>
   );

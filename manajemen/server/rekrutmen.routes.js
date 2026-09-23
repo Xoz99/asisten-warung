@@ -717,6 +717,12 @@ router.get('/rekrutmen/dokumen/:id', async (req, res, next) => {
 router.get('/rekrutmen/kampanye', async (req, res, next) => {
   try {
     const { rows: kampanye } = await query('SELECT *, biaya::float AS biaya FROM mj_rek_kampanye WHERE NOT arsip ORDER BY created_at DESC');
+    const { rows: arsip } = await query(
+      `SELECT k.id, k.nama, k.area, k.mulai, k.selesai, (k.biaya + COALESCE((SELECT sum(t.biaya) FROM mj_rek_titik t WHERE t.kampanye_id = k.id), 0))::float AS total_biaya,
+              (SELECT count(*)::int FROM mj_rek_titik t WHERE t.kampanye_id = k.id) AS jumlah_titik,
+              (SELECT count(*)::int FROM mj_lamaran l JOIN mj_rek_titik t ON t.id = l.sumber_titik_id WHERE t.kampanye_id = k.id) AS pelamar
+       FROM mj_rek_kampanye k WHERE k.arsip ORDER BY k.created_at DESC`
+    );
     // Funnel per titik. "Menemukan" = titik di lamaran PERTAMA orang itu; "Mengonversi" = titik di lamaran yang HIRED (D-71).
     const { rows: titik } = await query(
       `SELECT t.*, t.biaya::float AS biaya,
@@ -740,7 +746,7 @@ router.get('/rekrutmen/kampanye', async (req, res, next) => {
       `SELECT b.id, b.kampanye_id, b.jumlah::float AS jumlah, b.catatan, b.oleh, b.created_at, t.kode AS titik_kode
        FROM mj_rek_biaya b LEFT JOIN mj_rek_titik t ON t.id = b.titik_id ORDER BY b.created_at DESC LIMIT 300`
     );
-    res.json({ kampanye, titik, biaya, rendah, referral: referral[0], kanal: KANAL, linkDaftar: DAFTAR_URL });
+    res.json({ kampanye, arsip, titik, biaya, rendah, referral: referral[0], kanal: KANAL, linkDaftar: DAFTAR_URL });
   } catch (e) {
     next(e);
   }
@@ -778,12 +784,33 @@ router.patch('/rekrutmen/kampanye/:id', async (req, res, next) => {
     if (b.selesai !== undefined) ubah.selesai = tgl(b.selesai);
     if (b.catatan !== undefined) ubah.catatan = teks(b.catatan, 300) || null;
     if (b.biaya !== undefined) ubah.biaya = Math.max(0, Math.round(Number(b.biaya) || 0));
+    if (b.arsip !== undefined) ubah.arsip = b.arsip === true;
     if (ubah.mulai && ubah.selesai && ubah.selesai < ubah.mulai) throw salah('Tanggal selesai nggak boleh sebelum tanggal mulai');
     const kolom = Object.keys(ubah);
     if (!kolom.length) throw salah('Nggak ada yang diubah');
     const { rows } = await query(`UPDATE mj_rek_kampanye SET ${kolom.map((k, i) => `${k}=$${i + 2}`).join(', ')} WHERE id=$1 RETURNING nama`, [req.params.id, ...kolom.map((k) => ubah[k])]);
     if (!rows.length) throw salah('Kampanye tidak ditemukan', 404);
     await catatLog(req, 'rekrutmen.kampanye.ubah', { nama: rows[0].nama, diubah: kolom.join(', ') });
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Hapus kampanye (ikut titik & riwayat biayanya). Cuma boleh kalau belum ada pelamar dari titiknya - kalau udah ada,
+// arsipkan aja biar sumber lamaran & laporan biayanya nggak hilang.
+router.delete('/rekrutmen/kampanye/:id', async (req, res, next) => {
+  try {
+    if (!POLA_UUID.test(req.params.id)) throw salah('Kampanye tidak ditemukan', 404);
+    const { rows } = await query(
+      `SELECT k.nama, (SELECT count(*)::int FROM mj_lamaran l JOIN mj_rek_titik t ON t.id = l.sumber_titik_id WHERE t.kampanye_id = k.id) AS pelamar
+       FROM mj_rek_kampanye k WHERE k.id=$1`,
+      [req.params.id]
+    );
+    if (!rows.length) throw salah('Kampanye tidak ditemukan', 404);
+    if (rows[0].pelamar) throw salah(`Kampanye ini udah bawa ${rows[0].pelamar} pelamar, jadi nggak bisa dihapus (sumber lamarannya bakal hilang). Arsipkan aja.`, 409);
+    await query('DELETE FROM mj_rek_kampanye WHERE id=$1', [req.params.id]);
+    await catatLog(req, 'rekrutmen.kampanye.hapus', { nama: rows[0].nama });
     res.json({ ok: true });
   } catch (e) {
     next(e);
@@ -839,6 +866,21 @@ router.post('/rekrutmen/kampanye/:id/titik', async (req, res, next) => {
     if (!rows.length) throw salah(`Kode ${kode} udah dipakai`, 409);
     await catatLog(req, 'rekrutmen.titik.tambah', { kode });
     res.status(201).json(rows[0]);
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Hapus titik sebar - cuma kalau belum ada pelamar lewat kodenya (kalau udah ada, ganti statusnya jadi Dilewati/Kedaluwarsa).
+router.delete('/rekrutmen/titik/:id', async (req, res, next) => {
+  try {
+    if (!POLA_UUID.test(req.params.id)) throw salah('Titik tidak ditemukan', 404);
+    const { rows } = await query('SELECT kode, (SELECT count(*)::int FROM mj_lamaran l WHERE l.sumber_titik_id = t.id) AS pelamar FROM mj_rek_titik t WHERE id=$1', [req.params.id]);
+    if (!rows.length) throw salah('Titik tidak ditemukan', 404);
+    if (rows[0].pelamar) throw salah(`Titik ${rows[0].kode} udah bawa ${rows[0].pelamar} pelamar, jadi nggak bisa dihapus. Ganti statusnya jadi Dilewati atau Kedaluwarsa aja.`, 409);
+    await query('DELETE FROM mj_rek_titik WHERE id=$1', [req.params.id]);
+    await catatLog(req, 'rekrutmen.titik.hapus', { kode: rows[0].kode });
+    res.json({ ok: true });
   } catch (e) {
     next(e);
   }
