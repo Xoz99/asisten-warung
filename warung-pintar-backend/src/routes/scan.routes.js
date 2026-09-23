@@ -28,6 +28,25 @@ router.post('/produk/:id/referensi-visual', async (req, res, next) => {
   }
 });
 
+// Barang warung ini yang punya foto tampilan (mis. dari Katalog Barang Bersama / Open Food Facts, atau foto yang
+// diupload sendiri) tapi BELUM punya satu pun referensi scan. Client ngitung embedding dari foto itu pakai model
+// yang sama dengan kamera (lib/referensiKatalog.js), jadi barangnya langsung bisa dikenali scan foto tanpa
+// user jepret 3 sisi dulu. Foto dari kamera sendiri tetap lebih akurat - ini cuma titik awal.
+router.get('/perlu-referensi', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT p.id, p.foto_url FROM produk p
+       WHERE p.warung_id=$1 AND p.aktif AND p.foto_url LIKE 'https://%'
+         AND NOT EXISTS (SELECT 1 FROM produk_referensi_visual r WHERE r.produk_id = p.id)
+       ORDER BY p.created_at DESC LIMIT 100`,
+      [req.warungId]
+    );
+    res.json(rows);
+  } catch (e) {
+    next(e);
+  }
+});
+
 // Daftar foto referensi visual yang UDAH kesimpen buat 1 produk - dipakai layar Opname/edit barang
 // (Stok.jsx) buat nampilin "punya berapa foto referensi" & biar user bisa nambahin buat barang LAMA
 // yang belum sempet difoto pas awal ditambahin (dulu foto referensi CUMA bisa didaftarin pas alur

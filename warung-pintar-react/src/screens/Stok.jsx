@@ -14,6 +14,7 @@ import { ambilEmbedding } from '../lib/visualScan';
 import { useModelVisual } from '../lib/useModelVisual';
 import { FORMAT_RETAIL, ambilCanvasROI, buatDekoderZxing, mulaiScanBarcode as mulaiScanBarcodeShared } from '../lib/barcodeScan';
 import SheetKatalog from '../components/SheetKatalog.jsx';
+import { tungguReferensiKatalog } from '../lib/referensiKatalog';
 
 // Barang yang cuma beda ukuran/varian tapi merek sama (misal "Aqua 600ml" & "Aqua 1500ml") bisa
 // dikasih "grup" yang sama (lihat form daftar barang / opname) biar ditampilin sekelompok di sini,
@@ -540,6 +541,7 @@ function SheetBarcode({ mode, onClose, onKelola }) {
     try {
       const embedding = await ambilEmbedding(videoRef.current);
       embeddingRef.current = embedding;
+      await tungguReferensiKatalog(); // barang yang baru diambil dari katalog ikut kecocokan
       const cocok = await api.scan.visual(embedding);
       if (cocok.length) {
         setKandidat(cocok);

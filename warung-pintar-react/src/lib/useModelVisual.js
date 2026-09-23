@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { muatModelVisual } from './visualScan';
+import { lengkapiReferensiKatalog } from './referensiKatalog';
 
 // Status model pengenal foto barang (MobileNet), dimuat DI BELAKANG - nggak nahan kamera.
 //
@@ -23,6 +24,8 @@ export function useModelVisual(aktif = true) {
     muatModelVisual()
       .then(() => {
         if (!batal) setKeadaan('siap');
+        // Barang dari katalog yang punya foto tapi belum punya referensi scan -> dibikinin di belakang.
+        lengkapiReferensiKatalog();
       })
       .catch((e) => {
         if (batal) return;

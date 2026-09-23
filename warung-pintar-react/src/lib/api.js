@@ -163,6 +163,8 @@ export const api = {
     listReferensi: (produkId) => get(`/api/scan/produk/${produkId}/referensi-visual`),
     hapusReferensi: (refId) => del(`/api/scan/referensi-visual/${refId}`),
     visual: (embedding) => post('/api/scan/visual', { embedding }),
+    // Barang yang punya foto (katalog / upload) tapi belum punya referensi scan - lihat lib/referensiKatalog.js.
+    perluReferensi: () => get('/api/scan/perlu-referensi'),
     // Cadangan TERAKHIR (Gemini Vision) - dipanggil manual dari tombol "Coba pakai AI" kalau
     // scanner gratis di atas (ZXing/MobileNet) udah dicoba & gagal. Ada biaya kecil tiap panggilan
     // (beda dari 2 di atas yang gratis) - makanya sengaja BUKAN otomatis, user yang mutusin.

@@ -15,6 +15,7 @@ import { ambilDeskriptorWajah, gambarDariDataUrl, panaskanModelWajah } from '../
 import { perbaruiWajahLama, perluPerbaruiWajah } from '../lib/wajahLama';
 import { buatPengumpulSampel, layakDitampilkan } from '../lib/sampelWajah';
 import SheetStruk from '../components/SheetStruk.jsx';
+import { tungguReferensiKatalog } from '../lib/referensiKatalog';
 
 // Instance SpeechRecognition yang lagi AKTIF saat ini, kalau ada — sengaja modul-level (di luar
 // komponen React), bukan state/ref biasa, biar tetap "keinget" lintas mount/unmount SheetVoice.
@@ -1010,6 +1011,7 @@ function SheetVisual({ onClose }) {
     setStatus('memindai');
     try {
       const embedding = await ambilEmbedding(videoRef.current);
+      await tungguReferensiKatalog(); // barang yang baru diambil dari katalog ikut kecocokan
       const cocok = await api.scan.visual(embedding);
       setHasil(cocok);
       setSumberHasil('visual');
