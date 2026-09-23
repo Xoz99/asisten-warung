@@ -105,17 +105,24 @@ export function kunciBarang({ barcode, nama }) {
 // Tag kategori Open Food Facts -> kategori yang dipakai app (teks bebas di produk.kategori).
 // Dicek berurutan ke tag kategori OFF DULU (lebih bisa dipercaya), baru ke nama barangnya. Nggak ketebak = 'lainnya'.
 const ATURAN_KATEGORI = [
-  ['rokok', /cigarette|tobacco|\brokok\b|kretek|gudang garam|sampoerna|djarum|\bsurya\b|marlboro|dunhill|\bla bold\b/],
+  ['rokok', /cigarette|tobacco|\brokok\b|kretek|\bsigaret|gudang garam|\bgg (surya|filter|mild|merah)|sampoerna|djarum|\bsurya\b|marlboro|dunhill|\bla (bold|lights?|menthol)\b|dji sam soe|\bu mild\b|class mild|wismilak|magnum filter/],
   ['mie instan', /instant-noodle|noodle|\bmie\b|\bmi\b|ramen|bihun|soun|indomie|sarimi|supermi|sedaap|pop mie/],
-  ['susu', /milk|\bsusu\b|dairies|dairy|yogh?urt|creamer|kental manis|\bskm\b|keju|cheese|butter|mentega/],
+  ['susu', /milk|\bsusu\b|dairies|dairy|yogh?urt|creamer|kental manis|keju|cheese|butter|mentega|indomilk|frisian flag|\bbendera\b|carnation|dancow|ultra ?milk|cimory|greenfields|\bskm (pch|kaleng|klg|sachet|\d)/],
   ['bumbu', /sauce|condiment|seasoning|spice|kecap|sambal|saos|saus|bumbu|\bsalt\b|garam|vinegar|cuka|kaldu|stock|masako|royco|terasi|mayones|mayonnaise|\bkari\b|koepoe|ladaku|merica|ketumbar|penyedap|micin|\bmsg\b/],
   ['minuman', /beverage|drink|water|\btea\b|\bteh\b|coffee|\bkopi\b|juice|\bjus\b|isotonik|isotonic|soda|minuman|syrup|sirup|air mineral|energy|pocari|aqua\b|le mineral|pucuk|fruit tea|sprite|coca cola|fanta|good day|kapal api|nescafe|milo|ale ale|floridina|you c 1000|mizone/],
   ['snack', /snack|biscuit|biskuit|cracker|chip|wafer|cookie|candy|confection|chocolate|cokelat|coklat|cake|crisps|permen|keripik|kripik|pudding|puding|jelly|jeli|roti|bread|wafel|brownie|kacang|mentos|kopiko|relaxa|beng beng|chitato|\btaro\b|qtela|oreo|nabati|tango|silverqueen|momogi|chiki/],
   ['sembako', /\brice\b|beras|sugar|\bgula\b|\boil\b|minyak|flour|tepung|\begg\b|telur|cereal|oat|margarin|sarden|sardine|kornet|corned/],
   ['kebersihan', /soap|shampoo|sampo|detergent|deterjen|toothpaste|pasta gigi|sabun|hygiene|tissue|tisu|pembersih|rinso|so klin|sunlight|lifebuoy|pepsodent|ciptadent|molto|wipol|harpic|downy|karbol|supersol|so klin|pewangi|pelembut|pemutih|bayclin|baygon|hit\b|kamper|sabun|shampoo/],
 ];
+// Merek/penanda rokok di NAMA dicek paling awal: kategori dari sumber kadang pakai singkatan yang ambigu (SKM di Lotte =
+// sigaret kretek mesin, pernah kebaca "susu kental manis" -> A Mild masuk Susu).
+const NAMA_ROKOK = /\b(sampoerna|dji sam soe|djarum|gudang garam|gg (surya|filter|mild|merah|shiver)|surya (12|16|pro|exclusive|coklat|\d+'?s)|marlboro|dunhill|la (bold|lights?|menthol)|u mild|class mild|wismilak|magnum filter|esse (change|mild|honey)|camel (blue|filter|yellow))\b|\b\d+ ?'?s ?bks\b/;
 export function kategoriDariTag(tags = [], nama = '') {
+  if (NAMA_ROKOK.test(String(nama).toLowerCase().replace(/[-_/]+/g, ' '))) return 'rokok';
   const t = tags.join(' ').toLowerCase().replace(/-/g, ' ');
+  // SKM/SKT/SPM (sigaret kretek mesin/tangan, sigaret putih mesin) cuma dipercaya dari KATEGORI sumber - di nama
+  // barang "SKM" biasanya susu kental manis.
+  if (/\bsk[mt]\b|\bspm\b|sigaret/.test(t)) return 'rokok';
   for (const [kat, pola] of ATURAN_KATEGORI) if (pola.test(t)) return kat;
   const n = String(nama).toLowerCase().replace(/[-_/]+/g, ' ');
   for (const [kat, pola] of ATURAN_KATEGORI) if (pola.test(n)) return kat;

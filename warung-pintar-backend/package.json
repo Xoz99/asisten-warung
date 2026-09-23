@@ -19,6 +19,7 @@
     "kontribusi:katalog": "node src/kontribusiKatalog.js",
     "foto:katalog": "node src/fotoKatalog.js",
     "status:katalog": "node src/statusKatalog.js",
+    "rapikan:kategori": "node src/rapikanKategoriKatalog.js",
     "test:security": "node --test test/security.test.js"
   },
   "dependencies": {
