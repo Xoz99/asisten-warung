@@ -89,12 +89,17 @@ export default function Board({ api, versi, onBuka, setPesan, onUrutan }) {
         )}
       </div>
 
-      <div className="rk-funnel" aria-label="Funnel rekrutmen">
+      {/* Corong = SEPANJANG WAKTU (semua lamaran yang pernah sampai tahap itu, termasuk yang udah keluar/lanjut) -
+          beda sama angka di kepala kolom board yang cuma kandidat yang SEKARANG ada di situ. */}
+      <div className="rk-funnel" aria-label="Funnel rekrutmen sepanjang waktu">
         {data.kolom.map((k, i) => (
           <div key={k.id}>
-            <span className="adm-redup">{k.nama}</span>
+            <span className="adm-redup">{i === 0 ? `${k.nama} (sepanjang waktu)` : `Pernah sampai ${k.nama.toLowerCase()}`}</span>
             <b className="p-num">{data.funnel[i]}</b>
-            <span className="rk-funnel-p">{i === 0 ? 'total pelamar' : `${data.funnel[i - 1] ? Math.round((data.funnel[i] / data.funnel[i - 1]) * 100) : 0}% dari tahap sebelumnya`}</span>
+            <span className="rk-funnel-p">
+              {i === 0 ? 'total pelamar' : `${data.funnel[i - 1] ? Math.round((data.funnel[i] / data.funnel[i - 1]) * 100) : 0}% dari tahap sebelumnya`} · sekarang{' '}
+              {data.kandidat.filter((c) => c.kolom === i).length}
+            </span>
             <i style={{ width: `${data.funnel[0] ? (data.funnel[i] / data.funnel[0]) * 100 : 0}%` }} />
           </div>
         ))}
