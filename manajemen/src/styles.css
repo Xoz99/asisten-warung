@@ -903,7 +903,7 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 .rk-daftar-soal ul{margin:6px 0 0;padding-left:18px;font-size:13.5px}
 .rk-daftar-soal li.benar{font-weight:700;color:#138A4B}
 .rk-esai-jawab{display:flex;flex-direction:column;gap:10px;margin:4px 0 12px}
-.rk-esai-jawab>div{border:var(--garis-tipis);border-radius:10px;padding:10px 12px}
+.rk-esai-jawab>div{border:var(--garis-tipis);padding:10px 12px}
 .rk-esai-jawab b{font-size:13.5px}
 .rk-esai-jawab p{margin:4px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
 .rk-slot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
@@ -911,7 +911,22 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 .rk-slot b{font-size:17px}
 .rk-slot.dipilih{background:#DDF3E6}
 .rk-slot.lewat{opacity:.5}
-@media (max-width:640px){.rk-funnel{grid-template-columns:repeat(5,minmax(70px,1fr));overflow-x:auto}.rk-funnel b{font-size:18px}}
+/* HP: corong jadi daftar ke bawah (label kiri, angka kanan); board satu kolom per layar + tombol lompat kolom */
+.rk-lompat{display:none}
+@media (max-width:640px){
+  .rk-funnel{grid-template-columns:minmax(0,1fr)}
+  .rk-funnel>div{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;align-items:center;border-right:0;border-bottom:var(--garis-tipis);padding:8px 12px 10px}
+  .rk-funnel>div:last-child{border-bottom:0}
+  .rk-funnel>div>.adm-redup{grid-column:1;grid-row:1;font-size:13px}
+  .rk-funnel-p{grid-column:1;grid-row:2}
+  .rk-funnel b{grid-column:2;grid-row:1/3;font-size:24px}
+  .rk-lompat{display:flex;gap:6px;overflow-x:auto;margin:0 0 10px;padding-bottom:4px;scrollbar-width:none}
+  .rk-lompat::-webkit-scrollbar{display:none}
+  .rk-lompat button{flex:none;display:flex;gap:6px;align-items:center;border:var(--garis-tipis);background:var(--putih);padding:7px 10px;font:inherit;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;cursor:pointer;color:var(--tinta)}
+  .rk-lompat button[aria-pressed=true]{background:var(--hitam);color:var(--putih)}
+  .rk-lompat b{font-size:11px}
+  .rk-board{grid-template-columns:repeat(5,calc(100vw - 72px))}
+}
 .rk-template-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
 @media (max-width:420px){.rk-template-grid{grid-template-columns:minmax(0,1fr)}}
 .rk-template{border:var(--garis-tipis);padding:12px;display:flex;flex-direction:column;min-width:0}

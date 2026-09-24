@@ -124,6 +124,7 @@ export default function Board({ api, versi, onBuka, setPesan, onUrutan }) {
         </div>
       )}
 
+      <LompatKolom kolom={data.kolom.map((kol, i) => ({ nama: kol.nama, n: kandidat.filter((k) => k.kolom === i).length }))} />
       <div className="rk-board">
         {data.kolom.map((kol, i) => {
           const isi = tampil.filter((k) => k.kolom === i);
@@ -1055,6 +1056,41 @@ function ModalMateri({ api, l, paksa, onTutup, onSelesai }) {
 }
 
 // ---------------- Tab Kuis & materi ----------------
+// Khusus layar HP: board kandidat digeser ke samping satu kolom per layar, tombol ini buat lompat langsung ke kolomnya
+// (dan nandain kolom yang lagi kelihatan). Di layar lebar disembunyiin lewat CSS.
+function LompatKolom({ kolom }) {
+  const [aktif, setAktif] = useState(0);
+  useEffect(() => {
+    const board = document.querySelector('.rk-board');
+    if (!board) return;
+    const cek = () => {
+      const lebar = board.firstElementChild?.getBoundingClientRect().width || 1;
+      setAktif(Math.round(board.scrollLeft / (lebar + 12)));
+    };
+    board.addEventListener('scroll', cek, { passive: true });
+    return () => board.removeEventListener('scroll', cek);
+  }, []);
+  const nav = useRef(null);
+  useEffect(() => {
+    const t = nav.current?.children[aktif];
+    if (t) nav.current.scrollTo({ left: t.offsetLeft - nav.current.offsetLeft - 16, behavior: 'smooth' });
+  }, [aktif]);
+  const lompat = (i) => {
+    const board = document.querySelector('.rk-board');
+    const el = board?.children[i];
+    if (el) board.scrollTo({ left: el.offsetLeft - board.offsetLeft, behavior: 'smooth' });
+  };
+  return (
+    <nav className="rk-lompat" aria-label="Lompat ke kolom" ref={nav}>
+      {kolom.map((k, i) => (
+        <button key={k.nama} aria-pressed={aktif === i} onClick={() => lompat(i)}>
+          {k.nama} <b className="adm-mono">{k.n}</b>
+        </button>
+      ))}
+    </nav>
+  );
+}
+
 export function KuisMateri({ api }) {
   const { data, error, muat } = useData(api, '/rekrutmen/materi');
   const [edit, setEdit] = useState(null); // { jenis: 'materi'|'soal', awal }
