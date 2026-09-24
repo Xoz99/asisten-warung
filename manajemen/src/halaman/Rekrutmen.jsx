@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { rupiah, tampilHp, tgl, waktu, waktuRelatif } from '../lib/format.js';
 import { Gagal, Kosong, Memuat, Modal, Tabs, useData } from '../komponen/Ui.jsx';
 import { bukaFile } from '../lib/api.js';
+import { FotoKandidat } from '../komponen/FotoProfil.jsx';
 import QRCode from 'qrcode';
 import Board, { DetailKandidat, Ketersediaan, KuisMateri } from './RekrutmenBoard.jsx';
 
@@ -123,55 +124,77 @@ export default function Rekrutmen({ api, tab }) {
   );
 }
 
-const URUT_JAWABAN = ['tanggalLahir', 'jenisKelamin', 'kota', 'kecamatan', 'pendidikan', 'pekerjaan', 'pengalamanSales', 'bidangPengalaman', 'waktuKerja', 'ketersediaan', 'kendaraan', 'hpAndroid', 'area', 'kenalWarung', 'skemaKerja', 'tempatProspek', 'tempatProspekLain', 'waktuHubungi', 'sosmed'];
+// Jawaban form lamaran dikelompokin per topik biar gampang dibaca sekilas (dulu 1 grid panjang 20-an isian).
+const GRUP_JAWABAN = [
+  ['Data diri', ['tanggalLahir', 'jenisKelamin', 'kota', 'kecamatan', 'pendidikan', 'pekerjaan']],
+  ['Pengalaman', ['pengalamanSales', 'bidangPengalaman', 'kenalWarung']],
+  ['Ketersediaan & alat kerja', ['waktuKerja', 'ketersediaan', 'kendaraan', 'hpAndroid']],
+  ['Rencana kerja', ['area', 'skemaKerja', 'tempatProspek', 'tempatProspekLain']],
+  ['Kontak', ['waktuHubungi', 'sosmed']],
+];
+const DIKELOMPOKKAN = new Set([...GRUP_JAWABAN.flatMap(([, k]) => k), 'alasan', 'setujuData', 'setujuWa']);
+const ukuranFile = (n) => (n < 1024 ? `${n} B` : `${Math.round(n / 1024)} KB`);
 export function DataLamaran({ jawaban, label, dokumen, onError }) {
   if (!jawaban && !dokumen?.length) return null;
   const j = jawaban || {};
+  const ada = (k) => j[k] !== undefined && j[k] !== '' && j[k] !== null && !(Array.isArray(j[k]) && !j[k].length);
   const nilai = (k) => {
     if (k === 'tanggalLahir') return `${tgl(j[k])} (${Math.floor((Date.now() - new Date(j[k]).getTime()) / (365.25 * 86400000))} tahun)`;
     if (k === 'hpAndroid') return j[k] ? 'Punya HP Android + kuota' : 'Belum punya HP Android';
     if (Array.isArray(j[k])) return j[k].join('; ');
     if (k === 'sosmed' && /^https?:\/\//.test(j[k])) return <a href={j[k]} target="_blank" rel="noopener noreferrer">{j[k]}</a>;
-    return j[k];
+    if (typeof j[k] === 'boolean') return j[k] ? 'Ya' : 'Tidak';
+    return String(j[k]);
   };
+  const namaIsian = (k) => (k === 'tanggalLahir' ? 'Tanggal lahir' : k === 'hpAndroid' ? 'HP Android' : label?.[k] || k);
+  const grup = [...GRUP_JAWABAN, ['Lainnya', Object.keys(j).filter((k) => !DIKELOMPOKKAN.has(k))]].map(([judul, k]) => [judul, k.filter(ada)]).filter(([, k]) => k.length);
+  const buka = (x) => bukaFile(`/rekrutmen/dokumen/${x.id}`).catch((e) => onError(e.message));
+  const foto = dokumen?.filter((x) => x.jenis === 'foto').at(-1);
+  const lain = dokumen?.filter((x) => x !== foto) || [];
   return (
-    <>
-      <h4 className="adm-label" style={{ fontSize: 11, margin: '16px 0 6px' }}>
-        Data lamaran
-      </h4>
-      <div className="adm-kartu" style={{ boxShadow: 'none', padding: 12 }}>
-        {dokumen?.length > 0 && (
-          <div className="adm-tombol" style={{ marginTop: 0, marginBottom: 10 }}>
-            {dokumen.map((x) => (
-              <button key={x.id} className="btn kecil" onClick={() => bukaFile(`/rekrutmen/dokumen/${x.id}`).catch((e) => onError(e.message))}>
-                Lihat {x.jenis === 'cv' ? 'CV' : 'foto'} ({x.ukuran < 1024 ? `${x.ukuran} B` : `${Math.round(x.ukuran / 1024)} KB`})
+    <div className="rk-lamaran">
+      {dokumen?.length > 0 && (
+        <div className="rk-lamaran-dok">
+          {foto && (
+            <button className="rk-lamaran-foto" onClick={() => buka(foto)} title="Buka foto ukuran penuh">
+              <FotoKandidat fotoId={foto.id} nama="?" ukuran={72} />
+              <span>Foto · {ukuranFile(foto.ukuran)}</span>
+            </button>
+          )}
+          <div className="adm-tombol" style={{ margin: 0 }}>
+            {lain.map((x) => (
+              <button key={x.id} className="btn kecil" onClick={() => buka(x)}>
+                Lihat {x.jenis === 'cv' ? 'CV' : 'foto'} ({ukuranFile(x.ukuran)})
               </button>
             ))}
           </div>
-        )}
-        <dl className="adm-jawaban">
-          {URUT_JAWABAN.filter((k) => j[k] !== undefined && j[k] !== '').map((k) => (
-            <div key={k}>
-              <dt>{k === 'tanggalLahir' ? 'Tanggal lahir' : k === 'hpAndroid' ? 'HP Android' : label?.[k] || k}</dt>
-              <dd>{nilai(k)}</dd>
-            </div>
-          ))}
-        </dl>
-        {j.alasan && (
-          <>
-            <p className="adm-label" style={{ fontSize: 10, margin: '10px 0 4px' }}>
-              Alasan tertarik
-            </p>
-            <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{j.alasan}</p>
-          </>
-        )}
-        {jawaban && (
-          <p className="adm-redup" style={{ margin: '10px 0 0' }}>
-            {j.setujuData ? 'Setuju data dipakai buat seleksi' : 'Belum setuju pemakaian data'} · {j.setujuWa ? 'boleh dihubungi WA' : 'nggak mau dihubungi WA'}
-          </p>
-        )}
-      </div>
-    </>
+        </div>
+      )}
+      {ada('alasan') && (
+        <blockquote className="rk-lamaran-alasan">
+          <span className="adm-label">Alasan tertarik</span>
+          {j.alasan}
+        </blockquote>
+      )}
+      {grup.map(([judul, k]) => (
+        <section key={judul} className="rk-lamaran-grup">
+          <h5>{judul}</h5>
+          <dl>
+            {k.map((x) => (
+              <div key={x}>
+                <dt>{namaIsian(x)}</dt>
+                <dd>{nilai(x)}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ))}
+      {jawaban && (
+        <p className="adm-redup rk-lamaran-setuju">
+          {j.setujuData ? '✓ Setuju data dipakai buat seleksi' : '✗ Belum setuju pemakaian data'} · {j.setujuWa ? '✓ boleh dihubungi WA' : '✗ nggak mau dihubungi WA'}
+        </p>
+      )}
+    </div>
   );
 }
 

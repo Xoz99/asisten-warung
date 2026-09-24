@@ -316,13 +316,23 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
 .field.adm-pilihan label.on{background:var(--kuning)}
 .adm-pilihan label:has(input:disabled){opacity:.5;cursor:not-allowed}
 .field.adm-pilihan input.adm-centang{width:20px;height:20px;min-height:0;padding:0;margin-top:0;flex:none;box-shadow:none}
-.adm-jawaban{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px;margin:0}
-.adm-jawaban dt{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--redup)}
-.adm-jawaban dd{margin:2px 0 0;font-weight:500;overflow-wrap:anywhere}
+.rk-lamaran{display:flex;flex-direction:column;gap:12px}
+.rk-lamaran-dok{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.rk-lamaran-foto{display:flex;flex-direction:column;align-items:center;gap:4px;padding:0;border:0;background:none;cursor:zoom-in;font:inherit;font-size:11px;color:var(--redup)}
+.rk-lamaran-foto .foto-profil{border-width:2px}
+.rk-lamaran-alasan{margin:0;padding:10px 12px;border-left:5px solid var(--kuning);background:#FFFBEA;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5}
+.rk-lamaran-alasan .adm-label{display:block;font-size:10px;margin-bottom:4px;white-space:normal}
+.rk-lamaran-grup{border:var(--garis-tipis);background:var(--putih)}
+.rk-lamaran-grup h5{margin:0;padding:6px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;background:var(--kertas);border-bottom:var(--garis-tipis)}
+.rk-lamaran-grup dl{margin:0}
+.rk-lamaran-grup dl>div{display:grid;grid-template-columns:minmax(110px,40%) minmax(0,1fr);gap:10px;padding:7px 12px;font-size:14px}
+.rk-lamaran-grup dl>div+div{border-top:1px solid #e4e2d8}
+.rk-lamaran-grup dt{color:var(--redup);font-size:13px}
+.rk-lamaran-grup dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+.rk-lamaran-setuju{margin:0;font-size:12.5px}
 @media (max-width:560px){
   .adm-langkah{grid-template-columns:minmax(0,1fr)}
   .adm-langkah li+li{border-left:0;border-top:var(--garis-tipis)}
-  .adm-jawaban{grid-template-columns:minmax(0,1fr)}
 }
 
 /* ---- Artifact ---- */
@@ -781,9 +791,10 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 .rk-pilih{width:16px;height:16px;accent-color:var(--biru);margin-top:3px;flex:none}
 .rk-kartu-isi{flex:1;min-width:0;display:flex;flex-direction:column}
 .rk-baris1{display:flex;align-items:flex-start;gap:6px}
-.rk-baris1 b{flex:1;min-width:0;font-size:14px;line-height:1.25;overflow-wrap:anywhere}
-.rk-titik{width:11px;height:11px;border:2px solid #000;flex:none;margin-top:4px}
-.rk-titik.lolos{background:#138A4B}.rk-titik.gagal{background:var(--merah)}
+.rk-baris1 b{flex:1;min-width:0;font-size:14px;line-height:1.25;overflow-wrap:break-word}
+/* Foto kandidat di kartu: warna bingkai = lolos (hijau) / gagal (merah) syarat wajib */
+.rk-kartu-foto{border-width:3px !important;font-size:12px !important}
+.rk-kartu-foto.lolos{border-color:#138A4B}.rk-kartu-foto.gagal{border-color:var(--merah)}
 .rk-skor{font-weight:700;font-size:13px;flex:none}
 .rk-baris2{font-size:11px;color:var(--redup);margin-top:2px}
 .rk-tanda{color:var(--merah);font-weight:700;font-family:inherit}

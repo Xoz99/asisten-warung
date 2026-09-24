@@ -3,13 +3,13 @@ import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { fileURLToPath } from 'url';
 import { catatLog, query, pool } from './db.js';
 import { cekPassword, rapikanUsername } from './auth.js';
 import { pastikanTabelKaryawan } from './karyawan.routes.js';
 import { bacaFoto } from './lapangan.routes.js';
 import { POLA_KODE_SALES, pastikanTabelSales, query as queryWp, rapikanKodeSales } from './produk/warung-pintar/db.js';
 import { normalisasiNoHp } from './utils/noHp.js';
+import { PROFIL_DIR } from './utils/fotoLamaran.js';
 import { URL_MAKALIN, kirimEmail, susunEmail } from './utils/email.js';
 
 // Tim sales: satu sales = akun Makalin (peran sales) + kode referral Warung Pintar + data karyawan tipe kemitraan.
@@ -17,8 +17,7 @@ import { URL_MAKALIN, kirimEmail, susunEmail } from './utils/email.js';
 // Rekening yang diisi/diganti admin langsung dianggap udah dicek. Kalau sales sendiri yang ganti, statusnya balik
 // "belum dicek" dan bagi hasilnya nggak bisa ditransfer sampai admin ngecek (jaga-jaga akun sales dibajak).
 const router = Router();
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DIR = path.resolve(process.env.PROFIL_DIR || path.join(__dirname, '../data/profil'));
+const DIR = PROFIL_DIR;
 const POLA_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const teks = (v, n) => (typeof v === 'string' ? v.trim().slice(0, n) : '');
 const salah = (pesan, status = 400) => Object.assign(new Error(pesan), { status });

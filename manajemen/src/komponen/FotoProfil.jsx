@@ -32,37 +32,40 @@ export default function FotoProfil({ src, ada, nama, ukuran = 44, versi = 0, cla
   );
 }
 
-// Foto rekan kerja lewat id admin. Satu admin bisa muncul di puluhan kartu, jadi hasilnya disimpan per sesi halaman:
-// cukup sekali ambil per orang (yang belum punya foto juga diingat, biar nggak nembak 404 berulang).
+// Foto dari server yang butuh login (foto rekan kerja, foto diri kandidat). Satu orang bisa muncul di puluhan kartu,
+// jadi hasilnya disimpan per sesi halaman: cukup sekali ambil per foto (yang nggak ada juga diingat, biar nggak nembak
+// 404 berulang).
 const cacheFoto = new Map();
-function ambilFotoAdmin(id) {
-  if (!cacheFoto.has(id)) {
+function ambilFoto(src) {
+  if (!cacheFoto.has(src)) {
     cacheFoto.set(
-      id,
-      fetch(`/api/tim/foto/${id}`, { headers: { Authorization: 'Bearer ' + (bacaSesi()?.token || '') } })
+      src,
+      fetch(src, { headers: { Authorization: 'Bearer ' + (bacaSesi()?.token || '') } })
         .then((r) => (r.ok ? r.blob() : null))
         .then((b) => (b ? URL.createObjectURL(b) : null))
         .catch(() => {
-          cacheFoto.delete(id);
+          cacheFoto.delete(src);
           return null;
         })
     );
   }
-  return cacheFoto.get(id);
+  return cacheFoto.get(src);
 }
-export function FotoAdmin({ id, nama, ukuran = 26, className = 'kotak', title }) {
+export function FotoTersimpan({ src, nama, ukuran = 26, className = 'kotak', title }) {
   const [url, setUrl] = useState(null);
   useEffect(() => {
     let batal = false;
     setUrl(null);
-    if (id) ambilFotoAdmin(id).then((u) => !batal && setUrl(u));
+    if (src) ambilFoto(src).then((u) => !batal && setUrl(u));
     return () => {
       batal = true;
     };
-  }, [id]);
+  }, [src]);
   return (
     <span className={'foto-profil ' + className} style={{ width: ukuran, height: ukuran, fontSize: Math.round(ukuran * 0.42) }} title={title} aria-hidden={title ? undefined : 'true'}>
       {url ? <img src={url} alt="" /> : (nama || '?').trim()[0]?.toUpperCase()}
     </span>
   );
 }
+export const FotoAdmin = ({ id, ...p }) => <FotoTersimpan src={id ? `/api/tim/foto/${id}` : null} {...p} />;
+export const FotoKandidat = ({ fotoId, ...p }) => <FotoTersimpan src={fotoId ? `/api/rekrutmen/dokumen/${fotoId}` : null} {...p} />;

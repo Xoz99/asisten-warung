@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { catatLog, query, pool } from './db.js';
 import { normalisasiNoHp } from './utils/noHp.js';
+import { salinFotoLamaran } from './utils/fotoLamaran.js';
 
 // HR Karyawan: data kepegawaian, kehadiran harian, cuti & izin (dengan persetujuan), payroll bulanan, struktur organisasi.
 // Kehadiran diisi admin (belum ada akun karyawan buat absen sendiri). Potongan payroll diisi manual - sistem nggak
@@ -138,6 +139,8 @@ router.get('/karyawan/ringkasan', async (req, res, next) => {
 
 router.get('/karyawan', async (req, res, next) => {
   try {
+    // Karyawan dari Rekrutmen yang belum punya foto profil otomatis pakai foto diri dari lamarannya.
+    await salinFotoLamaran().catch((e) => console.error('Salin foto lamaran gagal:', e.message));
     const status = ['aktif', 'nonaktif', 'keluar', 'semua'].includes(req.query.status) ? req.query.status : 'aktif';
     const q = teks(req.query.q, 60);
     const pola = q ? '%' + q.replace(/[\\%_]/g, (c) => '\\' + c) + '%' : null;

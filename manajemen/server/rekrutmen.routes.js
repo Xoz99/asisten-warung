@@ -1,11 +1,11 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { Router } from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { catatLog, query, pool } from './db.js';
 import { normalisasiNoHp } from './utils/noHp.js';
+import { DOKUMEN_DIR } from './utils/fotoLamaran.js';
 
 // Rekrutmen Sales Partner (PRD v0.2 §7-10): orang (identitas seumur hidup, D-59), lamaran (satu siklus, D-30),
 // tahap + attempt (riwayat percobaan nggak pernah hilang), kampanye & titik sebar (sumber per titik, D-73), dan
@@ -235,8 +235,6 @@ export const LABEL = {
 // di domain internal makalin - lihat README.
 export const DAFTAR_URL = (process.env.DAFTAR_URL || '').replace(/\/+$/, '');
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DOKUMEN_DIR = process.env.DOKUMEN_DIR || path.resolve(__dirname, '../data/dokumen');
 const MAKS_DOKUMEN = 3 * 1024 * 1024;
 // Jenis file dicek dari ISI filenya (tanda tangan byte), bukan dari nama/klaim browser.
 function kenaliFile(buf) {

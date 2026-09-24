@@ -5,6 +5,7 @@ import { catatLog, query } from './db.js';
 import { JOIN_LAMARAN, KELUAR, KOLOM_LAMARAN, PROSPEK_LAIN, ambilLamaran, catatEvent, ganti, ipPelamar, pastikanTabelRekrutmen, tandaiNoResponse, transaksi } from './rekrutmen.routes.js';
 import { pastikanTabelSales, query as queryWp } from './produk/warung-pintar/db.js';
 import { pastikanTabelKaryawan } from './karyawan.routes.js';
+import { salinFotoLamaran } from './utils/fotoLamaran.js';
 
 // Alur rekrutmen revisi Sep 2026 (board 5 kolom): cek syarat wajib + skor pendukung otomatis, paket materi + kuis online,
 // akun APK kebaca dari nomor WA di Asisten Warung, kandidat pilih slot interview sendiri dari ketersediaan recruiter,
@@ -405,6 +406,17 @@ const teksJadwal = (nama, t) => pesan('jadwal', { nama: depan(nama), link_jadwal
 const teksTrial = (nama, kode) => pesan('trial', { nama: depan(nama), kode, link_referral: `${URL_WARUNG()}/?ref=${kode}` });
 
 // ---------------- Board ----------------
+// Foto diri terakhir yang diunggah orangnya (dari lamaran mana pun) - dipakai jadi avatar kandidat.
+async function fotoKandidat(ids) {
+  if (!ids.length) return {};
+  const { rows } = await query(
+    `SELECT l.id, (SELECT d.id FROM mj_lamaran_dokumen d JOIN mj_lamaran l2 ON l2.id = d.lamaran_id
+                   WHERE l2.orang_id = l.orang_id AND d.jenis = 'foto' ORDER BY d.created_at DESC LIMIT 1) AS foto
+     FROM mj_lamaran l WHERE l.id = ANY($1::uuid[])`,
+    [ids]
+  );
+  return Object.fromEntries(rows.filter((r) => r.foto).map((r) => [r.id, r.foto]));
+}
 router.get('/rekrutmen/board', async (req, res, next) => {
   try {
     await tandaiNoResponse();
@@ -415,11 +427,11 @@ router.get('/rekrutmen/board', async (req, res, next) => {
        ORDER BY l.created_at DESC LIMIT 800`
     );
     const ids = rows.map((r) => r.id);
-    const [kuis, jadwal, trial] = await Promise.all([kuisTerakhir(ids), jadwalTerpilih(ids), hitungTrial(rows.filter((r) => kolomDari(r.status) === 3))]);
+    const [kuis, jadwal, trial, foto] = await Promise.all([kuisTerakhir(ids), jadwalTerpilih(ids), hitungTrial(rows.filter((r) => kolomDari(r.status) === 3)), fotoKandidat(ids)]);
     const kandidat = rows.map((l) => {
       const x = { kuis: kuis[l.id] || null, jadwal: jadwal[l.id] || null, trial: trial[l.id] || null };
       const { jawaban, ...ringkas } = l;
-      return { ...ringkas, kolom: kolomDari(l.status), analisis: analisis(l), keadaan: keadaan(l, x), ...x, punya_jawaban: !!jawaban };
+      return { ...ringkas, kolom: kolomDari(l.status), analisis: analisis(l), keadaan: keadaan(l, x), ...x, punya_jawaban: !!jawaban, foto_id: foto[l.id] || null };
     });
     const { rows: keluar } = await query(
       `SELECT l.id, 'KD-' || lpad(l.nomor::text, 4, '0') AS kode, o.nama, l.status, l.alasan_keluar, l.status_sejak,
@@ -736,6 +748,7 @@ router.post('/rekrutmen/lamaran/:id/rekrut', async (req, res, next) => {
     if (!ada.length) {
       await query(`INSERT INTO mj_karyawan (nama, no_hp, email, tipe, jabatan, departemen, orang_id) VALUES ($1,$2,$3,'kemitraan','Sales Partner','Sales',$4)`, [r.o.nama, r.o.no_hp, r.o.email, r.o.id]);
     }
+    await salinFotoLamaran().catch((e) => console.error('Salin foto lamaran gagal:', e.message));
     await catatLog(req, 'rekrutmen.keputusan_hiring', { nama: r.o.nama, keputusan: 'terima', kode: r.l.trial_kode });
     res.json({ ok: true, kode: r.l.trial_kode });
   } catch (e) {

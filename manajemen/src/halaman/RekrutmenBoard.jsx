@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { tampilHp, tgl, waktu } from '../lib/format.js';
 import { Gagal, Kosong, Memuat, Modal, useData } from '../komponen/Ui.jsx';
+import { FotoKandidat } from '../komponen/FotoProfil.jsx';
 import { Catatan, DataLamaran, FollowUp, TAHAP } from './Rekrutmen.jsx';
 
 // Board rekrutmen (revisi Sep 2026): 5 kolom, syarat wajib + skor pendukung otomatis, siapa yang harus gerak + batas
@@ -251,7 +252,7 @@ function Kartu({ k, onBuka, pilih, setPilih }) {
       )}
       <span className="rk-kartu-isi">
         <span className="rk-baris1">
-          <span className={`rk-titik ${a.lolos ? 'lolos' : 'gagal'}`} title={a.lolos ? 'Lolos syarat wajib' : 'Gagal syarat wajib'} />
+          <FotoKandidat fotoId={k.foto_id} nama={k.nama} ukuran={26} className={`kotak rk-kartu-foto ${a.lolos ? 'lolos' : 'gagal'}`} title={a.lolos ? 'Lolos syarat wajib' : 'Gagal syarat wajib'} />
           <b>{k.nama}</b>
           <span className="adm-mono rk-skor" title="Skor pendukung">
             {a.skor ?? '–'}
@@ -376,9 +377,7 @@ export function DetailKandidat({ api, id, urutan = [], onTutup, onBerubah, onBuk
         ) : (
           <div className="rk-panel-isi">
             <div className="rk-hdr">
-              <span className="rk-avatar" aria-hidden="true">
-                {(l.nama || '?')[0].toUpperCase()}
-              </span>
+              <FotoKandidat fotoId={d.dokumen?.findLast((x) => x.jenis === 'foto')?.id} nama={l.nama} ukuran={56} className="kotak rk-avatar" />
               <div style={{ minWidth: 0 }}>
                 <h3>{l.nama}</h3>
                 <div className="adm-redup">
