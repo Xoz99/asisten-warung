@@ -188,24 +188,83 @@ export default function App() {
   );
 }
 
-// Menu yang belum dibangun ditulis "Segera" & nggak bisa diklik - bukan link ke halaman kosong (antislop R-24).
+// Ikon menu samping (garis tebal, ujung kotak - senada sama gaya panel). Wajib ada biar sidebar bisa dilipat jadi
+// baris ikon aja.
+const IKON_NAV = {
+  dashboard: <><path d="M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z" /></>,
+  leads: <><path d="M3 5h18l-7 8v6l-4 2v-8z" /></>,
+  lapangan: <><path d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z" /><path d="M12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z" /></>,
+  katalog: <><path d="M3 7l9-4 9 4v10l-9 4-9-4z" /><path d="M3 7l9 4 9-4M12 11v10" /></>,
+  rekrutmen: <><path d="M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM3 21v-1a6 6 0 0 1 11-3.3" /><path d="M18 14v7M14.5 17.5h7" /></>,
+  karyawan: <><path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 12 0v1" /><path d="M16 3.5a4 4 0 0 1 0 7M22 21v-1a6 6 0 0 0-4-5.6" /></>,
+  keuangan: <><path d="M3 6h16v14H3zM3 6l13-3v3" /><path d="M15 12h6v4h-6z" /></>,
+  artifact: <><path d="M3 5h7l2 2h9v13H3z" /></>,
+  ai: <><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" /><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z" /></>,
+  notifikasi: <><path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4z" /><path d="M10 21h4" /></>,
+  pengaturan: <><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></>,
+  profile: <><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zM4 21v-1a8 8 0 0 1 16 0v1" /></>,
+};
+const Ikon = ({ id }) => (
+  <svg className="adm-nav-ikon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter">
+    {IKON_NAV[id]}
+  </svg>
+);
+
+// Sidebar desktop bisa dilipat jadi baris ikon aja (diingat per browser). Di HP tetap laci menu biasa.
+const KUNCI_LIPAT = 'makalin_sidebar_lipat';
+function useLipat() {
+  const [lipat, setLipat] = useState(() => {
+    try {
+      return localStorage.getItem(KUNCI_LIPAT) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const ganti = () =>
+    setLipat((x) => {
+      try {
+        localStorage.setItem(KUNCI_LIPAT, x ? '0' : '1');
+      } catch {
+        // mode privat / storage diblok: tetap jalan, cuma nggak diingat
+      }
+      return !x;
+    });
+  return [lipat, ganti];
+}
+
 function Samping({ halaman, admin, foto, notifBaru, buka }) {
-  const link = (id, nama, ekstra) => (
-    <a key={id} href={`#/${id}`} className={'adm-nav' + (halaman === id ? ' on' : '')} aria-current={halaman === id ? 'page' : undefined}>
-      <span>{nama}</span>
+  const [lipat, gantiLipat] = useLipat();
+  const hitung = notifBaru > 0 ? <span className="adm-hitung">{notifBaru > 99 ? '99+' : notifBaru}</span> : null;
+  const link = (id, nama, { anak = false, ekstra = null } = {}) => (
+    <a
+      key={id}
+      href={`#/${id}`}
+      className={'adm-nav' + (anak ? ' anak' : '') + (halaman === id ? ' on' : '')}
+      aria-current={halaman === id ? 'page' : undefined}
+      title={lipat ? nama : undefined}
+      aria-label={lipat ? (id === 'notifikasi' && notifBaru ? `${nama}, ${notifBaru} belum dibaca` : nama) : undefined}
+    >
+      <Ikon id={id} />
+      <span className="adm-nav-teks">{nama}</span>
       {ekstra}
     </a>
   );
   return (
-    <aside className={'adm-samping' + (buka ? ' buka' : '')} aria-label="Menu utama">
+    <aside className={'adm-samping' + (buka ? ' buka' : '') + (lipat ? ' lipat' : '')} aria-label="Menu utama">
       <div className="adm-merek">
         <span className="adm-merek-kotak" aria-hidden="true">
           <img src="/logo-konsulin.png" alt="" />
         </span>
-        <div>
+        <div className="adm-merek-teks">
           Makalin Ops
           <small>Workspace internal</small>
         </div>
+        <button className="adm-lipat" onClick={gantiLipat} aria-label={lipat ? 'Buka sidebar' : 'Tutup sidebar'} title={lipat ? 'Buka sidebar' : 'Tutup sidebar'} aria-expanded={!lipat}>
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="square">
+            <path d="M3 4h18v16H3zM9 4v16" />
+            <path d={lipat ? 'M13 9l3 3-3 3' : 'M17 9l-3 3 3 3'} />
+          </svg>
+        </button>
       </div>
       <nav>
         <div className="adm-nav-grup">
@@ -216,12 +275,8 @@ function Samping({ halaman, admin, foto, notifBaru, buka }) {
           <span className="adm-nav-produk" style={{ marginTop: 8 }}>
             HR
           </span>
-          <a href="#/rekrutmen" className={'adm-nav anak' + (halaman === 'rekrutmen' ? ' on' : '')} aria-current={halaman === 'rekrutmen' ? 'page' : undefined}>
-            <span>Rekrutmen</span>
-          </a>
-          <a href="#/karyawan" className={'adm-nav anak' + (halaman === 'karyawan' ? ' on' : '')} aria-current={halaman === 'karyawan' ? 'page' : undefined}>
-            <span>Karyawan</span>
-          </a>
+          {link('rekrutmen', 'Rekrutmen', { anak: true })}
+          {link('karyawan', 'Karyawan', { anak: true })}
           {link('keuangan', 'Keuangan')}
         </div>
         <div className="adm-nav-grup">
@@ -229,12 +284,12 @@ function Samping({ halaman, admin, foto, notifBaru, buka }) {
           {link('ai', 'AI Chat')}
         </div>
         <div className="adm-nav-grup">
-          {link('notifikasi', 'Notifikasi', notifBaru > 0 ? <span className="adm-hitung">{notifBaru > 99 ? '99+' : notifBaru}</span> : null)}
+          {link('notifikasi', 'Notifikasi', { ekstra: hitung })}
           {link('pengaturan', 'Pengaturan')}
           {link('profile', 'Profile')}
         </div>
       </nav>
-      <a className="adm-akun" href="#/profile" style={{ textDecoration: 'none', color: 'inherit' }}>
+      <a className="adm-akun" href="#/profile" style={{ textDecoration: 'none', color: 'inherit' }} title={lipat ? admin.nama : undefined}>
         <FotoProfil src="/api/saya/foto" ada={foto.ada} versi={foto.versi} nama={admin.nama} ukuran={36} className="kotak" />
         <div>
           <b>{admin.nama}</b>

@@ -27,7 +27,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* ---------- kerangka ---------- */
 .adm{display:flex;min-height:100vh}
-.adm-samping{width:264px;flex:none;background:var(--putih);border-right:var(--garis);display:flex;flex-direction:column;gap:18px;padding:18px 14px;position:sticky;top:0;height:100vh;overflow-y:auto}
+.adm-samping{width:264px;flex:none;transition:width .15s ease,padding .15s ease;background:var(--putih);border-right:var(--garis);display:flex;flex-direction:column;gap:18px;padding:18px 14px;position:sticky;top:0;height:100vh;overflow-y:auto}
 .adm-merek{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;letter-spacing:-.02em}
 .adm-merek-kotak{width:36px;height:36px;display:grid;place-items:center;background:var(--putih);border:2px solid var(--hitam);flex:none;overflow:hidden}
 .adm-merek-kotak img,.sl-merek-kotak img,.mk-logo img{width:80%;height:80%;object-fit:contain;display:block}
@@ -36,10 +36,26 @@ button,input,select,textarea{font:inherit;color:inherit}
 .adm-nav-grup{display:flex;flex-direction:column;gap:4px}
 .adm-nav-grup+.adm-nav-grup{border-top:var(--garis-tipis);padding-top:12px}
 .adm-nav-produk{font-size:11px;color:var(--redup);margin:0 8px 4px}
-.adm-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left;background:none;border:2px solid transparent;padding:9px 10px;font-weight:700;cursor:pointer;color:var(--tinta);text-decoration:none}
+.adm-nav{position:relative;display:flex;align-items:center;justify-content:flex-start;gap:10px;width:100%;text-align:left;background:none;border:2px solid transparent;padding:9px 10px;font-weight:700;cursor:pointer;color:var(--tinta);text-decoration:none}
 .adm-nav:hover{border-color:var(--hitam)}
 .adm-nav.on{background:var(--biru);color:var(--putih);border:var(--garis-tipis);box-shadow:3px 3px 0 var(--hitam)}
-.adm-nav.anak{padding-left:26px;font-weight:500}
+.adm-nav.anak{padding-left:22px;font-weight:500}
+.adm-nav-ikon{flex:none}
+.adm-nav-teks{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.adm-merek-teks{flex:1;min-width:0;white-space:nowrap}
+.adm-lipat{flex:none;display:grid;place-items:center;width:32px;height:32px;padding:0;border:2px solid transparent;background:none;color:var(--tinta);cursor:pointer}
+.adm-lipat:hover{border-color:var(--hitam);background:var(--kertas)}
+.adm-lipat:focus-visible{outline:3px solid var(--biru);outline-offset:2px}
+/* Sidebar dilipat (desktop): cuma ikon, nama menu muncul sebagai tooltip */
+@media (min-width:901px){
+  .adm-samping.lipat{width:76px;padding:18px 10px;overflow-x:hidden}
+  .adm-samping.lipat .adm-merek{flex-direction:column;gap:8px}
+  .adm-samping.lipat .adm-merek-teks,.adm-samping.lipat .adm-nav-teks,.adm-samping.lipat .adm-akun div{display:none}
+  .adm-samping.lipat .adm-nav-produk{display:block;height:0;overflow:hidden;margin:6px 8px;border-top:2px dashed #c9c7bd}
+  .adm-samping.lipat .adm-nav{justify-content:center;padding:10px}
+  .adm-samping.lipat .adm-hitung{position:absolute;top:-6px;right:-6px;min-width:18px;font-size:10px;padding:0 3px;line-height:14px}
+  .adm-samping.lipat .adm-akun{justify-content:center;padding:6px;box-shadow:2px 2px 0 var(--hitam)}
+}
 .adm-nav[aria-disabled="true"]{color:var(--redup);cursor:default;border-color:transparent}
 .adm-segera{font-size:10px;font-weight:700;letter-spacing:.06em;border:2px solid var(--hitam);padding:1px 5px;background:var(--kertas);color:var(--tinta)}
 .adm-hitung{min-width:22px;text-align:center;font-size:11px;font-weight:700;background:var(--merah);color:var(--putih);border:2px solid var(--hitam);padding:0 5px}
@@ -204,6 +220,7 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
 @media (max-width:900px){
   .adm-samping{position:fixed;left:0;top:0;bottom:0;z-index:30;transform:translateX(-105%);box-shadow:6px 0 0 var(--hitam)}
   .adm-samping.buka{transform:none}
+  .adm-lipat{display:none}
   .adm-menu-tombol{display:grid;place-items:center;min-width:44px;height:44px;padding:0 12px;border:var(--garis-tipis);background:var(--kuning);font-weight:700;letter-spacing:.05em;font-size:12px;cursor:pointer;flex:none}
   .adm-topbar{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:var(--garis);background:var(--putih);position:sticky;top:0;z-index:5}
   .adm-isi{padding:20px 16px 48px}
