@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { rupiah, tgl, waktu } from '../lib/format.js';
 import { Gagal, Konfirmasi, Kosong, Memuat, Modal } from '../komponen/Ui.jsx';
 import LeadDetail from './LeadDetail.jsx';
+import { FotoAdmin } from '../komponen/FotoProfil.jsx';
 
 // CRM leads (sesuai referensi Leads Management): kartu tahap + total pipeline, toolbar tabel/kanban + filter, tabel
 // dengan pilih-banyak & aksi massal, kanban drag & drop, panel inspector di samping, impor CSV & ekspor.
@@ -581,9 +582,7 @@ function Kanban({ leads, onBuka, onPindah }) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, alignItems: 'center' }}>
                     {l.sumber ? <span className="adm-chip">{l.sumber}</span> : <span />}
                     {l.pemilik_nama && (
-                      <span className="adm-inisial" style={{ width: 26, height: 26, fontSize: 12 }} title={`Pemilik: ${l.pemilik_nama}`}>
-                        {l.pemilik_nama[0].toUpperCase()}
-                      </span>
+                      <FotoAdmin id={l.pemilik_id} nama={l.pemilik_nama} title={`Pemilik: ${l.pemilik_nama}`} />
                     )}
                   </div>
                 </article>

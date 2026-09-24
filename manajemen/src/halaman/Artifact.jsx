@@ -3,6 +3,7 @@ import { tgl, waktu } from '../lib/format.js';
 import { Gagal, Konfirmasi, Kosong, Memuat, Modal, useData } from '../komponen/Ui.jsx';
 import { unggahBerkas } from '../lib/api.js';
 import TeksMarkdown from '../komponen/TeksMarkdown.jsx';
+import { FotoAdmin } from '../komponen/FotoProfil.jsx';
 
 // Artifact: gudang dokumen internal - SOP, dokumen, aset, video, dan catatan, disusun per folder, dengan riwayat versi.
 // Alamat: #/artifact (semua), #/artifact/bintang, #/artifact/sampah, #/artifact/<id folder>.
@@ -24,13 +25,6 @@ export const ukuranFile = (b) => {
   return `${(b / 1024 ** 3).toFixed(2).replace('.', ',')} GB`;
 };
 const ekstensi = (n) => (n && n.includes('.') ? n.split('.').pop().toUpperCase() : '');
-const inisial = (n) =>
-  (n || '?')
-    .split(/\s+/)
-    .map((x) => x[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
 
 export default function Artifact({ api, tab }) {
   const lokasi = tab === 'bintang' || tab === 'sampah' ? tab : POLA_UUID.test(tab || '') ? tab : 'semua';
@@ -443,9 +437,7 @@ function Isi({ api, lokasi, judul, folder, pohon, pemilik, versi, onBuka, onBeru
                 </button>
               )}
               <div className="art-kartu-bawah">
-                <span className="adm-inisial kecil" aria-hidden="true">
-                  {inisial(a.pemilik_nama)}
-                </span>
+                <FotoAdmin id={a.pemilik_id} nama={a.pemilik_nama} />
                 <span className="adm-redup">{a.pemilik_nama || 'Admin dihapus'}</span>
                 <span className="adm-redup art-kartu-tgl">{tgl(a.diubah_at)}</span>
               </div>

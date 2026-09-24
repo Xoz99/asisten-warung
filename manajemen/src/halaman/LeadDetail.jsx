@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { rupiah, tgl, waktu, waktuRelatif } from '../lib/format.js';
 import { Konfirmasi, Memuat, Modal } from '../komponen/Ui.jsx';
-import FotoProfil from '../komponen/FotoProfil.jsx';
+import FotoProfil, { FotoAdmin } from '../komponen/FotoProfil.jsx';
 import { bacaSesi } from '../lib/api.js';
 import { keWebp } from '../lib/gambar.js';
 import { Detail, Foto, FormLog, HASIL } from './Lapangan.jsx';
@@ -1027,7 +1027,7 @@ function ModalPic({ admins, sekarang, onTutup, onPilih }) {
       <div className="adm-riwayat">
         {aktif.map((a) => (
           <button key={a.id} className="adm-riwayat-item ld-pilih-orang" onClick={() => a.id !== sekarang && onPilih(a.id)} aria-pressed={a.id === sekarang}>
-            <span className="ld-inisial kecil">{a.nama[0].toUpperCase()}</span>
+            <FotoAdmin id={a.id} nama={a.nama} ukuran={40} />
             <span style={{ textAlign: 'left', minWidth: 0 }}>
               <b>{a.nama}</b>
               <span className="adm-redup" style={{ display: 'block', fontSize: 12 }}>

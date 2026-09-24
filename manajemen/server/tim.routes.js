@@ -40,7 +40,7 @@ function pastikanTabel() {
   }
   return siap;
 }
-router.use(['/tim-sales', '/saya/profil', '/saya/foto'], async (req, res, next) => {
+router.use(['/tim-sales', '/saya/profil', '/saya/foto', '/tim/foto'], async (req, res, next) => {
   try {
     await pastikanTabel();
     next();
@@ -506,6 +506,29 @@ router.get('/saya/foto', async (req, res, next) => {
     const { rows } = await query('SELECT id FROM mj_karyawan WHERE admin_id=$1', [req.admin.id]);
     if (!rows.length) throw salah('Belum ada foto', 404);
     await kirimFoto(res, rows[0].id);
+  } catch (e) {
+    next(e);
+  }
+});
+
+// Foto profil rekan kerja (kartu Artifact, pemilik lead, dll) - buat semua yang login. Admin/dirut pakai foto di
+// mj_admin; akun sales pakai foto karyawannya.
+router.get('/tim/foto/:adminId', async (req, res, next) => {
+  try {
+    const id = req.params.adminId;
+    if (!POLA_UUID.test(id)) throw salah('Belum ada foto', 404);
+    const { rows } = await query('SELECT foto FROM mj_admin WHERE id=$1', [id]);
+    const file = rows[0]?.foto && path.join(DIR, path.basename(rows[0].foto));
+    if (file && fs.existsSync(file)) {
+      const ext = path.extname(file).slice(1);
+      res.setHeader('Content-Type', ext === 'png' ? 'image/png' : ext === 'jpg' ? 'image/jpeg' : 'image/webp');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Cache-Control', 'private, no-cache');
+      return res.sendFile(file);
+    }
+    const { rows: k } = await query('SELECT id FROM mj_karyawan WHERE admin_id=$1 AND foto IS NOT NULL LIMIT 1', [id]);
+    if (!k.length) throw salah('Belum ada foto', 404);
+    await kirimFoto(res, k[0].id);
   } catch (e) {
     next(e);
   }
