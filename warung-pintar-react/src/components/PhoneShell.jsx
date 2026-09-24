@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Ikon } from '../lib/icons.jsx';
 import { useApp } from '../state/AppContext.jsx';
 import { FONTS } from '../lib/data';
@@ -59,6 +59,28 @@ const NAV = [
   },
 ];
 
+// Sidebar desktop bisa dilipat jadi baris ikon aja; pilihannya diingat per browser. Di HP tetap nav bawah.
+const KUNCI_LIPAT = 'aw_sidebar_lipat';
+function useLipatSidebar() {
+  const [lipat, setLipat] = useState(() => {
+    try {
+      return localStorage.getItem(KUNCI_LIPAT) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const ganti = () =>
+    setLipat((x) => {
+      try {
+        localStorage.setItem(KUNCI_LIPAT, x ? '0' : '1');
+      } catch {
+        // storage diblok (mode privat): tetap jalan, cuma nggak diingat
+      }
+      return !x;
+    });
+  return [lipat, ganti];
+}
+
 export default function PhoneShell() {
   const { S, screen, goTo, cart, toastMsg, authed, authLoading, lisensi, syncStatus, lastSyncAt, outboxCount, perluOnlineDuluan, cobaLagiKoneksi, upgradeSukses, tutupUpgradeSukses } =
     useApp();
@@ -85,7 +107,8 @@ export default function PhoneShell() {
     return () => cancelAnimationFrame(id);
   }, [S.tema, authed, lisensi]);
 
-  const { notifKomunitas, profilUsaha } = useApp();
+  const { notifKomunitas, profilUsaha, authWarung } = useApp();
+  const [lipat, gantiLipat] = useLipatSidebar();
   const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
   const fontFamily = FONTS.find((f) => f.n === S.font)?.f || FONTS[0].f;
 
@@ -157,26 +180,28 @@ export default function PhoneShell() {
       {upgradeSukses && <SheetUpgradeSukses data={upgradeSukses} onClose={tutupUpgradeSukses} />}
 
       <div className="layout">
-        <aside className="sidebar">
+        <aside className={'sidebar' + (lipat ? ' lipat' : '')}>
           <div className="sidebar-brand">
             <div className="sidebar-logo">
-              <svg viewBox="0 0 24 24">
-                <path d="M4 9.3 5 4h14l1 5.3" />
-                <path d="M4 9.3a2.4 2.4 0 0 0 4.8 0 2.4 2.4 0 0 0 4.8 0 2.4 2.4 0 0 0 4.8 0 2.4 2.4 0 0 0 4.8 0" />
-                <path d="M5 9.8V20h14V9.8" />
-                <path d="M10 20v-5a2 2 0 0 1 4 0v5" />
-              </svg>
+              <img src="/logo-konsulin.png" alt="Konsulin" width="30" height="30" />
             </div>
-            <div>
-              <b>Warung Berkah</b>
+            <div className="sidebar-teks">
+              <b>{authWarung?.nama || 'Warungku'}</b>
               <span>Asisten Warung</span>
             </div>
+            <button className="sidebar-lipat" onClick={gantiLipat} aria-label={lipat ? 'Buka sidebar' : 'Tutup sidebar'} title={lipat ? 'Buka sidebar' : 'Tutup sidebar'} aria-expanded={!lipat}>
+              <svg viewBox="0 0 24 24">
+                <rect x="3" y="4" width="18" height="16" rx="3" />
+                <path d="M9 4v16" />
+                <path d={lipat ? 'M13 9.5l2.5 2.5-2.5 2.5' : 'M16.5 9.5 14 12l2.5 2.5'} />
+              </svg>
+            </button>
           </div>
 
           <nav className="sidenav">
             {NAV.map((n) =>
               n.fab ? (
-                <button key="fab" className="sn-catat" onClick={() => goTo(n.id)}>
+                <button key="fab" className="sn-catat" onClick={() => goTo(n.id)} title={lipat ? 'Catat jualan' : undefined} aria-label={lipat ? 'Catat jualan' : undefined}>
                   <svg viewBox="0 0 24 24">
                     <path d="M2 6.5V4A1.5 1.5 0 0 1 3.5 2.5H6" />
                     <path d="M18 2.5h2.5A1.5 1.5 0 0 1 22 4v2.5" />
@@ -184,13 +209,13 @@ export default function PhoneShell() {
                     <path d="M18 21.5h2.5A1.5 1.5 0 0 0 22 20v-2.5" />
                     <path d="M2.5 12h19" />
                   </svg>
-                  Catat jualan
+                  <span className="sn-teks">Catat jualan</span>
                   {cartCount > 0 && <span className="badge show">{cartCount}</span>}
                 </button>
               ) : (
-                <button key={n.id} className={'sn' + (screen === n.id ? ' on' : '')} onClick={() => goTo(n.id)}>
+                <button key={n.id} className={'sn' + (screen === n.id ? ' on' : '')} onClick={() => goTo(n.id)} title={lipat ? n.label : undefined} aria-label={lipat ? n.label : undefined}>
                   {n.icon}
-                  {n.label}
+                  <span className="sn-teks">{n.label}</span>
                   {n.id === 's-chat' && notifKomunitas > 0 && <span className="badge show">{notifKomunitas > 9 ? '9+' : notifKomunitas}</span>}
                 </button>
               )

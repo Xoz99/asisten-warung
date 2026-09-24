@@ -834,13 +834,28 @@ body{background:#E9E9E6}
   .toast{left:0;right:0;width:460px;max-width:calc(100% - 40px);margin:0 auto}
 
   .sidebar{
-    display:flex;flex-direction:column;flex:none;width:272px;padding:26px 16px;gap:4px;
+    display:flex;flex-direction:column;flex:none;width:272px;padding:26px 16px;gap:4px;transition:width .18s ease,padding .18s ease;
     background:var(--surface);border-right:1px solid var(--garis);overflow-y:auto;scrollbar-width:none;
   }
   .sidebar::-webkit-scrollbar{display:none}
   .sidebar-brand{display:flex;align-items:center;gap:12px;padding:6px 10px 22px}
-  .sidebar-logo{width:44px;height:44px;border-radius:14px;background:var(--aksen);color:#151517;display:grid;place-items:center;flex:none}
-  .sidebar-logo svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .sidebar-logo{width:44px;height:44px;border-radius:14px;background:#fff;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08);display:grid;place-items:center;flex:none;overflow:hidden}
+  .sidebar-logo img{width:30px;height:30px;object-fit:contain;display:block}
+  .sidebar-teks{flex:1;min-width:0}
+  .sidebar-teks b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sidebar-lipat{flex:none;width:34px;height:34px;display:grid;place-items:center;border:0;border-radius:10px;background:none;color:var(--abu);cursor:pointer;transition:background .15s,color .15s}
+  .sidebar-lipat:hover{background:var(--bg);color:var(--ink)}
+  .sidebar-lipat:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .sidebar-lipat svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .sn{position:relative}
+  .sn .badge{position:static;margin-left:auto}
+
+  /* Sidebar dilipat: cuma ikon (nama menu jadi tooltip) */
+  .sidebar.lipat{width:88px;padding:26px 14px}
+  .sidebar.lipat .sidebar-brand{flex-direction:column;gap:10px;padding:6px 0 18px}
+  .sidebar.lipat .sidebar-teks,.sidebar.lipat .sn-teks{display:none}
+  .sidebar.lipat .sn,.sidebar.lipat .sn-catat{justify-content:center;padding:13px 0}
+  .sidebar.lipat .sn .badge{position:absolute;top:4px;right:6px;margin:0}
   .sidebar-brand b{display:block;font-family:var(--f-head),sans-serif;font-size:16.5px;font-weight:800;letter-spacing:-.02em}
   .sidebar-brand span{display:block;font-size:12.5px;color:var(--abu);font-weight:600;margin-top:1px}
 
