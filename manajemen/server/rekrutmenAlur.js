@@ -28,6 +28,16 @@ const MIN_SOAL = 5;
 // Jumlahnya bebas - semua esai yang aktif ikut ditanyain.
 const MIN_JAWABAN_ESAI = 15;
 const BATAS = { masuk: 24, belajar: 72, pilihSlot: 48, h1: 24, h6: 144 }; // jam
+// {deadline} di template WA: batas waktu tahap itu, format dd/mm/yy jam.menit WIB (server bisa jalan di zona lain).
+export function teksDeadline(mulai, jam) {
+  const d = new Date(new Date(mulai || Date.now()).getTime() + jam * JAM);
+  const b = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
+      .formatToParts(d)
+      .map((x) => [x.type, x.value])
+  );
+  return `${b.day}/${b.month}/${b.year} ${b.hour === '24' ? '00' : b.hour}.${b.minute} WIB`;
+}
 
 // Kolom board -> status yang masuk ke situ.
 export const KOLOM = [
@@ -342,37 +352,37 @@ export const TEMPLATE = {
   },
   materi: {
     judul: 'Paket materi + kuis',
-    ket: 'Dikirim waktu kandidat lolos screening.',
+    ket: 'Dikirim waktu kandidat lolos screening. {deadline} = batas belajar & kuis (3 hari dari sekarang).',
     wajib: ['link_kuis'],
-    penanda: ['nama', 'materi', 'link_kuis'],
-    isi: 'Halo {nama}, makasih udah daftar jadi Sales Partner Konsulin.\n\nKamu lolos tahap screening. Sebelum interview, pelajari produknya dulu ya:\n{materi}\n• Kuis product: {link_kuis}\n\nWaktunya 3 hari. Kalau udah daftar di aplikasinya dan kuisnya benar semua, kamu dapet link buat pilih jadwal interview sendiri.',
+    penanda: ['nama', 'materi', 'link_kuis', 'deadline'],
+    isi: 'Halo {nama}, makasih udah daftar jadi Sales Partner Konsulin.\n\nKamu lolos tahap screening. Sebelum interview, pelajari produknya dulu ya:\n{materi}\n• Kuis product: {link_kuis}\n\nWaktunya 3 hari, sampai {deadline}. Kalau udah daftar di aplikasinya dan kuisnya benar semua, kamu dapet link buat pilih jadwal interview sendiri.',
   },
   kuis_ulang: {
     judul: 'Kirim ulang kuis',
-    ket: 'Kesempatan kedua buat kandidat yang kuisnya belum benar semua, atau link kuis yang ketinggalan.',
+    ket: 'Kesempatan kedua buat kandidat yang kuisnya belum benar semua, atau link kuis yang ketinggalan. {deadline} = batas belajar & kuis (3 hari sejak materi dikirim).',
     wajib: ['link_kuis'],
-    penanda: ['nama', 'link_kuis'],
+    penanda: ['nama', 'link_kuis', 'deadline'],
     isi: 'Halo {nama}, ini link kuisnya ya: {link_kuis}',
   },
   ingatkan_apk: {
     judul: 'Ingatkan daftar aplikasi',
-    ket: 'Buat kandidat yang belum daftar di Asisten Warung.',
+    ket: 'Buat kandidat yang belum daftar di Asisten Warung. {deadline} = batas belajar & kuis (3 hari sejak materi dikirim).',
     wajib: [],
-    penanda: ['nama', 'link_apk'],
+    penanda: ['nama', 'link_apk', 'deadline'],
     isi: 'Halo {nama}, udah sempet coba aplikasinya? Daftar di sini pakai nomor WA ini ya: {link_apk}. Kabarin kalau ada kendala.',
   },
   jadwal: {
     judul: 'Link pilih jadwal interview',
-    ket: 'Dikirim waktu kandidat sampai tahap Interview.',
+    ket: 'Dikirim waktu kandidat sampai tahap Interview. {deadline} = batas pilih jadwal (2 hari sejak link dikirim).',
     wajib: ['link_jadwal'],
-    penanda: ['nama', 'link_jadwal'],
+    penanda: ['nama', 'link_jadwal', 'deadline'],
     isi: 'Halo {nama}, selamat kamu lanjut ke tahap interview. Pilih jadwal yang cocok di sini ya: {link_jadwal}',
   },
   trial: {
     judul: 'Info trial lapangan',
-    ket: 'Dikirim waktu kandidat lulus interview.',
+    ket: 'Dikirim waktu kandidat lulus interview. {deadline} = batas 3 warung bayar (6 hari sejak trial mulai).',
     wajib: ['kode'],
-    penanda: ['nama', 'kode', 'link_referral'],
+    penanda: ['nama', 'kode', 'link_referral', 'deadline'],
     isi: 'Halo {nama}, selamat kamu lulus interview. Trial lapangan mulai sekarang:\n• Kode sales kamu: {kode}\n• Link daftar buat warung: {link_referral}\n\nTarget: 3 warung daftar dalam 24 jam, lalu 3 warung bayar langganan dalam 6 hari. Semua kehitung otomatis kalau warungnya daftar pakai link atau kode kamu.',
   },
 };
@@ -404,9 +414,9 @@ async function pesan(kunci, v) {
 }
 const barisMateri = (materi) => materi.map((m) => `• ${m.nama}${m.url ? `: ${m.url}` : ''}${m.keterangan ? ` (${m.keterangan})` : ''}`).join('\n');
 // {link_kuis} dibiarin jadi {LINK_KUIS} dulu: linknya baru ada setelah token kuis dibikin (lihat loloskan).
-const teksMateri = (nama, materi) => pesan('materi', { nama: depan(nama), materi: barisMateri(materi), link_kuis: '{LINK_KUIS}' });
-const teksJadwal = (nama, t) => pesan('jadwal', { nama: depan(nama), link_jadwal: linkJadwal(t) });
-const teksTrial = (nama, kode) => pesan('trial', { nama: depan(nama), kode, link_referral: `${URL_WARUNG()}/?ref=${kode}` });
+const teksMateri = (nama, materi) => pesan('materi', { nama: depan(nama), materi: barisMateri(materi), link_kuis: '{LINK_KUIS}', deadline: teksDeadline(null, BATAS.belajar) });
+const teksJadwal = (nama, t, mulai = null) => pesan('jadwal', { nama: depan(nama), link_jadwal: linkJadwal(t), deadline: teksDeadline(mulai, BATAS.pilihSlot) });
+const teksTrial = (nama, kode, mulai = null) => pesan('trial', { nama: depan(nama), kode, link_referral: `${URL_WARUNG()}/?ref=${kode}`, deadline: teksDeadline(mulai, BATAS.h6) });
 
 // ---------------- Board ----------------
 // Foto diri terakhir yang diunggah orangnya (dari lamaran mana pun) - dipakai jadi avatar kandidat.
@@ -480,10 +490,10 @@ router.get('/rekrutmen/lamaran/:id/alur', async (req, res, next) => {
       link: { kuis: t.kuis ? linkKuis(t.kuis) : null, jadwal: t.jadwal ? linkJadwal(t.jadwal) : null, referral: l.trial_kode ? `${URL_WARUNG()}/?ref=${l.trial_kode}` : null },
       wa: {
         sapa: await pesan('sapa', { nama: depan(l.nama) }),
-        jadwal: t.jadwal ? await teksJadwal(l.nama, t.jadwal) : null,
-        kuisUlang: t.kuis ? await pesan('kuis_ulang', { nama: depan(l.nama), link_kuis: linkKuis(t.kuis) }) : null,
-        ingatkanApk: await pesan('ingatkan_apk', { nama: depan(l.nama), link_apk: URL_WARUNG() }),
-        trial: l.trial_kode ? await teksTrial(l.nama, l.trial_kode) : null,
+        jadwal: t.jadwal ? await teksJadwal(l.nama, t.jadwal, l.jadwal_link_at) : null,
+        kuisUlang: t.kuis ? await pesan('kuis_ulang', { nama: depan(l.nama), link_kuis: linkKuis(t.kuis), deadline: teksDeadline(l.materi_dikirim_at, BATAS.belajar) }) : null,
+        ingatkanApk: await pesan('ingatkan_apk', { nama: depan(l.nama), link_apk: URL_WARUNG(), deadline: teksDeadline(l.materi_dikirim_at, BATAS.belajar) }),
+        trial: l.trial_kode ? await teksTrial(l.nama, l.trial_kode, l.trial_mulai || l.status_sejak) : null,
       },
     });
   } catch (e) {
@@ -521,7 +531,7 @@ async function loloskan(id, aktor, { materiId = null, teksWa = null, paksa = fal
       dari = { ...dari, status: ke };
     }
     const token = await tokenBaru(c, id, 'kuis');
-    const final = (teksWa && teksWa.includes('{LINK_KUIS}') ? teksWa : bawaan).replaceAll('{LINK_KUIS}', linkKuis(token));
+    const final = (teksWa && teksWa.includes('{LINK_KUIS}') ? teksWa : bawaan).replaceAll('{LINK_KUIS}', linkKuis(token)).replaceAll('{deadline}', teksDeadline(null, BATAS.belajar));
     return { id, nama: l.nama, teks: final };
   });
 }
@@ -579,7 +589,7 @@ router.post('/rekrutmen/lamaran/:id/kuis-ulang', async (req, res, next) => {
       if (!['pelajari_produk', 'product_test'].includes(l.status)) throw salah('Kuis cuma buat tahap Belajar & tes');
       const token = await tokenBaru(c, l.id, 'kuis');
       await catatEvent(c, l.id, 'catatan', { isi: 'Link kuis baru dikirim (kesempatan ulang)' }, req.admin.nama);
-      return { teks: await pesan('kuis_ulang', { nama: depan(l.nama), link_kuis: linkKuis(token) }), hp: await hpKandidat(l.id) };
+      return { teks: await pesan('kuis_ulang', { nama: depan(l.nama), link_kuis: linkKuis(token), deadline: teksDeadline(l.materi_dikirim_at, BATAS.belajar) }), hp: await hpKandidat(l.id) };
     });
     res.json(r);
   } catch (e) {
@@ -914,7 +924,7 @@ router.get('/rekrutmen/template', async (req, res, next) => {
   try {
     const { rows } = await query('SELECT kunci, isi, diubah_oleh, diubah_at FROM mj_rek_template');
     const ada = Object.fromEntries(rows.map((r) => [r.kunci, r]));
-    const contoh = { nama: 'Budi', materi: '• Aplikasi Asisten Warung: ' + URL_WARUNG(), link_kuis: `${PUBLIK_URL()}/kuis/contoh`, link_jadwal: `${PUBLIK_URL()}/jadwal/contoh`, link_apk: URL_WARUNG(), kode: 'BUDI27', link_referral: `${URL_WARUNG()}/?ref=BUDI27` };
+    const contoh = { nama: 'Budi', materi: '• Aplikasi Asisten Warung: ' + URL_WARUNG(), link_kuis: `${PUBLIK_URL()}/kuis/contoh`, link_jadwal: `${PUBLIK_URL()}/jadwal/contoh`, link_apk: URL_WARUNG(), kode: 'BUDI27', link_referral: `${URL_WARUNG()}/?ref=BUDI27`, deadline: teksDeadline(null, BATAS.belajar) };
     res.json({
       contoh,
       template: Object.entries(TEMPLATE).map(([kunci, t]) => ({

@@ -965,9 +965,18 @@ function Keluarkan({ saran, kirim }) {
 }
 
 // Isi template materi (dari Pengaturan). {link_kuis} dibiarin jadi {LINK_KUIS}: linknya ditempel server waktu dikirim.
+// {deadline} = batas belajar & kuis, 3 hari dari sekarang (WIB) - sama kayak yang diisi server.
+function deadlineBelajar() {
+  const b = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
+      .formatToParts(new Date(Date.now() + 72 * 3600000))
+      .map((x) => [x.type, x.value])
+  );
+  return `${b.day}/${b.month}/${b.year} ${b.hour === '24' ? '00' : b.hour}.${b.minute} WIB`;
+}
 function teksMateri(template, nama, materi) {
   const baris = materi.map((m) => `• ${m.nama}${m.url ? `: ${m.url}` : ''}${m.keterangan ? ` (${m.keterangan})` : ''}`).join('\n');
-  return template.replaceAll('{nama}', depan(nama)).replaceAll('{materi}', baris).replaceAll('{link_kuis}', '{LINK_KUIS}');
+  return template.replaceAll('{nama}', depan(nama)).replaceAll('{materi}', baris).replaceAll('{link_kuis}', '{LINK_KUIS}').replaceAll('{deadline}', deadlineBelajar());
 }
 
 function ModalMateri({ api, l, paksa, onTutup, onSelesai }) {
