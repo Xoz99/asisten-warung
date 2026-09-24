@@ -88,12 +88,16 @@ async function tampil() {
     console.log(`          putaran ini: ${angka(l.halaman)} halaman, ${angka(l.masuk)} masuk, ${angka(l.duplikat)} dobel, ${angka(l.ditolak)} ditolak${l.segar !== undefined ? `, ${angka(l.segar)} barang segar` : ''}, ${l.gagal?.length || 0} gagal`);
     console.log(`          laporan terakhir ditulis ${lalu(l._diubah)}${l.sisa_url !== undefined ? ` · sisa URL: ${angka(l.sisa_url)}` : ''}`);
     if (nyala && Date.now() - l._diubah > 30 * 60000) console.log('          ⚠ prosesnya ada tapi laporan nggak update >30 menit - kemungkinan macet, cek: tail -c 600 scrape.log');
-    if (!nyala && l.sisa_url > 0 && l.halaman >= 5000) console.log('          ⚠ berhenti karena batas --max-pages, sisa URL-nya belum habis - jalanin lagi');
+    // Batas --max-pages yang dipakai di perintah pm2 masing-masing (Lotte 5.000, Sayurbox 25.000).
+    const batas = sumber === 'sayurbox' ? 25000 : 5000;
+    if (!nyala && l.sisa_url > 0 && l.halaman >= batas) console.log('          ⚠ berhenti karena batas --max-pages, sisa URL-nya belum habis - jalanin lagi');
+    else if (!nyala && l.selesai && l.sisa_url > 0 && l.sisa_url <= 50) console.log(`          (sisa ${l.sisa_url} URL = halaman yang gagal dibuka, dicoba lagi kalau skripnya dijalanin ulang)`);
   }
 
   console.log('\n--- Foto di server sendiri ---');
   console.log(`${batang(f.udah, f.total)} ${angka(f.udah)}/${angka(f.total)} (${persen(f.udah, f.total)})  ${unduhFoto ? 'JALAN' : 'nggak jalan'}`);
-  if (!unduhFoto && f.udah < f.total) console.log('          lanjutin: pm2 start npm --name foto-katalog --no-autorestart -- run foto:katalog');
+  if (!unduhFoto && f.udah < f.total)
+    console.log('          (kalau udah dijadwalin tiap 2 jam lewat pm2 --cron-restart, "nggak jalan" di antara jadwal itu normal)\n          belum dijadwalin? pm2 start npm --name foto-katalog --no-autorestart --cron-restart "0 */2 * * *" -- run foto:katalog');
   console.log('');
 }
 
