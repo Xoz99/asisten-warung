@@ -757,7 +757,18 @@ function Meter({ judul, n, catatan, lewat }) {
 // Lembar interview: disusun otomatis (pertanyaan product + pertanyaan gali dari analisis), lalu bisa diubah admin mana aja.
 // Tiap perubahan (nilai, teks, tambah/hapus) kesimpen otomatis ke server, jadi admin/dirut lain lihat lembar yang sama.
 function lembarAwal(alur) {
-  if (alur.lembar?.soal?.length) return alur.lembar.soal;
+  // Lembar yang udah pernah disimpan tetap dipakai (nilai & editannya aman), tapi pertanyaan product yang baru
+  // ditambah di Pengaturan ikut nyusul masuk - disisipin setelah pertanyaan product terakhir. Yang dihapus dari
+  // Pengaturan nggak ikut ilang di sini, siapa tau udah dinilai.
+  if (alur.lembar?.soal?.length) {
+    const ada = new Set(alur.lembar.soal.map((s) => s.q.trim().toLowerCase()));
+    const baru = (alur.pertanyaanProduk || []).filter((q) => !ada.has(q.trim().toLowerCase())).map((q) => ({ jenis: 'produk', q, nilai: null }));
+    if (!baru.length) return alur.lembar.soal;
+    const soal = [...alur.lembar.soal];
+    const akhirProduk = soal.map((s) => s.jenis).lastIndexOf('produk');
+    soal.splice(akhirProduk + 1, 0, ...baru);
+    return soal;
+  }
   const a = alur.analisis;
   const gali = [...a.items.filter((i) => i.gali).map((i) => i.gali), ...(a.wajib.find((w) => w.catatan) ? ['Kamu pilih skema lain. Skema seperti apa yang kamu mau?'] : [])];
   return [...(alur.pertanyaanProduk || []).map((q) => ({ jenis: 'produk', q, nilai: null })), ...gali.map((q) => ({ jenis: 'gali', q, nilai: null }))];
@@ -1251,7 +1262,7 @@ function PertanyaanInterview({ api }) {
         {data?.diubah && <span className="adm-redup">Diubah {data.diubah_oleh}, {waktu(data.diubah_at)}</span>}
       </div>
       <p className="adm-redup" style={{ marginTop: 0 }}>
-        Satu pertanyaan per baris (maks 10). Masuk otomatis ke lembar interview kandidat baru, ditambah pertanyaan gali dari analisis lamarannya. Lembar yang udah pernah diisi nggak ikut berubah.
+        Satu pertanyaan per baris (maks 30). Masuk otomatis ke lembar interview semua kandidat, ditambah pertanyaan gali dari analisis lamarannya. Pertanyaan baru ikut nyusul ke lembar yang udah pernah diisi - nilai yang udah dikasih tetap aman.
       </p>
       <textarea className="adm-input" rows={Math.max(4, daftar.length + 1)} value={isi} onChange={(e) => setIsi(e.target.value)} aria-label="Pertanyaan interview product" style={{ width: '100%', resize: 'vertical' }} />
       {pesan && <p className={pesan.startsWith('Gagal') ? 'adm-error' : 'adm-ok'}>{pesan}</p>}

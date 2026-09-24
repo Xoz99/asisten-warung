@@ -376,6 +376,7 @@ export const TEMPLATE = {
 };
 // Pertanyaan product di lembar interview. Bisa diganti admin (Rekrutmen -> Pengaturan), disimpan di mj_rek_template
 // dengan kunci 'interview_produk' (satu pertanyaan per baris).
+export const MAKS_PERTANYAAN_PRODUK = 30;
 export const PERTANYAAN_PRODUK = [
   'Jelasin fitur utama aplikasinya dalam 1 menit, anggap aku pemilik warung.',
   'Pemilik warung bilang "saya udah pakai buku catatan". Kamu jawab apa?',
@@ -676,7 +677,8 @@ router.post('/rekrutmen/lamaran/:id/interview-hasil', async (req, res, next) => 
 router.put('/rekrutmen/lamaran/:id/lembar-interview', async (req, res, next) => {
   try {
     if (!POLA_UUID.test(req.params.id)) throw salah('Lamaran tidak ditemukan', 404);
-    const daftar = Array.isArray(req.body.soal) ? req.body.soal.slice(0, 20) : null;
+    // Muat semua pertanyaan product (maks 30) + gali + tambahan - dulu dipotong 20, sisanya ilang diem-diem.
+    const daftar = Array.isArray(req.body.soal) ? req.body.soal.slice(0, 60) : null;
     if (!daftar) throw salah('Lembar interview nggak valid');
     const soal = daftar
       .map((x) => ({
@@ -705,7 +707,7 @@ router.get('/rekrutmen/pertanyaan-interview', async (req, res, next) => {
 });
 router.put('/rekrutmen/pertanyaan-interview', async (req, res, next) => {
   try {
-    const daftar = (Array.isArray(req.body.pertanyaan) ? req.body.pertanyaan : []).map((x) => teks(x, 300)).filter(Boolean).slice(0, 10);
+    const daftar = (Array.isArray(req.body.pertanyaan) ? req.body.pertanyaan : []).map((x) => teks(x, 300)).filter(Boolean).slice(0, MAKS_PERTANYAAN_PRODUK);
     if (!daftar.length) throw salah('Minimal 1 pertanyaan');
     await query(
       "INSERT INTO mj_rek_template (kunci, isi, diubah_oleh, diubah_at) VALUES ('interview_produk',$1,$2,now()) ON CONFLICT (kunci) DO UPDATE SET isi=EXCLUDED.isi, diubah_oleh=EXCLUDED.diubah_oleh, diubah_at=now()",
