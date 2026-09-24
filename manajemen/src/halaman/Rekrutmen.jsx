@@ -12,7 +12,7 @@ export const TAHAP = [
   { id: 'screening', nama: 'Screening', ket: 'Lagi dicek' },
   { id: 'screening_passed', nama: 'Lolos screening', ket: 'Siap kirim materi' },
   { id: 'pelajari_produk', nama: 'Pelajari produk', ket: 'Pakai APK + baca materi + kuis' },
-  { id: 'product_test', nama: 'Product test', ket: 'Kuis 5 soal, benar semua' },
+  { id: 'product_test', nama: 'Product test', ket: 'Kuis product, benar semua' },
   { id: 'interview', nama: 'Interview', ket: 'Kandidat pilih slot, pewawancara mutusin' },
   { id: 'field_test_24h', nama: 'Trial H+1', ket: '3 warung daftar pakai kodenya dalam 24 jam' },
   { id: 'closing_test', nama: 'Trial H+6', ket: '3 warung bayar dalam 6 hari' },

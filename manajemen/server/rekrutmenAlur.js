@@ -20,7 +20,9 @@ const salah = (pesan, status = 400) => Object.assign(new Error(pesan), { status 
 const JAM = 3600000;
 const PUBLIK_URL = () => (process.env.PUBLIK_URL || 'https://konsulin.com').replace(/\/+$/, '');
 const URL_WARUNG = () => (process.env.WARUNG_PINTAR_URL || 'https://asistenwarung.konsulin.com').replace(/\/+$/, '');
-const JUMLAH_SOAL = 5;
+// Kuis product pakai SEMUA soal pilihan ganda yang aktif (urut sesuai urutan di Pengaturan), lulus kalau benar
+// semua. Minimal harus ada MIN_SOAL aktif sebelum kandidat bisa dikirimin kuis. Dulu dikunci 5 soal teratas.
+const MIN_SOAL = 5;
 // Soal esai: dijawab kandidat di halaman kuis yang sama setelah pilihan ganda. Nggak ikut nentuin lulus (lulus tetap
 // dari pilihan ganda, dinilai otomatis) - jawabannya dibaca rekruter di panel kandidat & jadi bahan interview.
 const MAKS_ESAI_AKTIF = 3;
@@ -227,7 +229,7 @@ async function kuisTerakhir(ids) {
     `SELECT DISTINCT ON (lamaran_id) lamaran_id, hasil, data, created_at FROM mj_rek_attempt WHERE tahap='product_test' AND lamaran_id = ANY($1::uuid[]) ORDER BY lamaran_id, id DESC`,
     [ids]
   );
-  return Object.fromEntries(rows.map((r) => [r.lamaran_id, { lulus: r.hasil === 'lulus', benar: r.data?.benar ?? 0, dari: r.data?.dari ?? JUMLAH_SOAL, at: r.created_at }]));
+  return Object.fromEntries(rows.map((r) => [r.lamaran_id, { lulus: r.hasil === 'lulus', benar: r.data?.benar ?? 0, dari: r.data?.dari ?? null, at: r.created_at }]));
 }
 async function jadwalTerpilih(ids) {
   if (!ids.length) return {};
@@ -277,12 +279,12 @@ async function sinkronAlur() {
       await query("INSERT INTO mj_lamaran_event (lamaran_id, jenis, isi, aktor) VALUES ($1,'apk','Akun Asisten Warung terdeteksi (nomor WA-nya udah daftar)','sistem')", [l.id]);
     }
   }
-  // 2) APK ✓ + kuis 5/5 -> Interview.
+  // 2) APK ✓ + kuis benar semua -> Interview.
   const { rows: siapIv } = await query(
     `SELECT l.id, l.status FROM mj_lamaran l WHERE l.status IN ('pelajari_produk','product_test') AND l.apk_at IS NOT NULL
        AND EXISTS (SELECT 1 FROM mj_rek_attempt a WHERE a.lamaran_id=l.id AND a.tahap='product_test' AND a.hasil='lulus')`
   );
-  for (const r of siapIv) await majuKeInterview(r.id, 'sistem', 'Otomatis maju ke Interview (APK ✓, kuis 5/5)');
+  for (const r of siapIv) await majuKeInterview(r.id, 'sistem', 'Otomatis maju ke Interview (APK ✓, kuis benar semua)');
   // 3) Trial: 3 warung dalam 24 jam -> Closing test (catat attempt lulus). 3 closing -> attempt closing lulus.
   const { rows: trial } = await query(`SELECT id, status, status_sejak, trial_mulai, wp_sales_id, trial_kode FROM mj_lamaran WHERE status IN ('field_test_24h','closing_test') AND wp_sales_id IS NOT NULL`);
   const hitung = await hitungTrial(trial);
@@ -343,7 +345,7 @@ export const TEMPLATE = {
     ket: 'Dikirim waktu kandidat lolos screening.',
     wajib: ['link_kuis'],
     penanda: ['nama', 'materi', 'link_kuis'],
-    isi: 'Halo {nama}, makasih udah daftar jadi Sales Partner Konsulin.\n\nKamu lolos tahap screening. Sebelum interview, pelajari produknya dulu ya:\n{materi}\n• Kuis 5 soal: {link_kuis}\n\nWaktunya 3 hari. Kalau udah daftar di aplikasinya dan kuisnya benar semua, kamu dapet link buat pilih jadwal interview sendiri.',
+    isi: 'Halo {nama}, makasih udah daftar jadi Sales Partner Konsulin.\n\nKamu lolos tahap screening. Sebelum interview, pelajari produknya dulu ya:\n{materi}\n• Kuis product: {link_kuis}\n\nWaktunya 3 hari. Kalau udah daftar di aplikasinya dan kuisnya benar semua, kamu dapet link buat pilih jadwal interview sendiri.',
   },
   kuis_ulang: {
     judul: 'Kirim ulang kuis',
@@ -492,7 +494,7 @@ router.get('/rekrutmen/lamaran/:id/alur', async (req, res, next) => {
 // Loloskan screening + kirim paket materi: new/screening/screening_passed -> pelajari_produk, token kuis baru.
 async function loloskan(id, aktor, { materiId = null, teksWa = null, paksa = false } = {}) {
   const { rows: soal } = await query('SELECT count(*)::int AS n FROM mj_rek_soal WHERE aktif');
-  if (soal[0].n < JUMLAH_SOAL) throw salah(`Soal kuis aktif baru ${soal[0].n}. Tambahin sampai ${JUMLAH_SOAL} di Rekrutmen → Pengaturan dulu.`);
+  if (soal[0].n < MIN_SOAL) throw salah(`Soal kuis aktif baru ${soal[0].n}. Tambahin minimal ${MIN_SOAL} di Rekrutmen → Pengaturan dulu.`);
   const { rows: materiSemua } = await query('SELECT * FROM mj_rek_materi WHERE aktif ORDER BY urutan, id');
   const materi = materiId ? materiSemua.filter((m) => materiId.includes(Number(m.id))) : materiSemua;
   const { rows: nm } = await query('SELECT o.nama FROM mj_lamaran l JOIN mj_orang o ON o.id=l.orang_id WHERE l.id=$1', [id]);
@@ -589,7 +591,7 @@ router.post('/rekrutmen/lamaran/:id/kuis-ulang', async (req, res, next) => {
 router.post('/rekrutmen/lamaran/:id/maju-interview', async (req, res, next) => {
   try {
     const { rows } = await query("SELECT 1 FROM mj_rek_attempt WHERE lamaran_id=$1 AND tahap='product_test' AND hasil='lulus'", [req.params.id]);
-    if (!rows.length) throw salah('Kuis belum lulus 5/5');
+    if (!rows.length) throw salah('Kuis belum lulus (harus benar semua)');
     const token = await majuKeInterview(req.params.id, req.admin.nama, 'Maju ke Interview (APK belum kebaca, diputusin recruiter)');
     if (!token) throw salah('Kandidat nggak lagi di tahap Belajar & tes');
     await catatLog(req, 'rekrutmen.lamaran.maju', { ke: 'interview' });
@@ -791,7 +793,7 @@ router.get('/rekrutmen/materi', async (req, res, next) => {
       query('SELECT * FROM mj_rek_esai ORDER BY urutan, id'),
     ]);
     const t = await templateAktif();
-    res.json({ materi, soal, esai, maksEsai: MAKS_ESAI_AKTIF, jumlahSoal: JUMLAH_SOAL, templateMateri: t.materi || TEMPLATE.materi.isi, contohTeks: (await teksMateri('Budi', materi.filter((m) => m.aktif))).replace('{LINK_KUIS}', `${PUBLIK_URL()}/kuis/contoh`) });
+    res.json({ materi, soal, esai, maksEsai: MAKS_ESAI_AKTIF, minSoal: MIN_SOAL, templateMateri: t.materi || TEMPLATE.materi.isi, contohTeks: (await teksMateri('Budi', materi.filter((m) => m.aktif))).replace('{LINK_KUIS}', `${PUBLIK_URL()}/kuis/contoh`) });
   } catch (e) {
     next(e);
   }
@@ -1041,7 +1043,7 @@ async function bacaToken(token, jenis) {
   if (!rows[0].aktif) throw salah('Link ini udah nggak berlaku. Minta link terbaru ke tim rekrutmen.', 410);
   return rows[0];
 }
-const soalKuis = () => query('SELECT id, pertanyaan, pilihan, jawaban FROM mj_rek_soal WHERE aktif ORDER BY urutan, id LIMIT $1', [JUMLAH_SOAL]).then((r) => r.rows);
+const soalKuis = () => query('SELECT id, pertanyaan, pilihan, jawaban FROM mj_rek_soal WHERE aktif ORDER BY urutan, id').then((r) => r.rows);
 const esaiKuis = () => query('SELECT id, pertanyaan, petunjuk, maks FROM mj_rek_esai WHERE aktif ORDER BY urutan, id LIMIT $1', [MAKS_ESAI_AKTIF]).then((r) => r.rows);
 
 publikAlurRouter.get('/kuis/:token', async (req, res, next) => {
@@ -1049,7 +1051,7 @@ publikAlurRouter.get('/kuis/:token', async (req, res, next) => {
     const t = await bacaToken(req.params.token, 'kuis');
     if (t.dipakai_at) {
       const { rows } = await query("SELECT data, hasil FROM mj_rek_attempt WHERE lamaran_id=$1 AND tahap='product_test' ORDER BY id DESC LIMIT 1", [t.lamaran_id]);
-      return res.json({ nama: depan(t.nama), selesai: true, benar: rows[0]?.data?.benar ?? 0, dari: rows[0]?.data?.dari ?? JUMLAH_SOAL, lulus: rows[0]?.hasil === 'lulus' });
+      return res.json({ nama: depan(t.nama), selesai: true, benar: rows[0]?.data?.benar ?? 0, dari: rows[0]?.data?.dari ?? 0, lulus: rows[0]?.hasil === 'lulus' });
     }
     if (!['pelajari_produk', 'product_test'].includes(t.status)) throw salah('Kuis ini udah nggak dibuka buat kamu', 410);
     const [soal, esai] = await Promise.all([soalKuis(), esaiKuis()]);

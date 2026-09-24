@@ -266,7 +266,7 @@ function Kartu({ k, onBuka, pilih, setPilih }) {
         {k.kolom === 1 && (
           <span className="rk-pil">
             <span className={k.apk_at ? 'ok' : ''}>APK {k.apk_at ? '✓' : '–'}</span>
-            <span className={k.kuis?.lulus ? 'ok' : k.kuis ? 'no' : ''}>Kuis {k.kuis ? `${k.kuis.benar}/${k.kuis.dari}` : '–/5'}</span>
+            <span className={k.kuis?.lulus ? 'ok' : k.kuis ? 'no' : ''}>Kuis {k.kuis ? `${k.kuis.benar}/${k.kuis.dari}` : '–'}</span>
           </span>
         )}
         {k.kolom === 3 && (
@@ -639,7 +639,7 @@ function Langkah({ api, l, alur, kirim, setModal, setError }) {
             </div>
           </div>
           <p className="adm-redup" style={{ fontSize: 13 }}>
-            Akun APK kebaca otomatis kalau nomor {tampilHp(l.no_hp)} daftar di Asisten Warung. APK ✓ + kuis 5/5 = otomatis pindah ke Interview.
+            Akun APK kebaca otomatis kalau nomor {tampilHp(l.no_hp)} daftar di Asisten Warung. APK ✓ + kuis benar semua = otomatis pindah ke Interview.
           </p>
           <JawabanEsai esai={alur.esai} />
           {s.lewat && <div className="rk-saran">Udah lewat 3 hari. Keluarkan sebagai No response, atau follow-up dulu kalau masih mau nunggu.</div>}
@@ -992,7 +992,7 @@ function ModalMateri({ api, l, paksa, onTutup, onSelesai }) {
       ) : (
         <>
           {paksa && <p className="adm-error" style={{ marginTop: 0 }}>Syarat wajib belum lengkap. Kamu meloloskan manual, dan ini kecatat di riwayat.</p>}
-          {soalAktif < data.jumlahSoal && <p className="adm-error">Soal kuis aktif baru {soalAktif}. Tambahin dulu di tab Pengaturan.</p>}
+          {soalAktif < data.minSoal && <p className="adm-error">Soal kuis aktif baru {soalAktif}. Tambahin dulu di tab Pengaturan.</p>}
           <p className="adm-redup" style={{ marginTop: 0 }}>Pilih materi yang dikirim. Link kuis unik buat kandidat ini ditempel otomatis pas kamu kirim.</p>
           <div className="rk-materi-pilih">
             {aktif.map((m) => (
@@ -1042,7 +1042,7 @@ function ModalMateri({ api, l, paksa, onTutup, onSelesai }) {
             </button>
             <button
               className="btn utama"
-              disabled={sibuk || !teks.includes('{LINK_KUIS}') || soalAktif < data.jumlahSoal}
+              disabled={sibuk || !teks.includes('{LINK_KUIS}') || soalAktif < data.minSoal}
               onClick={async () => {
                 setSibuk(true);
                 setError('');
@@ -1162,8 +1162,8 @@ export function KuisMateri({ api }) {
               + Soal
             </button>
           </div>
-          <p className={soalAktif < data.jumlahSoal ? 'adm-error' : 'adm-redup'}>
-            Kuis pakai {data.jumlahSoal} soal aktif teratas, lulus kalau benar semua. Aktif sekarang: {soalAktif}.
+          <p className={soalAktif < data.minSoal ? 'adm-error' : 'adm-redup'}>
+            Kuis pakai semua soal aktif (urut dari atas), lulus kalau benar semua. Aktif sekarang: {soalAktif} soal{soalAktif < data.minSoal ? ` - minimal ${data.minSoal} biar kuis bisa dikirim` : ''}. Nonaktifkan soal yang nggak mau dipakai.
           </p>
           <ol className="rk-daftar-soal">
             {data.soal.map((s) => (

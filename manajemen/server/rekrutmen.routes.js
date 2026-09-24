@@ -15,7 +15,7 @@ import { DOKUMEN_DIR } from './utils/fotoLamaran.js';
 // Urutan tahap (D-77, tidak berubah). HIRING_DECISION = peristiwa, bukan status (§8.2): lamaran yang lulus Closing
 // Test tetap di 'closing_test' sampai keputusan manusia dicatat.
 // 'pelajari_produk' (revisi Sep 2026): setelah lolos screening kandidat dikirimin paket materi + link APK + kuis online;
-// selesai pakai APK dan kuis 5/5 -> otomatis ke Interview (lihat rekrutmenAlur.js).
+// selesai pakai APK dan kuis benar semua -> otomatis ke Interview (lihat rekrutmenAlur.js).
 export const TAHAP = ['new', 'screening', 'screening_passed', 'pelajari_produk', 'product_test', 'interview', 'field_test_24h', 'closing_test', 'hired'];
 export const KELUAR = ['rejected', 'withdrawn', 'no_response', 'on_hold', 'talent_pool'];
 // Tahap yang majunya lewat attempt yang lulus (bukan tombol "maju" biasa).
@@ -534,7 +534,7 @@ router.post('/rekrutmen/lamaran/:id/maju', async (req, res, next) => {
 });
 
 // Catat attempt di tahap bertes. Aturan lulus (D-33):
-//  product_test  : 5 soal benar semua + setuju bagi hasil
+//  product_test  : semua soal kuis aktif benar + setuju bagi hasil
 //  interview     : keputusan manusia (lulus/gagal) + pewawancara + alasan; bisa dijadwalkan dulu
 //  field_test_24h: 3 warung dikunjungi + laporan terkirim
 //  closing_test  : 3 warung jadi customer, maksimal 6 hari sejak closing test dimulai
@@ -550,10 +550,13 @@ router.post('/rekrutmen/lamaran/:id/attempt', async (req, res, next) => {
       let pewawancara = null;
       let jadwal = null;
       if (l.status === 'product_test') {
-        const benar = Math.max(0, Math.min(5, Math.floor(Number(b.benar))));
-        if (!Number.isFinite(benar)) throw salah('Isi jumlah jawaban benar (0-5)');
-        data = { benar, dari: 5, setujuBagiHasil: !!b.setujuBagiHasil };
-        lulus = benar === 5 && !!b.setujuBagiHasil;
+        // Jumlah soal = semua soal kuis aktif (sama kayak kuis online), kecuali admin nyebut sendiri.
+        const { rows: aktif } = await query('SELECT count(*)::int AS n FROM mj_rek_soal WHERE aktif').catch(() => ({ rows: [{ n: 5 }] }));
+        const dari = Math.max(1, Math.min(100, Math.floor(Number(b.dari)) || aktif[0].n || 5));
+        const benar = Math.max(0, Math.min(dari, Math.floor(Number(b.benar))));
+        if (!Number.isFinite(benar)) throw salah(`Isi jumlah jawaban benar (0-${dari})`);
+        data = { benar, dari, setujuBagiHasil: !!b.setujuBagiHasil };
+        lulus = benar === dari && !!b.setujuBagiHasil;
       } else if (l.status === 'interview') {
         pewawancara = teks(b.pewawancara, 80);
         if (!pewawancara) throw salah('Isi nama pewawancara');
