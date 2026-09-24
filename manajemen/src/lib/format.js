@@ -1,5 +1,12 @@
 export const rupiah = (n) => (n < 0 ? '-Rp ' : 'Rp ') + Math.abs(Math.round(n || 0)).toLocaleString('id-ID');
 export const tgl = (t) => (t ? new Date(t).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-');
+// 24/09/26 22.59 (dd/mm/yy + jam) - buat cap "terakhir diubah" yang perlu tanggal lengkap tapi ringkas.
+export const waktuDdmmyy = (t) => {
+  if (!t) return '-';
+  const d = new Date(t);
+  const dua = (n) => String(n).padStart(2, '0');
+  return `${dua(d.getDate())}/${dua(d.getMonth() + 1)}/${dua(d.getFullYear() % 100)} ${dua(d.getHours())}.${dua(d.getMinutes())}`;
+};
 export const waktu = (t) => (t ? new Date(t).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-');
 // "2026-09" -> "Sep 2026"
 export const bulanLabel = (b, panjang = false) => {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { tampilHp, tgl, waktu } from '../lib/format.js';
+import { tampilHp, tgl, waktu, waktuDdmmyy } from '../lib/format.js';
 import { Gagal, Kosong, Memuat, Modal, useData } from '../komponen/Ui.jsx';
 import { FotoKandidat } from '../komponen/FotoProfil.jsx';
 import { Catatan, DataLamaran, FollowUp, TAHAP } from './Rekrutmen.jsx';
@@ -1292,7 +1292,7 @@ function PertanyaanInterview({ api }) {
     <section className="adm-kartu" style={{ marginTop: 20 }}>
       <div className="adm-kartu-kepala" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
         <h2 style={{ margin: 0 }}>Pertanyaan interview (product)</h2>
-        {data?.diubah && <span className="adm-redup">Diubah {data.diubah_oleh}, {waktu(data.diubah_at)}</span>}
+        {data?.diubah && <span className="adm-redup">Diubah {data.diubah_oleh} · {waktuDdmmyy(data.diubah_at)}</span>}
       </div>
       <p className="adm-redup" style={{ marginTop: 0 }}>
         Satu pertanyaan per baris (maks 30). Masuk otomatis ke lembar interview semua kandidat, ditambah pertanyaan gali dari analisis lamarannya. Pertanyaan baru ikut nyusul ke lembar yang udah pernah diisi - nilai yang udah dikasih tetap aman.
@@ -1379,7 +1379,7 @@ function KartuTemplate({ api, t, contoh, onSimpan }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
         <b>{t.judul}</b>
         <span className="adm-redup" style={{ fontSize: 12 }}>
-          {t.diubah ? `Diubah ${t.diubah_oleh || '-'} · ${waktu(t.diubah_at)}` : 'Bawaan'}
+          {t.diubah ? `Diubah ${t.diubah_oleh || '-'} · ${waktuDdmmyy(t.diubah_at)}` : 'Bawaan'}
         </span>
       </div>
       <p className="adm-redup" style={{ margin: '2px 0 8px', fontSize: 13 }}>
