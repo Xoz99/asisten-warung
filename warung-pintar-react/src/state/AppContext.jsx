@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { api, sesi } from '../lib/api';
 import { inisial, escapeHtml } from '../lib/format';
+import { bisaDijual, belumDiatur } from '../lib/voice';
 import { simpanSemuaKeCache, muatSemuaDariCache } from '../lib/dataCache';
 import { getMeta, setMeta, hapusCacheWarung } from '../lib/localdb';
 import { tambahKeOutbox, hapusDariOutbox, ambilOutboxPending, prosesOutbox } from '../lib/outbox';
@@ -587,9 +588,9 @@ export function AppProvider({ children }) {
     (id, qty = 1, diam = false) => {
       const p = produkById[id];
       if (!p) return;
-      // Barang dari katalog yang belum diatur (harga jual masih 0) nggak boleh kejual Rp0.
-      if (!(p.harga > 0)) {
-        toast(`Harga <b>${escapeHtml(p.nama)}</b> belum diatur. Atur dulu di Stok ya.`);
+      // Barang yang harga jual / modal (HPP)-nya belum ada nggak boleh dijual - untung & laporannya bakal ngaco.
+      if (!bisaDijual(p)) {
+        toast(`<b>${escapeHtml(p.nama)}</b> belum bisa dijual: ${belumDiatur(p)}. Atur dulu di Stok ya.`);
         return;
       }
       setCart((c) => {

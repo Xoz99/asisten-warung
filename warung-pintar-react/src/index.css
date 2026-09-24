@@ -1154,6 +1154,10 @@ body{background:#E9E9E6}
 .perlu-atur-ikon{flex:none;width:30px;height:30px;border-radius:50%;background:#F59E0B;color:#fff;display:grid;place-items:center;font-weight:900}
 .perlu-atur-aksi{flex:none;padding:8px 14px;border-radius:999px;background:#78350F;color:#FEF3C7;font-weight:800;font-size:14px}
 .perlu-atur-teks{color:#B45309}
+.kat-rp-tetap{background:none !important;border-color:transparent !important;padding-left:2px}
+.kat-rp-tetap b{flex:1;font-size:17px}
+.hasil.belum-siap{opacity:.55}
+.hasil.belum-siap .tgl{color:#B45309;font-weight:700}
 .t-dark .perlu-atur{background:#3B2A0A;color:#FDE68A}
 .t-dark .perlu-atur b{color:#FDE68A}
 .t-dark .perlu-atur-aksi{background:#FDE68A;color:#3B2A0A}

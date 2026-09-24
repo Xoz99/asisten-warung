@@ -85,6 +85,9 @@ function gabungAngkaNama(token, produk) {
 }
 
 // Barang yang harganya belum diatur (baru diambil dari katalog) belum dijual - bukan "hampir habis".
+// Barang baru boleh dijual kalau harga jual & modal/HPP-nya udah ada - tanpa HPP, untung & laporan jadi ngaco.
+export const bisaDijual = (p) => p.harga > 0 && p.modal > 0;
+export const belumDiatur = (p) => (!(p.harga > 0) ? 'harga jual belum diatur' : !(p.modal > 0) ? 'HPP belum diisi' : null);
 export const kritisQ = (p) => p.harga > 0 && p.stok <= Math.max(3, Math.ceil(p.laku / 4));
 
 // Balikin SEMUA produk yang skor cocoknya SAMA TINGGI dengan yang terbaik (bukan cuma 1

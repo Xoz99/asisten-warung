@@ -96,9 +96,10 @@ router.get('/barcode/:kode', async (req, res, next) => {
   }
 });
 
-// Atur barang yang baru diambil dari katalog (harga jual masih 0): harga jual, modal/HPP per satuan, & stok awal
-// sekaligus. Cuma barang yang harganya MASIH 0 yang boleh lewat sini - barang yang udah jalan tetap diubah lewat
-// opname / catat belanja, biar riwayat stok & modalnya nggak dilompatin. items: [{ id, harga, modal?, stok? }]
+// Atur barang yang belum bisa dijual (harga jual masih 0 / modal-HPP masih 0, misal baru diambil dari katalog):
+// harga jual, modal/HPP per satuan, & stok awal sekaligus. Stok awal cuma dipakai buat barang yang beneran baru
+// (harga 0 & stok 0) - barang yang udah punya stok tetap lewat opname / catat belanja, biar riwayatnya nggak
+// dilompatin. Barang yang udah lengkap harga & HPP-nya nggak bisa diubah lewat sini. items: [{ id, harga, modal?, stok? }]
 router.post('/atur', async (req, res, next) => {
   try {
     const items = Array.isArray(req.body.items) ? req.body.items.slice(0, 300) : [];
@@ -107,13 +108,26 @@ router.post('/atur', async (req, res, next) => {
       .map((x) => ({ id: String(x?.id || ''), harga: Math.min(angka(x?.harga), 1e9), modal: Math.min(angka(x?.modal), 1e9), stok: Math.min(angka(x?.stok), 1e6) }))
       .filter((x) => /^[0-9a-f-]{36}$/i.test(x.id));
     if (!bersih.length) return res.status(400).json({ error: 'Nggak ada barang yang diatur' });
-    const salah = bersih.find((x) => !x.harga || (x.stok > 0 && !x.modal));
-    if (salah) return res.status(400).json({ error: !salah.harga ? 'Harga jual wajib diisi' : 'Stok diisi, modal/HPP-nya wajib diisi juga' });
+    if (bersih.some((x) => !x.harga)) return res.status(400).json({ error: 'Harga jual wajib diisi' });
+    const { rows: produk } = await query(
+      'SELECT id, harga, modal, stok FROM produk WHERE warung_id=$1 AND id = ANY($2) AND (harga <= 0 OR modal <= 0)',
+      [req.warungId, bersih.map((x) => x.id)]
+    );
+    const byId = Object.fromEntries(produk.map((p) => [p.id, p]));
+    const rencana = bersih
+      .filter((x) => byId[x.id])
+      .map((x) => {
+        const p = byId[x.id];
+        const baru = Number(p.harga) <= 0 && Number(p.stok) <= 0;
+        return { ...x, stok: baru ? x.stok : Number(p.stok), modal: x.modal || Number(p.modal) || 0 };
+      });
+    // Ada stok tapi HPP kosong = rata-rata HPP & laporan untungnya ngaco.
+    if (rencana.some((x) => x.stok > 0 && !x.modal)) return res.status(400).json({ error: 'Barang yang ada stoknya wajib diisi modal/HPP-nya' });
     const diatur = [];
-    for (const x of bersih) {
+    for (const x of rencana) {
       const { rows } = await query(
         `UPDATE produk SET harga=$1, modal=$2, stok=$3, updated_at=now()
-         WHERE id=$4 AND warung_id=$5 AND harga <= 0 RETURNING id`,
+         WHERE id=$4 AND warung_id=$5 AND (harga <= 0 OR modal <= 0) RETURNING id`,
         [x.harga, x.modal, x.stok, x.id, req.warungId]
       );
       if (rows.length) diatur.push(rows[0].id);

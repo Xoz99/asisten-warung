@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { ProductIcon, CameraIcon } from '../lib/icons.jsx';
-import { kritisQ, hppRata } from '../lib/voice';
+import { kritisQ, hppRata, bisaDijual, belumDiatur } from '../lib/voice';
 import { rupiah, escapeHtml, angkaRingkas } from '../lib/format';
 import { MARGIN_REKOMENDASI, hargaDariMargin } from '../lib/harga';
 import { api } from '../lib/api';
@@ -47,7 +47,8 @@ function BarisProduk({ p, onTap }) {
           <div>
             <div className="nama">{p.nama}</div>
             <div className="tgl">
-              {p.harga > 0 ? rupiah(p.harga) : <b className="perlu-atur-teks">Harga belum diatur</b>} · laku {angkaRingkas(p.laku)}/hari ·{' '}
+              {p.harga > 0 ? rupiah(p.harga) : <b className="perlu-atur-teks">Harga belum diatur</b>}
+              {p.harga > 0 && !(p.modal > 0) && <b className="perlu-atur-teks"> · HPP belum diisi</b>} · laku {angkaRingkas(p.laku)}/hari ·{' '}
               <span className="ic-inline">
                 <svg viewBox="0 0 24 24">
                   <rect x="5.5" y="11" width="13" height="9" rx="2.5" />
@@ -101,8 +102,8 @@ export default function Stok() {
   }
 
   const jumlahKritis = S.produk.filter(kritisQ).length;
-  // Barang dari katalog yang harga jualnya belum diisi - belum bisa dijual sampai diatur.
-  const perluDiatur = S.produk.filter((p) => !(p.harga > 0));
+  // Barang yang harga jual atau modal/HPP-nya belum ada - belum bisa dijual di Catat jualan sampai diatur.
+  const perluDiatur = S.produk.filter((p) => !bisaDijual(p));
   const [aturBuka, setAturBuka] = useState(false);
   const bukaAtur = () => mintaPin(() => setAturBuka(true));
 
@@ -120,7 +121,7 @@ export default function Stok() {
           <span className="perlu-atur-ikon" aria-hidden="true">!</span>
           <span>
             <b>{perluDiatur.length} barang perlu diatur dulu</b>
-            <span>Isi harga jual, modal/HPP & stok awalnya - belum bisa dijual sebelum ada harganya.</span>
+            <span>Isi harga jual & modal/HPP-nya - barang ini belum bisa dijual di Catat jualan sebelum diatur.</span>
           </span>
           <span className="perlu-atur-aksi">Atur</span>
         </button>
@@ -222,13 +223,13 @@ export default function Stok() {
             </div>
             {items.map((p, i) => (
               <div key={p.id} style={i > 0 ? { marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--garis)' } : undefined}>
-                <BarisProduk p={p} onTap={() => (p.harga > 0 ? mintaPin(() => setOpnameProduk(p)) : bukaAtur())} />
+                <BarisProduk p={p} onTap={() => (bisaDijual(p) ? mintaPin(() => setOpnameProduk(p)) : bukaAtur())} />
               </div>
             ))}
           </div>
         ))}
         {kelompokkan(list).tunggal.map((p) => (
-          <div key={p.id} className="card tapx" onClick={() => (p.harga > 0 ? mintaPin(() => setOpnameProduk(p)) : bukaAtur())}>
+          <div key={p.id} className="card tapx" onClick={() => (bisaDijual(p) ? mintaPin(() => setOpnameProduk(p)) : bukaAtur())}>
             <BarisProduk p={p} />
           </div>
         ))}
@@ -255,24 +256,31 @@ export default function Stok() {
   );
 }
 
-// Atur barang yang baru diambil dari katalog (harga jual masih 0): harga jual, modal/HPP & stok awal diisi sekaligus
-// di satu lembar. Boleh sebagian dulu - yang harganya belum diisi tetap nunggu di kotak "Perlu diatur".
+// Atur barang yang belum bisa dijual (harga jual / modal-HPP belum ada, misal baru diambil dari katalog): harga jual,
+// modal/HPP & stok awal diisi sekaligus di satu lembar. Boleh sebagian dulu - yang belum lengkap tetap nunggu di kotak
+// "Perlu diatur". Stok awal cuma bisa diisi buat barang yang beneran baru (harga 0 & stok 0); barang yang udah punya
+// stok, stoknya tetap lewat opname / catat belanja.
 function SheetAturBarang({ barang, onClose }) {
   const { toast, refreshData } = useApp();
-  const [isi, setIsi] = useState({}); // id -> { harga, modal, stok }
+  const baru = (b) => !(b.harga > 0) && !(b.stok > 0);
+  const [isi, setIsi] = useState(() => Object.fromEntries(barang.map((b) => [b.id, { harga: b.harga > 0 ? String(b.harga) : '', modal: '', stok: '' }])));
   const [simpan, setSimpan] = useState(false);
   const ubah = (id, k, v) => setIsi((x) => ({ ...x, [id]: { ...x[id], [k]: v.replace(/\D/g, '').slice(0, 9) } }));
-  const siap = barang.filter((b) => +isi[b.id]?.harga > 0);
-  // Stok diisi tapi modal kosong = HPP rata-rata & laporan untungnya ngaco. Stok 0 boleh tanpa modal (keisi pas belanja).
-  const kurangModal = siap.filter((b) => +isi[b.id]?.stok > 0 && !(+isi[b.id]?.modal > 0));
+  const stokAkhir = (b) => (baru(b) ? +isi[b.id]?.stok || 0 : b.stok);
+  // Baris yang ada perubahan & harganya keisi.
+  const siap = barang.filter((b) => +isi[b.id]?.harga > 0 && (+isi[b.id]?.modal > 0 || +isi[b.id]?.harga !== b.harga || +isi[b.id]?.stok > 0));
+  // Ada stok tapi modal kosong = HPP rata-rata & laporan untungnya ngaco. Stok 0 boleh tanpa modal dulu (keisi pas
+  // catat belanja), tapi barangnya belum bisa dijual sampai HPP-nya ada.
+  const kurangModal = siap.filter((b) => stokAkhir(b) > 0 && !(+isi[b.id]?.modal > 0));
   const kirim = async () => {
     if (!siap.length || kurangModal.length) return;
     setSimpan(true);
     try {
       const r = await api.katalog.atur(siap.map((b) => ({ id: b.id, harga: +isi[b.id].harga, modal: +isi[b.id].modal || 0, stok: +isi[b.id].stok || 0 })));
       await refreshData();
-      const sisa = barang.length - r.diatur;
-      toast(`<b>${r.diatur} barang</b> siap dijual${sisa ? ` · ${sisa} lagi masih perlu diatur` : ''}.`);
+      const lengkap = siap.filter((b) => +isi[b.id].modal > 0).length;
+      const tanpaHpp = r.diatur - lengkap;
+      toast(`<b>${lengkap} barang</b> siap dijual${tanpaHpp > 0 ? ` · ${tanpaHpp} lagi masih nunggu HPP` : ''}.`);
       onClose();
     } catch (e) {
       toast(escapeHtml(e.message || 'Gagal nyimpen, coba lagi'));
@@ -285,7 +293,7 @@ function SheetAturBarang({ barang, onClose }) {
         <div className="kat-kepala">
           <div>
             <h3>Atur barang</h3>
-            <p>Isi harga jual tiap barang. Modal/HPP wajib kalau stoknya diisi. Yang belum diisi bisa nanti.</p>
+            <p>Barang baru bisa dijual kalau harga jual & modal/HPP-nya udah diisi. Yang belum sempat bisa nanti.</p>
           </div>
           <button type="button" className="kat-tutup" onClick={onClose} aria-label="Tutup">
             <svg viewBox="0 0 24 24">
@@ -306,9 +314,7 @@ function SheetAturBarang({ barang, onClose }) {
                   </span>
                   <span className="kat-teks">
                     <b>{b.nama}</b>
-                    <span>
-                      {b.kat || 'lainnya'} · per {b.satuan}
-                    </span>
+                    <span>{belumDiatur(b)?.replace(/^./, (c) => c.toUpperCase())}</span>
                   </span>
                 </div>
                 <div className="kat-isian">
@@ -321,26 +327,33 @@ function SheetAturBarang({ barang, onClose }) {
                   </label>
                   <label>
                     <span>Modal / HPP</span>
-                    <div className={'kat-rp' + (+x.stok > 0 && !(+x.modal > 0) ? ' kurang' : '')}>
+                    <div className={'kat-rp' + (stokAkhir(b) > 0 && +x.harga > 0 && !(+x.modal > 0) ? ' kurang' : '')}>
                       <i>Rp</i>
-                      <input inputMode="numeric" value={x.modal || ''} onChange={(e) => ubah(b.id, 'modal', e.target.value)} placeholder={+x.stok > 0 ? 'wajib' : 'nanti'} aria-label={`Modal ${b.nama}`} />
+                      <input inputMode="numeric" value={x.modal || ''} onChange={(e) => ubah(b.id, 'modal', e.target.value)} placeholder="wajib" aria-label={`Modal ${b.nama}`} />
                     </div>
                   </label>
                   <label>
-                    <span>Stok awal</span>
-                    <div className="kat-rp">
-                      <input inputMode="numeric" value={x.stok || ''} onChange={(e) => ubah(b.id, 'stok', e.target.value)} placeholder="0" aria-label={`Stok awal ${b.nama}`} />
-                      <i>{b.satuan}</i>
-                    </div>
+                    <span>{baru(b) ? 'Stok awal' : 'Stok sekarang'}</span>
+                    {baru(b) ? (
+                      <div className="kat-rp">
+                        <input inputMode="numeric" value={x.stok || ''} onChange={(e) => ubah(b.id, 'stok', e.target.value)} placeholder="0" aria-label={`Stok awal ${b.nama}`} />
+                        <i>{b.satuan}</i>
+                      </div>
+                    ) : (
+                      <div className="kat-rp kat-rp-tetap">
+                        <b>{b.stok}</b>
+                        <i>{b.satuan}</i>
+                      </div>
+                    )}
                   </label>
                   <p className="kat-catatan">
                     {untung !== null
                       ? untung > 0
                         ? `Untung ${rupiah(untung)} per ${b.satuan}`
                         : 'Harga jual di bawah modal - rugi'
-                      : +x.stok > 0
-                        ? `Stok diisi, modal per ${b.satuan} wajib diisi biar untungnya bener`
-                        : 'Modal boleh kosong kalau stoknya 0 - keisi otomatis pas kamu catat belanja'}
+                      : stokAkhir(b) > 0
+                        ? `Ada stoknya, modal per ${b.satuan} wajib diisi biar untungnya bener`
+                        : 'Belum bisa dijual sampai HPP-nya ada - isi sekarang, atau keisi otomatis pas kamu catat belanja'}
                   </p>
                 </div>
               </div>
@@ -348,9 +361,9 @@ function SheetAturBarang({ barang, onClose }) {
           })}
         </div>
         <div className="kat-bawah">
-          {kurangModal.length > 0 && <p>{kurangModal.length} barang stoknya diisi tapi modal/HPP-nya belum</p>}
+          {kurangModal.length > 0 && <p>{kurangModal.length} barang ada stoknya tapi modal/HPP-nya belum</p>}
           <button className="btn utama" style={{ width: '100%' }} disabled={!siap.length || kurangModal.length > 0 || simpan} onClick={kirim}>
-            {simpan ? 'Menyimpan…' : siap.length ? `Simpan ${siap.length} barang` : 'Isi harga jual dulu'}
+            {simpan ? 'Menyimpan…' : siap.length ? `Simpan ${siap.length} barang` : 'Isi harga & HPP dulu'}
           </button>
         </div>
       </div>

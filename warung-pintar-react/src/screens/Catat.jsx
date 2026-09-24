@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { ProductIcon, CameraIcon, Ikon } from '../lib/icons.jsx';
-import { parseUcapan } from '../lib/voice';
+import { parseUcapan, bisaDijual, belumDiatur } from '../lib/voice';
 import { perangkatIOS } from '../lib/mic';
 import { mulaiRekam, rekamanDidukung } from '../lib/rekam';
 import { terpasangSebagaiApp } from '../lib/pwa';
@@ -131,7 +131,8 @@ export default function Catat() {
     };
   }, []);
 
-  const produkSeringPagi = (idSeringPagi?.length ? idSeringPagi.map((id) => produkById[id]).filter(Boolean) : null) || S.produk.slice(0, 6);
+  // Barang yang belum bisa dijual (harga/HPP belum diatur) nggak ditawarin di chip cepat.
+  const produkSeringPagi = ((idSeringPagi?.length ? idSeringPagi.map((id) => produkById[id]).filter(Boolean) : null) || S.produk.slice(0, 12)).filter(bisaDijual).slice(0, 6);
 
   const chipTap = (id) => {
     tambah(id, 1);
@@ -479,13 +480,11 @@ function SheetCariManual({ onClose }) {
           {baris.length === 0 && <div className="kosong">Nggak ada barang cocok "{escapeHtml(cari)}"</div>}
           {baris.map((row) =>
             row.tipe === 'satu' ? (
-              <button key={row.item.id} className="hasil" onClick={() => pilihDariHasil(row.item)}>
+              <button key={row.item.id} className={'hasil' + (bisaDijual(row.item) ? '' : ' belum-siap')} onClick={() => pilihDariHasil(row.item)}>
                 <ProductIcon id={row.item.id} foto={row.item.foto} />
                 <div>
                   <div className="nama">{row.item.nama}</div>
-                  <div className="tgl">
-                    {rupiah(row.item.harga)} · sisa {row.item.stok}
-                  </div>
+                  <div className="tgl">{bisaDijual(row.item) ? `${rupiah(row.item.harga)} · sisa ${row.item.stok}` : `Belum bisa dijual · ${belumDiatur(row.item)}`}</div>
                 </div>
               </button>
             ) : (
@@ -504,13 +503,11 @@ function SheetCariManual({ onClose }) {
                 {grupTerbuka === row.grup && (
                   <div style={{ paddingLeft: 16 }}>
                     {row.items.map((p) => (
-                      <button key={p.id} className="hasil" style={{ marginTop: 6 }} onClick={() => pilihDariHasil(p)}>
+                      <button key={p.id} className={'hasil' + (bisaDijual(p) ? '' : ' belum-siap')} style={{ marginTop: 6 }} onClick={() => pilihDariHasil(p)}>
                         <ProductIcon id={p.id} foto={p.foto} />
                         <div>
                           <div className="nama">{p.nama}</div>
-                          <div className="tgl">
-                            {rupiah(p.harga)} · sisa {p.stok}
-                          </div>
+                          <div className="tgl">{bisaDijual(p) ? `${rupiah(p.harga)} · sisa ${p.stok}` : `Belum bisa dijual · ${belumDiatur(p)}`}</div>
                         </div>
                       </button>
                     ))}
