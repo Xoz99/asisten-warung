@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { tgl, waktu } from '../lib/format.js';
 import { Gagal, Konfirmasi, Kosong, Memuat, Modal, useData } from '../komponen/Ui.jsx';
 import { unggahBerkas } from '../lib/api.js';
+import TeksMarkdown from '../komponen/TeksMarkdown.jsx';
 
 // Artifact: gudang dokumen internal - SOP, dokumen, aset, video, dan catatan, disusun per folder, dengan riwayat versi.
 // Alamat: #/artifact (semua), #/artifact/bintang, #/artifact/sampah, #/artifact/<id folder>.
@@ -912,7 +913,11 @@ function Detail({ api, id, pohon, onTutup, onBerubah, onEditCatatan, setPesan })
           <>
             <div className="adm-art-pratinjau">
               {a.isi_md !== null && a.isi_md !== undefined && !a.nama_file ? (
-                a.isi_md.trim() ? <pre>{a.isi_md}</pre> : <p className="adm-redup">Catatan ini masih kosong.</p>
+                a.isi_md.trim() ? (
+                  <div className="ai-teks adm-art-md">
+                    <TeksMarkdown teks={a.isi_md} />
+                  </div>
+                ) : <p className="adm-redup">Catatan ini masih kosong.</p>
               ) : !bisaPratinjau ? (
                 <div className="adm-art-tanpa">
                   <b>{ekstensi(a.nama_file)}</b>
@@ -927,7 +932,13 @@ function Detail({ api, id, pohon, onTutup, onBerubah, onEditCatatan, setPesan })
               ) : a.mime === 'application/pdf' ? (
                 <iframe src={tautan} title={`Pratinjau ${a.judul}`} />
               ) : (
-                <pre>{teksPratinjau ?? 'Memuat…'}</pre>
+                teksPratinjau != null && /\.(md|markdown)$/i.test(a.nama_file || '') ? (
+                  <div className="ai-teks adm-art-md">
+                    <TeksMarkdown teks={teksPratinjau} />
+                  </div>
+                ) : (
+                  <pre>{teksPratinjau ?? 'Memuat…'}</pre>
+                )
               )}
             </div>
             {tautan && (
