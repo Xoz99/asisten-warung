@@ -130,6 +130,8 @@ export const api = {
       get(`/api/katalog?${new URLSearchParams({ ...(q ? { q } : {}), ...(kategori ? { kategori } : {}), limit, offset })}`),
     barcode: (kode) => get(`/api/katalog/barcode/${encodeURIComponent(kode)}`),
     tambah: (items) => post('/api/katalog/tambah', { items }),
+    // Atur harga jual / modal / stok awal barang dari katalog yang harganya masih 0 (lihat Stok > Atur barang).
+    atur: (items) => post('/api/katalog/atur', { items }),
     pengaturan: () => get('/api/katalog/pengaturan'),
     setBagikan: (bagikan) => put('/api/katalog/pengaturan', { bagikan }),
   },

@@ -3,9 +3,9 @@ import { useApp } from '../state/AppContext.jsx';
 import { api } from '../lib/api';
 import { escapeHtml, rupiah } from '../lib/format';
 
-// "Ambil dari katalog": pilih banyak barang sekaligus dari Katalog Barang Bersama (Open Food Facts + barang yang
-// dipakai banyak warung), isi harga jualnya, langsung masuk Stok. Biar warung baru nggak ngetik barang satu-satu.
-// Kisaran harga cuma muncul kalau udah ada minimal 5 warung yang jual barang itu (lihat katalog.service.js di backend).
+// "Ambil dari katalog": centang banyak barang sekaligus dari Katalog Barang Bersama, langsung masuk Stok tanpa ngisi
+// apa-apa di sini. Harga jual, modal/HPP & stok awalnya diatur belakangan di Stok (kotak "Perlu diatur" -> Atur
+// barang). Kisaran harga cuma muncul kalau udah ada minimal 5 warung yang jual barang itu (katalog.service.js).
 const NAMA_KATEGORI = { lainnya: 'Lainnya', 'mie instan': 'Mie instan' };
 const namaKategori = (k) => NAMA_KATEGORI[k] || k.charAt(0).toUpperCase() + k.slice(1);
 const PER_HALAMAN = 60;
@@ -18,7 +18,7 @@ export default function SheetKatalog({ onClose }) {
   const [data, setData] = useState({ barang: [], kategori: [], adaLagi: false });
   const [memuat, setMemuat] = useState(true);
   const [gagal, setGagal] = useState('');
-  const [pilihan, setPilihan] = useState({}); // id -> { b, harga, stok }
+  const [pilihan, setPilihan] = useState({}); // id -> barang katalog
   const [simpan, setSimpan] = useState(false);
   const minta = useRef(0);
 
@@ -48,11 +48,6 @@ export default function SheetKatalog({ onClose }) {
   }, [q, kategori]);
 
   const dipilih = Object.values(pilihan);
-  const kurangHarga = dipilih.filter((x) => !(+x.harga > 0)).length;
-  // Stok diisi tapi modal kosong = HPP rata-rata & untungnya ngaco (lihat masuk-stok di backend). Stok kosong boleh
-  // tanpa modal: nanti keisi pas catat belanja pertama.
-  const kurangModal = dipilih.filter((x) => +x.stok > 0 && !(+x.modal > 0)).length;
-  const kurang = kurangHarga + kurangModal;
   const kategoriUrut = useMemo(
     () => [...data.kategori].sort((a, b) => (a.kategori === 'lainnya') - (b.kategori === 'lainnya') || b.n - a.n),
     [data.kategori]
@@ -62,21 +57,20 @@ export default function SheetKatalog({ onClose }) {
     setPilihan((p) => {
       const x = { ...p };
       if (x[b.id]) delete x[b.id];
-      else x[b.id] = { b, harga: b.harga?.tengah ? String(b.harga.tengah) : '', modal: '', stok: '' };
+      else x[b.id] = b;
       return x;
     });
-  const ubah = (id, k, v) => setPilihan((p) => ({ ...p, [id]: { ...p[id], [k]: v.replace(/\D/g, '').slice(0, 9) } }));
 
   const tambah = async () => {
-    if (!dipilih.length || kurang) return;
+    if (!dipilih.length) return;
     setSimpan(true);
     try {
-      const r = await api.katalog.tambah(dipilih.map((x) => ({ id: x.b.id, harga: +x.harga, modal: +x.modal || 0, stok: +x.stok || 0 })));
+      const r = await api.katalog.tambah(dipilih.map((b) => ({ id: b.id })));
       await refreshData();
       toast(
-        `<b>${r.ditambah} barang</b> masuk ke Stok${r.dilewati ? ` (${r.dilewati} udah ada, dilewati)` : ''}. Barang yang stoknya kosong, modalnya keisi pas catat belanja.`
+        `<b>${r.ditambah} barang</b> masuk ke Stok${r.dilewati ? ` (${r.dilewati} udah ada, dilewati)` : ''}. Atur harga jual & HPP-nya dulu di Stok sebelum dijual.`
       );
-      onClose();
+      onClose(r.ditambah);
     } catch (e) {
       toast(escapeHtml(e.message || 'Gagal nambah barang, coba lagi'));
       setSimpan(false);
@@ -89,7 +83,7 @@ export default function SheetKatalog({ onClose }) {
         <div className="kat-kepala">
           <div>
             <h3>Ambil dari katalog</h3>
-            <p>Centang barang yang kamu jual, isi harga jualnya, langsung masuk Stok.</p>
+            <p>Centang aja barang yang kamu jual. Harga & HPP-nya diatur nanti di Stok.</p>
           </div>
           <button type="button" className="kat-tutup" onClick={onClose} aria-label="Tutup">
             <svg viewBox="0 0 24 24">
@@ -146,40 +140,6 @@ export default function SheetKatalog({ onClose }) {
                   </span>
                   <span className="kat-cek">{b.sudahPunya ? 'Udah ada' : x ? '✓' : ''}</span>
                 </button>
-                {x && (
-                  <div className="kat-isian">
-                    <label>
-                      <span>Harga jual</span>
-                      <div className="kat-rp">
-                        <i>Rp</i>
-                        <input inputMode="numeric" value={x.harga} onChange={(e) => ubah(b.id, 'harga', e.target.value)} placeholder="0" autoFocus={!x.harga} />
-                      </div>
-                    </label>
-                    <label>
-                      <span>Modal / HPP</span>
-                      <div className={'kat-rp' + (+x.stok > 0 && !(+x.modal > 0) ? ' kurang' : '')}>
-                        <i>Rp</i>
-                        <input inputMode="numeric" value={x.modal} onChange={(e) => ubah(b.id, 'modal', e.target.value)} placeholder={+x.stok > 0 ? 'wajib' : 'nanti'} />
-                      </div>
-                    </label>
-                    <label>
-                      <span>Stok</span>
-                      <div className="kat-rp">
-                        <input inputMode="numeric" value={x.stok} onChange={(e) => ubah(b.id, 'stok', e.target.value)} placeholder="0" />
-                        <i>{b.satuan}</i>
-                      </div>
-                    </label>
-                    <p className="kat-catatan">
-                      {+x.modal > 0 && +x.harga > 0
-                        ? +x.harga > +x.modal
-                          ? `Untung ${rupiah(x.harga - x.modal)} per ${b.satuan}`
-                          : 'Harga jual di bawah modal - rugi'
-                        : +x.stok > 0
-                          ? 'Stok diisi, modal per ' + b.satuan + ' wajib diisi biar untungnya bener'
-                          : 'Modal boleh kosong - keisi otomatis pas kamu catat belanja barang ini'}
-                    </p>
-                  </div>
-                )}
               </div>
             );
           })}
@@ -209,13 +169,8 @@ export default function SheetKatalog({ onClose }) {
         </div>
 
         <div className="kat-bawah">
-          {kurang > 0 && (
-            <p>
-              {[kurangHarga && `${kurangHarga} barang belum ada harga jualnya`, kurangModal && `${kurangModal} barang stoknya diisi tapi modalnya belum`].filter(Boolean).join(' · ')}
-            </p>
-          )}
-          <button className="btn utama" style={{ width: '100%' }} disabled={!dipilih.length || kurang > 0 || simpan} onClick={tambah}>
-            {simpan ? 'Menyimpan…' : dipilih.length ? `Tambah ${dipilih.length} barang ke Stok` : 'Pilih barang dulu'}
+          <button className="btn utama" style={{ width: '100%' }} disabled={!dipilih.length || simpan} onClick={tambah}>
+            {simpan ? 'Menyimpan…' : dipilih.length ? `Masukin ${dipilih.length} barang ke Stok` : 'Centang barang dulu'}
           </button>
         </div>
       </div>

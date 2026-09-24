@@ -1146,6 +1146,18 @@ body{background:#E9E9E6}
 .kat-isian{display:grid;grid-template-columns:1.1fr 1.1fr .9fr;gap:8px;padding:0 12px 12px}
 .kat-catatan{grid-column:1 / -1;margin:0 !important;font-size:12px !important;color:var(--abu);font-weight:600}
 .kat-rp.kurang{border-color:#DC2626}
+/* Stok: barang dari katalog yang harga jualnya belum diisi */
+.perlu-atur{display:flex;align-items:center;gap:12px;width:100%;margin:14px 0 0;padding:14px 16px;border:0;border-radius:var(--r);background:#FEF3C7;color:#78350F;font:inherit;text-align:left;cursor:pointer}
+.perlu-atur>span:nth-child(2){flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.perlu-atur b{font-size:var(--body);color:#78350F}
+.perlu-atur>span:nth-child(2)>span{font-size:13px;font-weight:600;opacity:.85}
+.perlu-atur-ikon{flex:none;width:30px;height:30px;border-radius:50%;background:#F59E0B;color:#fff;display:grid;place-items:center;font-weight:900}
+.perlu-atur-aksi{flex:none;padding:8px 14px;border-radius:999px;background:#78350F;color:#FEF3C7;font-weight:800;font-size:14px}
+.perlu-atur-teks{color:#B45309}
+.t-dark .perlu-atur{background:#3B2A0A;color:#FDE68A}
+.t-dark .perlu-atur b{color:#FDE68A}
+.t-dark .perlu-atur-aksi{background:#FDE68A;color:#3B2A0A}
+.t-dark .perlu-atur-teks{color:#FBBF24}
 .kat-isian label{display:flex;flex-direction:column;gap:4px;min-width:0}
 .kat-isian label>span{font-size:12px;font-weight:700;color:var(--abu)}
 .kat-rp{display:flex;align-items:center;gap:6px;border:1.5px solid var(--garis);border-radius:12px;padding:0 10px;background:var(--bg)}

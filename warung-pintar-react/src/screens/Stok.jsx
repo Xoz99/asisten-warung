@@ -47,7 +47,7 @@ function BarisProduk({ p, onTap }) {
           <div>
             <div className="nama">{p.nama}</div>
             <div className="tgl">
-              {rupiah(p.harga)} · laku {angkaRingkas(p.laku)}/hari ·{' '}
+              {p.harga > 0 ? rupiah(p.harga) : <b className="perlu-atur-teks">Harga belum diatur</b>} · laku {angkaRingkas(p.laku)}/hari ·{' '}
               <span className="ic-inline">
                 <svg viewBox="0 0 24 24">
                   <rect x="5.5" y="11" width="13" height="9" rx="2.5" />
@@ -101,6 +101,10 @@ export default function Stok() {
   }
 
   const jumlahKritis = S.produk.filter(kritisQ).length;
+  // Barang dari katalog yang harga jualnya belum diisi - belum bisa dijual sampai diatur.
+  const perluDiatur = S.produk.filter((p) => !(p.harga > 0));
+  const [aturBuka, setAturBuka] = useState(false);
+  const bukaAtur = () => mintaPin(() => setAturBuka(true));
 
   return (
     <>
@@ -110,6 +114,17 @@ export default function Stok() {
           {S.produk.length} jenis barang · {jumlahKritis} hampir habis · tap barang untuk opname
         </p>
       </div>
+
+      {perluDiatur.length > 0 && (
+        <button type="button" className="perlu-atur" onClick={bukaAtur}>
+          <span className="perlu-atur-ikon" aria-hidden="true">!</span>
+          <span>
+            <b>{perluDiatur.length} barang perlu diatur dulu</b>
+            <span>Isi harga jual, modal/HPP & stok awalnya - belum bisa dijual sebelum ada harganya.</span>
+          </span>
+          <span className="perlu-atur-aksi">Atur</span>
+        </button>
+      )}
 
       <div className="scan katalog" onClick={() => setKatalogBuka(true)} role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && setKatalogBuka(true)}>
         <div className="kotak">
@@ -207,19 +222,20 @@ export default function Stok() {
             </div>
             {items.map((p, i) => (
               <div key={p.id} style={i > 0 ? { marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--garis)' } : undefined}>
-                <BarisProduk p={p} onTap={() => mintaPin(() => setOpnameProduk(p))} />
+                <BarisProduk p={p} onTap={() => (p.harga > 0 ? mintaPin(() => setOpnameProduk(p)) : bukaAtur())} />
               </div>
             ))}
           </div>
         ))}
         {kelompokkan(list).tunggal.map((p) => (
-          <div key={p.id} className="card tapx" onClick={() => mintaPin(() => setOpnameProduk(p))}>
+          <div key={p.id} className="card tapx" onClick={() => (p.harga > 0 ? mintaPin(() => setOpnameProduk(p)) : bukaAtur())}>
             <BarisProduk p={p} />
           </div>
         ))}
       </div>
 
       {katalogBuka && <SheetKatalog onClose={() => setKatalogBuka(false)} />}
+      {aturBuka && <SheetAturBarang barang={perluDiatur} onClose={() => setAturBuka(false)} />}
       {barcodeMode && <SheetBarcode mode={barcodeMode} onClose={() => setBarcodeMode(null)} onKelola={(p) => mintaPin(() => setOpnameProduk(p))} />}
       {opnameProduk && <SheetOpname produk={opnameProduk} onClose={() => setOpnameProduk(null)} />}
       {tambahVarianGrup && (
@@ -236,6 +252,109 @@ export default function Stok() {
         />
       )}
     </>
+  );
+}
+
+// Atur barang yang baru diambil dari katalog (harga jual masih 0): harga jual, modal/HPP & stok awal diisi sekaligus
+// di satu lembar. Boleh sebagian dulu - yang harganya belum diisi tetap nunggu di kotak "Perlu diatur".
+function SheetAturBarang({ barang, onClose }) {
+  const { toast, refreshData } = useApp();
+  const [isi, setIsi] = useState({}); // id -> { harga, modal, stok }
+  const [simpan, setSimpan] = useState(false);
+  const ubah = (id, k, v) => setIsi((x) => ({ ...x, [id]: { ...x[id], [k]: v.replace(/\D/g, '').slice(0, 9) } }));
+  const siap = barang.filter((b) => +isi[b.id]?.harga > 0);
+  // Stok diisi tapi modal kosong = HPP rata-rata & laporan untungnya ngaco. Stok 0 boleh tanpa modal (keisi pas belanja).
+  const kurangModal = siap.filter((b) => +isi[b.id]?.stok > 0 && !(+isi[b.id]?.modal > 0));
+  const kirim = async () => {
+    if (!siap.length || kurangModal.length) return;
+    setSimpan(true);
+    try {
+      const r = await api.katalog.atur(siap.map((b) => ({ id: b.id, harga: +isi[b.id].harga, modal: +isi[b.id].modal || 0, stok: +isi[b.id].stok || 0 })));
+      await refreshData();
+      const sisa = barang.length - r.diatur;
+      toast(`<b>${r.diatur} barang</b> siap dijual${sisa ? ` · ${sisa} lagi masih perlu diatur` : ''}.`);
+      onClose();
+    } catch (e) {
+      toast(escapeHtml(e.message || 'Gagal nyimpen, coba lagi'));
+      setSimpan(false);
+    }
+  };
+  return (
+    <div className="sheet show kat-sheet">
+      <div className="panel kat-panel">
+        <div className="kat-kepala">
+          <div>
+            <h3>Atur barang</h3>
+            <p>Isi harga jual tiap barang. Modal/HPP wajib kalau stoknya diisi. Yang belum diisi bisa nanti.</p>
+          </div>
+          <button type="button" className="kat-tutup" onClick={onClose} aria-label="Tutup">
+            <svg viewBox="0 0 24 24">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+        <div className="kat-daftar">
+          {barang.map((b) => {
+            const x = isi[b.id] || {};
+            const untung = +x.harga > 0 && +x.modal > 0 ? +x.harga - +x.modal : null;
+            return (
+              <div key={b.id} className={'kat-item atur' + (+x.harga > 0 ? ' kat-on' : '')}>
+                <div className="kat-baris" style={{ cursor: 'default' }}>
+                  <span className="kat-foto">
+                    <i>{b.nama.charAt(0)}</i>
+                    {b.foto && <img src={b.foto} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+                  </span>
+                  <span className="kat-teks">
+                    <b>{b.nama}</b>
+                    <span>
+                      {b.kat || 'lainnya'} · per {b.satuan}
+                    </span>
+                  </span>
+                </div>
+                <div className="kat-isian">
+                  <label>
+                    <span>Harga jual</span>
+                    <div className="kat-rp">
+                      <i>Rp</i>
+                      <input inputMode="numeric" value={x.harga || ''} onChange={(e) => ubah(b.id, 'harga', e.target.value)} placeholder="wajib" aria-label={`Harga jual ${b.nama}`} />
+                    </div>
+                  </label>
+                  <label>
+                    <span>Modal / HPP</span>
+                    <div className={'kat-rp' + (+x.stok > 0 && !(+x.modal > 0) ? ' kurang' : '')}>
+                      <i>Rp</i>
+                      <input inputMode="numeric" value={x.modal || ''} onChange={(e) => ubah(b.id, 'modal', e.target.value)} placeholder={+x.stok > 0 ? 'wajib' : 'nanti'} aria-label={`Modal ${b.nama}`} />
+                    </div>
+                  </label>
+                  <label>
+                    <span>Stok awal</span>
+                    <div className="kat-rp">
+                      <input inputMode="numeric" value={x.stok || ''} onChange={(e) => ubah(b.id, 'stok', e.target.value)} placeholder="0" aria-label={`Stok awal ${b.nama}`} />
+                      <i>{b.satuan}</i>
+                    </div>
+                  </label>
+                  <p className="kat-catatan">
+                    {untung !== null
+                      ? untung > 0
+                        ? `Untung ${rupiah(untung)} per ${b.satuan}`
+                        : 'Harga jual di bawah modal - rugi'
+                      : +x.stok > 0
+                        ? `Stok diisi, modal per ${b.satuan} wajib diisi biar untungnya bener`
+                        : 'Modal boleh kosong kalau stoknya 0 - keisi otomatis pas kamu catat belanja'}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="kat-bawah">
+          {kurangModal.length > 0 && <p>{kurangModal.length} barang stoknya diisi tapi modal/HPP-nya belum</p>}
+          <button className="btn utama" style={{ width: '100%' }} disabled={!siap.length || kurangModal.length > 0 || simpan} onClick={kirim}>
+            {simpan ? 'Menyimpan…' : siap.length ? `Simpan ${siap.length} barang` : 'Isi harga jual dulu'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

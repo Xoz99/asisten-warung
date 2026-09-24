@@ -84,7 +84,8 @@ function gabungAngkaNama(token, produk) {
   return hasil;
 }
 
-export const kritisQ = (p) => p.stok <= Math.max(3, Math.ceil(p.laku / 4));
+// Barang yang harganya belum diatur (baru diambil dari katalog) belum dijual - bukan "hampir habis".
+export const kritisQ = (p) => p.harga > 0 && p.stok <= Math.max(3, Math.ceil(p.laku / 4));
 
 // Balikin SEMUA produk yang skor cocoknya SAMA TINGGI dengan yang terbaik (bukan cuma 1
 // pemenang) — dipakai buat deteksi ambigu: kalau beberapa varian ukuran/kemasan (satu "grup",

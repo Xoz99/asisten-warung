@@ -96,6 +96,36 @@ router.get('/barcode/:kode', async (req, res, next) => {
   }
 });
 
+// Atur barang yang baru diambil dari katalog (harga jual masih 0): harga jual, modal/HPP per satuan, & stok awal
+// sekaligus. Cuma barang yang harganya MASIH 0 yang boleh lewat sini - barang yang udah jalan tetap diubah lewat
+// opname / catat belanja, biar riwayat stok & modalnya nggak dilompatin. items: [{ id, harga, modal?, stok? }]
+router.post('/atur', async (req, res, next) => {
+  try {
+    const items = Array.isArray(req.body.items) ? req.body.items.slice(0, 300) : [];
+    const angka = (v) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Math.round(Number(v)) : 0);
+    const bersih = items
+      .map((x) => ({ id: String(x?.id || ''), harga: Math.min(angka(x?.harga), 1e9), modal: Math.min(angka(x?.modal), 1e9), stok: Math.min(angka(x?.stok), 1e6) }))
+      .filter((x) => /^[0-9a-f-]{36}$/i.test(x.id));
+    if (!bersih.length) return res.status(400).json({ error: 'Nggak ada barang yang diatur' });
+    const salah = bersih.find((x) => !x.harga || (x.stok > 0 && !x.modal));
+    if (salah) return res.status(400).json({ error: !salah.harga ? 'Harga jual wajib diisi' : 'Stok diisi, modal/HPP-nya wajib diisi juga' });
+    const diatur = [];
+    for (const x of bersih) {
+      const { rows } = await query(
+        `UPDATE produk SET harga=$1, modal=$2, stok=$3, updated_at=now()
+         WHERE id=$4 AND warung_id=$5 AND harga <= 0 RETURNING id`,
+        [x.harga, x.modal, x.stok, x.id, req.warungId]
+      );
+      if (rows.length) diatur.push(rows[0].id);
+    }
+    // Harganya sekarang udah ada - ikut dihitung di kisaran harga katalog (kalau warungnya mau berbagi).
+    setImmediate(() => diatur.reduce((p, id) => p.then(() => catatKontribusi(id)), Promise.resolve()));
+    res.json({ diatur: diatur.length, dilewati: bersih.length - diatur.length });
+  } catch (e) {
+    next(e);
+  }
+});
+
 // Tambah banyak barang sekaligus dari katalog ke stok warung ini. items: [{ id, harga?, modal?, stok? }]
 router.post('/tambah', async (req, res, next) => {
   try {

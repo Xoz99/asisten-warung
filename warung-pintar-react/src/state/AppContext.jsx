@@ -587,6 +587,11 @@ export function AppProvider({ children }) {
     (id, qty = 1, diam = false) => {
       const p = produkById[id];
       if (!p) return;
+      // Barang dari katalog yang belum diatur (harga jual masih 0) nggak boleh kejual Rp0.
+      if (!(p.harga > 0)) {
+        toast(`Harga <b>${escapeHtml(p.nama)}</b> belum diatur. Atur dulu di Stok ya.`);
+        return;
+      }
       setCart((c) => {
         const sudah = c[id] || 0;
         let q = qty;
