@@ -1105,9 +1105,16 @@ export function KuisMateri({ api }) {
   const { data, error, muat } = useData(api, '/rekrutmen/materi');
   const [edit, setEdit] = useState(null); // { jenis: 'materi'|'soal', awal }
   const [pesan, setPesan] = useState('');
+  const [halSoal, setHalSoal] = useState(1);
   if (error) return <Gagal apa="kuis & materi" pesan={error} onUlang={muat} />;
   if (!data) return <Memuat apa="kuis & materi" />;
   const soalAktif = data.soal.filter((s) => s.aktif).length;
+  // Daftar soal PG dipecah per halaman biar nggak jadi satu gulungan panjang. Nomornya tetap nomor urut di kuis.
+  const PER_HAL_SOAL = 5;
+  const jumlahHalSoal = Math.max(1, Math.ceil(data.soal.length / PER_HAL_SOAL));
+  const hal = Math.min(halSoal, jumlahHalSoal);
+  const awalSoal = (hal - 1) * PER_HAL_SOAL;
+  const soalHalIni = data.soal.slice(awalSoal, awalSoal + PER_HAL_SOAL);
   const esaiAktif = data.esai.filter((s) => s.aktif).length;
   const hapus = async (jenis, id) => {
     try {
@@ -1165,8 +1172,8 @@ export function KuisMateri({ api }) {
           <p className={soalAktif < data.minSoal ? 'adm-error' : 'adm-redup'}>
             Kuis pakai semua soal aktif (urut dari atas), lulus kalau benar semua. Aktif sekarang: {soalAktif} soal{soalAktif < data.minSoal ? ` - minimal ${data.minSoal} biar kuis bisa dikirim` : ''}. Nonaktifkan soal yang nggak mau dipakai.
           </p>
-          <ol className="rk-daftar-soal">
-            {data.soal.map((s) => (
+          <ol className="rk-daftar-soal" start={awalSoal + 1}>
+            {soalHalIni.map((s) => (
               <li key={s.id} style={s.aktif ? undefined : { opacity: 0.55 }}>
                 <b>{s.pertanyaan}</b> {!s.aktif && <span className="adm-chip">Nonaktif</span>}
                 <ul>
@@ -1188,6 +1195,21 @@ export function KuisMateri({ api }) {
               </li>
             ))}
           </ol>
+          {jumlahHalSoal > 1 && (
+            <div className="adm-halaman">
+              <span className="adm-label" style={{ fontSize: 11 }}>
+                Soal {awalSoal + 1}-{awalSoal + soalHalIni.length} dari {data.soal.length}
+              </span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button className="btn kecil" disabled={hal <= 1} onClick={() => setHalSoal(hal - 1)}>
+                  ‹ Sebelumnya
+                </button>
+                <button className="btn kecil" disabled={hal >= jumlahHalSoal} onClick={() => setHalSoal(hal + 1)}>
+                  Berikutnya ›
+                </button>
+              </div>
+            </div>
+          )}
         </section>
       </div>
       <section className="adm-kartu" style={{ marginTop: 16 }}>
@@ -1223,7 +1245,18 @@ export function KuisMateri({ api }) {
       <PertanyaanInterview api={api} />
       <TemplateWa api={api} onBerubah={muat} />
       {edit?.jenis === 'materi' && <FormMateri api={api} awal={edit.awal} onTutup={() => setEdit(null)} onSelesai={() => (setEdit(null), muat())} />}
-      {edit?.jenis === 'soal' && <FormSoal api={api} awal={edit.awal} onTutup={() => setEdit(null)} onSelesai={() => (setEdit(null), muat())} />}
+      {edit?.jenis === 'soal' && (
+        <FormSoal
+          api={api}
+          awal={edit.awal}
+          onTutup={() => setEdit(null)}
+          onSelesai={() => {
+            if (!edit.awal.id) setHalSoal(Infinity); // soal baru ada di paling bawah - langsung tunjukin halamannya
+            setEdit(null);
+            muat();
+          }}
+        />
+      )}
       {edit?.jenis === 'esai' && <FormEsai api={api} awal={edit.awal} onTutup={() => setEdit(null)} onSelesai={() => (setEdit(null), muat())} />}
     </>
   );
