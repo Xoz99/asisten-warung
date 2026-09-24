@@ -641,6 +641,7 @@ function Langkah({ api, l, alur, kirim, setModal, setError }) {
           <p className="adm-redup" style={{ fontSize: 13 }}>
             Akun APK kebaca otomatis kalau nomor {tampilHp(l.no_hp)} daftar di Asisten Warung. APK ✓ + kuis 5/5 = otomatis pindah ke Interview.
           </p>
+          <JawabanEsai esai={alur.esai} />
           {s.lewat && <div className="rk-saran">Udah lewat 3 hari. Keluarkan sebagai No response, atau follow-up dulu kalau masih mau nunggu.</div>}
           {alur.kuis && !alur.kuis.lulus && (
             <>
@@ -762,6 +763,24 @@ function lembarAwal(alur) {
   return [...(alur.pertanyaanProduk || []).map((q) => ({ jenis: 'produk', q, nilai: null })), ...gali.map((q) => ({ jenis: 'gali', q, nilai: null }))];
 }
 const NAMA_JENIS = { produk: 'Product', gali: 'Gali', tambahan: 'Tambahan' };
+// Jawaban soal esai dari kuis terakhir - nggak ikut nentuin lulus, dibaca rekruter buat bahan interview.
+function JawabanEsai({ esai }) {
+  if (!esai?.length) return null;
+  return (
+    <div className="rk-esai-jawab">
+      <p className="adm-label" style={{ fontSize: 10, margin: '4px 0 6px' }}>
+        Jawaban esai kuis (nggak ikut nentuin lulus - bahan buat interview)
+      </p>
+      {esai.map((e, i) => (
+        <div key={i}>
+          <b>{e.pertanyaan}</b>
+          <p>{e.jawaban}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function LangkahInterview({ api, l, alur, kirim }) {
   const [soal, setSoal] = useState(() => lembarAwal(alur));
   const [simpan, setSimpan] = useState(alur.lembar ? { oleh: alur.lembar.diubah_oleh, at: alur.lembar.diubah_at } : null);
@@ -795,6 +814,7 @@ function LangkahInterview({ api, l, alur, kirim }) {
   const nilai = Object.fromEntries(dinilai.map((s) => [s.q, s.nilai]));
   return (
     <>
+      <JawabanEsai esai={alur.esai} />
       {!alur.jadwal ? (
         <>
           <p>{l.jadwal_link_at ? `Link pilih jadwal dikirim ${waktu(l.jadwal_link_at)}. Kandidat belum milih.` : 'Kirim link pilih jadwal ke kandidat. Dia milih sendiri dari slot ketersediaan yang kamu isi.'}</p>
@@ -1042,6 +1062,7 @@ export function KuisMateri({ api }) {
   if (error) return <Gagal apa="kuis & materi" pesan={error} onUlang={muat} />;
   if (!data) return <Memuat apa="kuis & materi" />;
   const soalAktif = data.soal.filter((s) => s.aktif).length;
+  const esaiAktif = data.esai.filter((s) => s.aktif).length;
   const hapus = async (jenis, id) => {
     try {
       await api('DELETE', `/rekrutmen/${jenis}/${id}`);
@@ -1123,10 +1144,41 @@ export function KuisMateri({ api }) {
           </ol>
         </section>
       </div>
+      <section className="adm-kartu" style={{ marginTop: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+          <h2 style={{ margin: 0 }}>Soal esai</h2>
+          <button className="btn kecil utama" onClick={() => setEdit({ jenis: 'esai', awal: {} })} disabled={esaiAktif >= data.maksEsai} title={esaiAktif >= data.maksEsai ? `Maksimal ${data.maksEsai} soal esai aktif` : undefined}>
+            + Soal esai
+          </button>
+        </div>
+        <p className="adm-redup">
+          Dijawab kandidat di halaman kuis yang sama, setelah pilihan ganda. Nggak ikut nentuin lulus (lulus tetap dari pilihan ganda) - jawabannya muncul di panel kandidat buat bahan interview. Maksimal {data.maksEsai} soal aktif. Aktif sekarang: {esaiAktif}.
+        </p>
+        {!data.esai.length && <p className="adm-redup">Belum ada soal esai.</p>}
+        <ol className="rk-daftar-soal">
+          {data.esai.map((s) => (
+            <li key={s.id} style={s.aktif ? undefined : { opacity: 0.55 }}>
+              <b>{s.pertanyaan}</b> {!s.aktif && <span className="adm-chip">Nonaktif</span>}
+              <div className="adm-redup" style={{ fontSize: 13 }}>
+                {s.petunjuk ? `${s.petunjuk} · ` : ''}maks {s.maks} huruf
+              </div>
+              <span className="adm-tombol" style={{ marginTop: 4 }}>
+                <button className="btn kecil" onClick={() => setEdit({ jenis: 'esai', awal: s })}>
+                  Ubah
+                </button>
+                <button className="btn kecil bahaya" onClick={() => hapus('esai', s.id)}>
+                  Hapus
+                </button>
+              </span>
+            </li>
+          ))}
+        </ol>
+      </section>
       <PertanyaanInterview api={api} />
       <TemplateWa api={api} onBerubah={muat} />
       {edit?.jenis === 'materi' && <FormMateri api={api} awal={edit.awal} onTutup={() => setEdit(null)} onSelesai={() => (setEdit(null), muat())} />}
       {edit?.jenis === 'soal' && <FormSoal api={api} awal={edit.awal} onTutup={() => setEdit(null)} onSelesai={() => (setEdit(null), muat())} />}
+      {edit?.jenis === 'esai' && <FormEsai api={api} awal={edit.awal} onTutup={() => setEdit(null)} onSelesai={() => (setEdit(null), muat())} />}
     </>
   );
 }
@@ -1368,6 +1420,51 @@ function FormSoal({ api, awal, onTutup, onSelesai }) {
             <input className="adm-input" value={p} onChange={(e) => setIsi((x) => ({ ...x, pilihan: x.pilihan.map((y, z) => (z === i ? e.target.value : y)) }))} placeholder={`Pilihan ${i + 1}`} aria-label={`Pilihan ${i + 1}`} />
           </div>
         ))}
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input type="checkbox" checked={isi.aktif} onChange={(e) => setIsi((x) => ({ ...x, aktif: e.target.checked }))} /> Aktif
+        </label>
+        {error && <p className="adm-error">{error}</p>}
+        <div className="adm-tombol" style={{ justifyContent: 'flex-end' }}>
+          <button type="button" className="btn" onClick={onTutup}>
+            Batal
+          </button>
+          <button className="btn utama" type="submit">
+            Simpan
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function FormEsai({ api, awal, onTutup, onSelesai }) {
+  const [isi, setIsi] = useState({ pertanyaan: awal.pertanyaan || '', petunjuk: awal.petunjuk || '', maks: awal.maks ?? 800, aktif: awal.aktif ?? true, urutan: awal.urutan ?? 0 });
+  const [error, setError] = useState('');
+  return (
+    <Modal judul={awal.id ? 'Ubah soal esai' : 'Tambah soal esai'} onTutup={onTutup} lebar={600}>
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          try {
+            await api(awal.id ? 'PATCH' : 'POST', `/rekrutmen/esai${awal.id ? '/' + awal.id : ''}`, { ...isi, maks: +isi.maks });
+            onSelesai();
+          } catch (err) {
+            setError(err.message);
+          }
+        }}
+      >
+        <div className="field">
+          <label htmlFor="e-tanya">Pertanyaan</label>
+          <textarea id="e-tanya" className="adm-input" value={isi.pertanyaan} onChange={(e) => setIsi((x) => ({ ...x, pertanyaan: e.target.value }))} placeholder="Contoh: Kalau pemilik warung bilang 'nggak butuh aplikasi', kamu jawab apa?" required />
+        </div>
+        <div className="field">
+          <label htmlFor="e-petunjuk">Petunjuk buat kandidat (opsional)</label>
+          <input id="e-petunjuk" className="adm-input" value={isi.petunjuk} onChange={(e) => setIsi((x) => ({ ...x, petunjuk: e.target.value }))} placeholder="Contoh: Jawab 2-3 kalimat, pakai bahasa sehari-hari" />
+        </div>
+        <div className="field">
+          <label htmlFor="e-maks">Panjang maksimal jawaban (huruf)</label>
+          <input id="e-maks" className="adm-input" type="number" min={100} max={3000} step={50} value={isi.maks} onChange={(e) => setIsi((x) => ({ ...x, maks: e.target.value }))} />
+        </div>
         <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <input type="checkbox" checked={isi.aktif} onChange={(e) => setIsi((x) => ({ ...x, aktif: e.target.checked }))} /> Aktif
         </label>

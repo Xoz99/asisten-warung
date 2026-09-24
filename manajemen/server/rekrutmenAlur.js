@@ -20,6 +20,10 @@ const JAM = 3600000;
 const PUBLIK_URL = () => (process.env.PUBLIK_URL || 'https://konsulin.com').replace(/\/+$/, '');
 const URL_WARUNG = () => (process.env.WARUNG_PINTAR_URL || 'https://asistenwarung.konsulin.com').replace(/\/+$/, '');
 const JUMLAH_SOAL = 5;
+// Soal esai: dijawab kandidat di halaman kuis yang sama setelah pilihan ganda. Nggak ikut nentuin lulus (lulus tetap
+// dari pilihan ganda, dinilai otomatis) - jawabannya dibaca rekruter di panel kandidat & jadi bahan interview.
+const MAKS_ESAI_AKTIF = 3;
+const MIN_JAWABAN_ESAI = 15;
 const BATAS = { masuk: 24, belajar: 72, pilihSlot: 48, h1: 24, h6: 144 }; // jam
 
 // Kolom board -> status yang masuk ke situ.
@@ -53,6 +57,10 @@ function pastikan() {
       )`);
       await query(`CREATE TABLE IF NOT EXISTS mj_rek_soal (
         id BIGSERIAL PRIMARY KEY, pertanyaan TEXT NOT NULL, pilihan JSONB NOT NULL, jawaban INT NOT NULL,
+        aktif BOOLEAN NOT NULL DEFAULT true, urutan INT NOT NULL DEFAULT 0, created_at TIMESTAMPTZ DEFAULT now()
+      )`);
+      await query(`CREATE TABLE IF NOT EXISTS mj_rek_esai (
+        id BIGSERIAL PRIMARY KEY, pertanyaan TEXT NOT NULL, petunjuk TEXT, maks INT NOT NULL DEFAULT 800,
         aktif BOOLEAN NOT NULL DEFAULT true, urutan INT NOT NULL DEFAULT 0, created_at TIMESTAMPTZ DEFAULT now()
       )`);
       await query(`CREATE TABLE IF NOT EXISTS mj_rek_slot (
@@ -444,7 +452,10 @@ router.get('/rekrutmen/lamaran/:id/alur', async (req, res, next) => {
     const x = { kuis: kuis[l.id] || null, jadwal: jadwal[l.id] || null, trial: trial[l.id] || null };
     const { rows: tok } = await query('SELECT jenis, token FROM mj_rek_token WHERE lamaran_id=$1 AND aktif', [l.id]);
     const t = Object.fromEntries(tok.map((r) => [r.jenis, r.token]));
+    // Jawaban esai dari kuis terakhir (pertanyaannya ikut kesimpen, jadi tetap kebaca walau soalnya udah diubah/dihapus).
+    const { rows: at } = await query("SELECT data FROM mj_rek_attempt WHERE lamaran_id=$1 AND tahap='product_test' ORDER BY id DESC LIMIT 1", [l.id]);
     res.json({
+      esai: Array.isArray(at[0]?.data?.esai) ? at[0].data.esai : [],
       kolom: kolomDari(l.status),
       analisis: analisis(l),
       keadaan: keadaan(l, x),
@@ -759,9 +770,13 @@ router.post('/rekrutmen/lamaran/:id/kembalikan', async (req, res, next) => {
 // ---------------- Pengaturan: materi, soal kuis, ketersediaan interview ----------------
 router.get('/rekrutmen/materi', async (req, res, next) => {
   try {
-    const [{ rows: materi }, { rows: soal }] = await Promise.all([query('SELECT * FROM mj_rek_materi ORDER BY urutan, id'), query('SELECT * FROM mj_rek_soal ORDER BY urutan, id')]);
+    const [{ rows: materi }, { rows: soal }, { rows: esai }] = await Promise.all([
+      query('SELECT * FROM mj_rek_materi ORDER BY urutan, id'),
+      query('SELECT * FROM mj_rek_soal ORDER BY urutan, id'),
+      query('SELECT * FROM mj_rek_esai ORDER BY urutan, id'),
+    ]);
     const t = await templateAktif();
-    res.json({ materi, soal, jumlahSoal: JUMLAH_SOAL, templateMateri: t.materi || TEMPLATE.materi.isi, contohTeks: (await teksMateri('Budi', materi.filter((m) => m.aktif))).replace('{LINK_KUIS}', `${PUBLIK_URL()}/kuis/contoh`) });
+    res.json({ materi, soal, esai, maksEsai: MAKS_ESAI_AKTIF, jumlahSoal: JUMLAH_SOAL, templateMateri: t.materi || TEMPLATE.materi.isi, contohTeks: (await teksMateri('Budi', materi.filter((m) => m.aktif))).replace('{LINK_KUIS}', `${PUBLIK_URL()}/kuis/contoh`) });
   } catch (e) {
     next(e);
   }
@@ -831,6 +846,50 @@ router.patch('/rekrutmen/soal/:id', async (req, res, next) => {
 router.delete('/rekrutmen/soal/:id', async (req, res, next) => {
   try {
     await query('DELETE FROM mj_rek_soal WHERE id=$1', [Number(req.params.id) || 0]);
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ---- Soal esai ----
+async function bersihkanEsai(b, id = 0) {
+  const pertanyaan = teks(b.pertanyaan, 400);
+  if (!pertanyaan) throw salah('Pertanyaan wajib diisi');
+  const maks = Math.min(3000, Math.max(100, Math.round(Number(b.maks) || 800)));
+  const aktif = b.aktif !== false;
+  if (aktif) {
+    const { rows } = await query('SELECT count(*)::int AS n FROM mj_rek_esai WHERE aktif AND id <> $1', [id]);
+    if (rows[0].n >= MAKS_ESAI_AKTIF) throw salah(`Maksimal ${MAKS_ESAI_AKTIF} soal esai aktif (biar kuisnya nggak kepanjangan). Nonaktifkan yang lain dulu.`);
+  }
+  return { pertanyaan, petunjuk: teks(b.petunjuk, 200) || null, maks, aktif, urutan: Math.round(Number(b.urutan) || 0) };
+}
+router.post('/rekrutmen/esai', async (req, res, next) => {
+  try {
+    const s = await bersihkanEsai(req.body || {});
+    const { rows } = await query('INSERT INTO mj_rek_esai (pertanyaan, petunjuk, maks, aktif, urutan) VALUES ($1,$2,$3,$4,$5) RETURNING *', [s.pertanyaan, s.petunjuk, s.maks, s.aktif, s.urutan]);
+    await catatLog(req, 'rekrutmen.esai.tambah', { pertanyaan: s.pertanyaan.slice(0, 80) });
+    res.status(201).json(rows[0]);
+  } catch (e) {
+    next(e);
+  }
+});
+router.patch('/rekrutmen/esai/:id', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id) || 0;
+    const s = await bersihkanEsai(req.body || {}, id);
+    const { rows } = await query('UPDATE mj_rek_esai SET pertanyaan=$2, petunjuk=$3, maks=$4, aktif=$5, urutan=$6 WHERE id=$1 RETURNING *', [id, s.pertanyaan, s.petunjuk, s.maks, s.aktif, s.urutan]);
+    if (!rows.length) throw salah('Soal esai nggak ditemukan', 404);
+    await catatLog(req, 'rekrutmen.esai.ubah', { pertanyaan: s.pertanyaan.slice(0, 80) });
+    res.json(rows[0]);
+  } catch (e) {
+    next(e);
+  }
+});
+router.delete('/rekrutmen/esai/:id', async (req, res, next) => {
+  try {
+    // Jawaban kandidat yang udah masuk tetap aman: pertanyaannya ikut kesimpen di data attempt.
+    await query('DELETE FROM mj_rek_esai WHERE id=$1', [Number(req.params.id) || 0]);
     res.json({ ok: true });
   } catch (e) {
     next(e);
@@ -968,6 +1027,7 @@ async function bacaToken(token, jenis) {
   return rows[0];
 }
 const soalKuis = () => query('SELECT id, pertanyaan, pilihan, jawaban FROM mj_rek_soal WHERE aktif ORDER BY urutan, id LIMIT $1', [JUMLAH_SOAL]).then((r) => r.rows);
+const esaiKuis = () => query('SELECT id, pertanyaan, petunjuk, maks FROM mj_rek_esai WHERE aktif ORDER BY urutan, id LIMIT $1', [MAKS_ESAI_AKTIF]).then((r) => r.rows);
 
 publikAlurRouter.get('/kuis/:token', async (req, res, next) => {
   try {
@@ -977,8 +1037,8 @@ publikAlurRouter.get('/kuis/:token', async (req, res, next) => {
       return res.json({ nama: depan(t.nama), selesai: true, benar: rows[0]?.data?.benar ?? 0, dari: rows[0]?.data?.dari ?? JUMLAH_SOAL, lulus: rows[0]?.hasil === 'lulus' });
     }
     if (!['pelajari_produk', 'product_test'].includes(t.status)) throw salah('Kuis ini udah nggak dibuka buat kamu', 410);
-    const soal = await soalKuis();
-    res.json({ nama: depan(t.nama), selesai: false, soal: soal.map(({ jawaban, ...s }) => s) });
+    const [soal, esai] = await Promise.all([soalKuis(), esaiKuis()]);
+    res.json({ nama: depan(t.nama), selesai: false, soal: soal.map(({ jawaban, ...s }) => s), esai, minEsai: MIN_JAWABAN_ESAI });
   } catch (e) {
     next(e);
   }
@@ -989,15 +1049,19 @@ publikAlurRouter.post('/kuis/:token', async (req, res, next) => {
     if (t.dipakai_at) throw salah('Kuis ini udah dikerjain', 409);
     if (!['pelajari_produk', 'product_test'].includes(t.status)) throw salah('Kuis ini udah nggak dibuka buat kamu', 410);
     if (req.body?.setuju !== true) throw salah('Centang persetujuan skema bagi hasil dulu');
-    const soal = await soalKuis();
+    const [soal, esai] = await Promise.all([soalKuis(), esaiKuis()]);
     const jawab = req.body?.jawaban || {};
     if (soal.some((s) => jawab[s.id] === undefined)) throw salah('Jawab semua soal dulu');
+    const tulisan = req.body?.esai && typeof req.body.esai === 'object' ? req.body.esai : {};
+    const jawabanEsai = esai.map((e) => ({ id: e.id, pertanyaan: e.pertanyaan, jawaban: (typeof tulisan[e.id] === 'string' ? tulisan[e.id] : '').replace(/\r/g, '').trim().slice(0, e.maks) }));
+    const kurang = jawabanEsai.filter((e) => e.jawaban.length < MIN_JAWABAN_ESAI);
+    if (kurang.length) throw salah(`Jawab soal esai dulu (minimal ${MIN_JAWABAN_ESAI} huruf): "${kurang[0].pertanyaan.slice(0, 60)}"`);
     const benar = soal.filter((s) => Number(jawab[s.id]) === s.jawaban).length;
     const lulus = benar === soal.length;
     const r = await transaksi(async (c) => {
       const { rowCount } = await c.query('UPDATE mj_rek_token SET dipakai_at=now() WHERE token=$1 AND dipakai_at IS NULL', [t.token]);
       if (!rowCount) throw salah('Kuis ini udah dikerjain', 409);
-      const data = { benar, dari: soal.length, setujuBagiHasil: true, jawaban: Object.fromEntries(soal.map((s) => [s.id, Number(jawab[s.id])])) };
+      const data = { benar, dari: soal.length, setujuBagiHasil: true, jawaban: Object.fromEntries(soal.map((s) => [s.id, Number(jawab[s.id])])), esai: jawabanEsai };
       await c.query("INSERT INTO mj_rek_attempt (lamaran_id, tahap, hasil, data, aktor) VALUES ($1,'product_test',$2,$3,'kandidat (kuis online)')", [t.lamaran_id, lulus ? 'lulus' : 'gagal', JSON.stringify(data)]);
       await catatEvent(c, t.lamaran_id, 'attempt', { dari: 'product_test', ke: lulus ? 'lulus' : 'gagal', isi: `Kuis online ${benar}/${soal.length}` }, 'kandidat');
       return { benar, dari: soal.length, lulus };
