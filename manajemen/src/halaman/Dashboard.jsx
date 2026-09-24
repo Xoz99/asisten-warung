@@ -22,12 +22,7 @@ export default function Dashboard({ api }) {
 
   return (
     <>
-      <header className="adm-kepala">
-        <h1 className="sr-only">Dashboard</h1>
-        <button className="btn" onClick={muat}>
-          Muat ulang
-        </button>
-      </header>
+      <h1 className="sr-only">Dashboard</h1>
 
       <section className="adm-dashboard-atas" aria-label="Ringkasan">
         <a href="#/keuangan" className="adm-kartu adm-stat fokus">
