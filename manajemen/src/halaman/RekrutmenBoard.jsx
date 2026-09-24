@@ -1193,12 +1193,12 @@ export function KuisMateri({ api }) {
       <section className="adm-kartu" style={{ marginTop: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
           <h2 style={{ margin: 0 }}>Soal esai</h2>
-          <button className="btn kecil utama" onClick={() => setEdit({ jenis: 'esai', awal: {} })} disabled={esaiAktif >= data.maksEsai} title={esaiAktif >= data.maksEsai ? `Maksimal ${data.maksEsai} soal esai aktif` : undefined}>
+          <button className="btn kecil utama" onClick={() => setEdit({ jenis: 'esai', awal: {} })}>
             + Soal esai
           </button>
         </div>
         <p className="adm-redup">
-          Dijawab kandidat di halaman kuis yang sama, setelah pilihan ganda. Nggak ikut nentuin lulus (lulus tetap dari pilihan ganda) - jawabannya muncul di panel kandidat buat bahan interview. Maksimal {data.maksEsai} soal aktif. Aktif sekarang: {esaiAktif}.
+          Dijawab kandidat di halaman kuis yang sama, setelah pilihan ganda. Nggak ikut nentuin lulus (lulus tetap dari pilihan ganda) - jawabannya muncul di panel kandidat buat bahan interview. Semua esai yang aktif ikut ditanyain. Aktif sekarang: {esaiAktif}.
         </p>
         {!data.esai.length && <p className="adm-redup">Belum ada soal esai.</p>}
         <ol className="rk-daftar-soal">

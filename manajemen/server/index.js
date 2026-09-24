@@ -43,6 +43,8 @@ app.use(['/api/leads', '/api/lapangan/crm'], express.json({ limit: '3mb' }));
 app.use('/api/warung-pintar/katalog/impor', express.json({ limit: '2mb' }));
 // Upload foto barang katalog (udah dikecilin di browser, maks 1,5 MB -> base64 ~2 MB).
 app.use(/^\/api\/warung-pintar\/katalog\/[^/]+\/foto$/, express.json({ limit: '3mb' }));
+// Jawaban kuis kandidat: esai jumlahnya bebas (tiap jawaban maks 3.000 huruf), jadi nggak muat di batas 100kb.
+app.use('/api/publik/kuis', express.json({ limit: '1mb' }));
 app.use(express.json({ limit: '100kb' }));
 
 app.get('/health', (req, res) => res.json({ ok: true }));
