@@ -192,8 +192,9 @@ function bersihkanJawaban(b, wajib) {
     else if (wajib && min > 0) throw salah(min > 1 ? `${LABEL[k]} minimal ${min} huruf` : `${LABEL[k]} wajib diisi`);
   };
   if (/^\d{4}-\d{2}-\d{2}$/.test(b.tanggalLahir || '')) {
+    // Nggak ada batas umur minimal - cuma dicek tanggalnya masuk akal (bukan tanggal depan / salah ketik tahun).
     const umur = (Date.now() - new Date(b.tanggalLahir).getTime()) / (365.25 * 86400000);
-    if (umur < 17 || umur > 70) throw salah('Umur pelamar minimal 17 tahun');
+    if (!(umur > 0 && umur <= 100)) throw salah('Tanggal lahir nggak valid, cek lagi tahunnya');
     j.tanggalLahir = b.tanggalLahir;
   } else if (wajib) throw salah('Tanggal lahir wajib diisi');
   pilih('jenisKelamin');
