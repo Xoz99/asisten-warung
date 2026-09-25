@@ -257,7 +257,10 @@ function bacaDokumen(d, jenis) {
 }
 
 // Bikin lamaran baru (dari form publik atau input recruiter). Orang dikenali dari hash nomor HP (D-35/D-59).
-async function buatLamaran({ nama, noHp, email, domisili, s, dropdown, referral, jawaban = null, dokumen = [] }, aktor) {
+// `lengkapi` (form publik): kalau orangnya udah punya lamaran jalan yang belum ada isian form-nya (ditambah manual
+// recruiter, mis. kandidat dari Glints), isian + CV/foto + sumber link-nya dipakai buat ngelengkapin lamaran itu.
+// Dulu ditolak 409 - kandidat udah ngisi form lewat link, tapi datanya ilang dan titik sebarnya nggak kehitung.
+async function buatLamaran({ nama, noHp, email, domisili, s, dropdown, referral, jawaban = null, dokumen = [], lengkapi = false }, aktor) {
   const hp = normalisasiNoHp(noHp || '');
   if (!teks(nama, 80)) throw salah('Nama wajib diisi');
   if (!hp) throw salah('Nomor HP nggak valid. Contoh: 0812-3456-7890');
@@ -298,17 +301,33 @@ async function buatLamaran({ nama, noHp, email, domisili, s, dropdown, referral,
     }
     const orang = o[0];
     const { rows: aktif } = await c.query(
-      `SELECT id, status FROM mj_lamaran WHERE orang_id=$1 AND status NOT IN ('rejected','withdrawn','no_response','on_hold','talent_pool')`,
+      `SELECT id, status, jawaban IS NOT NULL AS ada_jawaban, keyakinan FROM mj_lamaran
+       WHERE orang_id=$1 AND status NOT IN ('rejected','withdrawn','no_response','on_hold','talent_pool') FOR UPDATE`,
       [orang.id]
     );
     if (aktif.some((a) => a.status === 'hired')) throw salah('Orang ini udah jadi Sales Partner. Sales yang masih aktif nggak bisa daftar lagi (D-34).', 409);
-    if (aktif.length) throw salah('Orang ini masih punya lamaran yang lagi jalan.', 409);
     if (referrer && referrer.id === orang.id) throw salah('Nggak bisa mereferensikan diri sendiri');
-    const { rows: l } = await c.query(
-      `INSERT INTO mj_lamaran (orang_id, sumber_kode, sumber_titik_id, sumber_dropdown, keyakinan, referrer_orang_id, dibuat_oleh, jawaban)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [orang.id, titik?.kode || (kode || null), titik?.id || null, pilihan, keyakinan, referrer?.id || null, aktor, jawaban ? JSON.stringify(jawaban) : null]
-    );
+    const kosong = lengkapi && jawaban ? aktif.find((a) => !a.ada_jawaban) : null;
+    if (aktif.length && !kosong) throw salah('Orang ini masih punya lamaran yang lagi jalan.', 409);
+    let l;
+    if (kosong) {
+      // Sumber dari link/referral (keyakinan tinggi) ngalahin sumber yang ditebak waktu ditambah manual.
+      const pakaiSumber = keyakinan === 'tinggi' || kosong.keyakinan === 'unknown';
+      ({ rows: l } = await c.query(
+        `UPDATE mj_lamaran SET jawaban=$2,
+           sumber_kode = CASE WHEN $3 THEN $4 ELSE sumber_kode END, sumber_titik_id = CASE WHEN $3 THEN $5::uuid ELSE sumber_titik_id END,
+           sumber_dropdown = CASE WHEN $3 THEN $6 ELSE sumber_dropdown END, keyakinan = CASE WHEN $3 THEN $7 ELSE keyakinan END,
+           referrer_orang_id = CASE WHEN $3 THEN $8::uuid ELSE referrer_orang_id END
+         WHERE id=$1 RETURNING *`,
+        [kosong.id, JSON.stringify(jawaban), pakaiSumber, titik?.kode || (kode || null), titik?.id || null, pilihan, keyakinan, referrer?.id || null]
+      ));
+    } else {
+      ({ rows: l } = await c.query(
+        `INSERT INTO mj_lamaran (orang_id, sumber_kode, sumber_titik_id, sumber_dropdown, keyakinan, referrer_orang_id, dibuat_oleh, jawaban)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+        [orang.id, titik?.kode || (kode || null), titik?.id || null, pilihan, keyakinan, referrer?.id || null, aktor, jawaban ? JSON.stringify(jawaban) : null]
+      ));
+    }
     // File ditulis di dalam transaksi: kalau nyimpen barisnya gagal, file yang udah ketulis dihapus lagi.
     const ditulis = [];
     try {
@@ -325,7 +344,9 @@ async function buatLamaran({ nama, noHp, email, domisili, s, dropdown, referral,
       for (const f of ditulis) fs.rmSync(path.join(DOKUMEN_DIR, f), { force: true });
       throw e;
     }
-    await catatEvent(c, l[0].id, 'status', { ke: 'new', isi: `Lamaran masuk (sumber: ${titik?.kode || (referrer ? 'referral ' + ref : pilihan || 'tidak diketahui')})` }, aktor);
+    const sumberTeks = titik?.kode || (referrer ? 'referral ' + ref : pilihan || 'tidak diketahui');
+    if (kosong) await catatEvent(c, l[0].id, 'catatan', { isi: `Kandidat ngisi form lamaran sendiri (sumber: ${sumberTeks}) - data form, CV & foto kelengkap` }, aktor);
+    else await catatEvent(c, l[0].id, 'status', { ke: 'new', isi: `Lamaran masuk (sumber: ${sumberTeks})` }, aktor);
     return { lamaran: l[0], orang };
   });
 }
@@ -379,7 +400,7 @@ publikRouter.post('/daftar', daftarLimiter, async (req, res, next) => {
       b.cv ? { jenis: 'cv', ...bacaDokumen(b.cv, 'cv') } : null,
       b.foto ? { jenis: 'foto', ...bacaDokumen(b.foto, 'foto') } : null,
     ].filter(Boolean);
-    await buatLamaran({ ...b, domisili: [teks(b.kecamatan, 60), teks(b.kota, 60)].filter(Boolean).join(', '), jawaban, dokumen }, 'form daftar');
+    await buatLamaran({ ...b, domisili: [teks(b.kecamatan, 60), teks(b.kota, 60)].filter(Boolean).join(', '), jawaban, dokumen, lengkapi: true }, 'form daftar');
     res.status(201).json({ ok: true });
   } catch (e) {
     if (e.status === 409) return res.status(409).json({ error: 'Nomor ini udah terdaftar dan lagi diproses. Tim kami bakal ngehubungin kamu.' });
