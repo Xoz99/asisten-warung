@@ -843,10 +843,12 @@ body{background:#E9E9E6}
   .sidebar-logo img{width:30px;height:30px;object-fit:contain;display:block}
   .sidebar-teks{flex:1;min-width:0}
   .sidebar-teks b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .sidebar-lipat{flex:none;width:34px;height:34px;display:grid;place-items:center;border:0;border-radius:10px;background:none;color:var(--abu);cursor:pointer;transition:background .15s,color .15s}
-  .sidebar-lipat:hover{background:var(--bg);color:var(--ink)}
+  .sidebar-lipat{border:0;padding:0;cursor:pointer;color:var(--ink);transition:background .15s}
   .sidebar-lipat:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-  .sidebar-lipat svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .sidebar-lipat-ikon{display:none;width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .sidebar-lipat:hover,.sidebar-lipat:focus-visible{background:var(--bg)}
+  .sidebar-lipat:hover img,.sidebar-lipat:focus-visible img{display:none}
+  .sidebar-lipat:hover .sidebar-lipat-ikon,.sidebar-lipat:focus-visible .sidebar-lipat-ikon{display:block}
   .sn{position:relative}
   .sn .badge{position:static;margin-left:auto}
 

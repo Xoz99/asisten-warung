@@ -43,9 +43,14 @@ button,input,select,textarea{font:inherit;color:inherit}
 .adm-nav-ikon{flex:none}
 .adm-nav-teks{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .adm-merek-teks{flex:1;min-width:0;white-space:nowrap}
-.adm-lipat{flex:none;display:grid;place-items:center;width:32px;height:32px;padding:0;border:2px solid transparent;background:none;color:var(--tinta);cursor:pointer}
-.adm-lipat:hover{border-color:var(--hitam);background:var(--kertas)}
+.adm-lipat{padding:0;cursor:pointer;color:var(--tinta);position:relative}
+.adm-lipat-ikon{display:none}
 .adm-lipat:focus-visible{outline:3px solid var(--biru);outline-offset:2px}
+@media (min-width:901px){
+  .adm-lipat:hover,.adm-lipat:focus-visible{background:var(--kertas)}
+  .adm-lipat:hover img,.adm-lipat:focus-visible img{display:none}
+  .adm-lipat:hover .adm-lipat-ikon,.adm-lipat:focus-visible .adm-lipat-ikon{display:block}
+}
 /* Sidebar dilipat (desktop): cuma ikon, nama menu muncul sebagai tooltip */
 @media (min-width:901px){
   .adm-samping.lipat{width:76px;padding:18px 10px;overflow-x:hidden}
@@ -220,7 +225,7 @@ a.adm-stat:hover{box-shadow:6px 6px 0 var(--hitam)}
 @media (max-width:900px){
   .adm-samping{position:fixed;left:0;top:0;bottom:0;z-index:30;transform:translateX(-105%);box-shadow:6px 0 0 var(--hitam)}
   .adm-samping.buka{transform:none}
-  .adm-lipat{display:none}
+  .adm-lipat{cursor:default}
   .adm-menu-tombol{display:grid;place-items:center;min-width:44px;height:44px;padding:0 12px;border:var(--garis-tipis);background:var(--kuning);font-weight:700;letter-spacing:.05em;font-size:12px;cursor:pointer;flex:none}
   .adm-topbar{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:var(--garis);background:var(--putih);position:sticky;top:0;z-index:5}
   .adm-isi{padding:20px 16px 48px}

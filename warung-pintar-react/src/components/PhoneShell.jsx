@@ -182,20 +182,19 @@ export default function PhoneShell() {
       <div className="layout">
         <aside className={'sidebar' + (lipat ? ' lipat' : '')}>
           <div className="sidebar-brand">
-            <div className="sidebar-logo">
-              <img src="/logo-konsulin.png" alt="Konsulin" width="30" height="30" />
-            </div>
-            <div className="sidebar-teks">
-              <b>{authWarung?.nama || 'Warungku'}</b>
-              <span>Asisten Warung</span>
-            </div>
-            <button className="sidebar-lipat" onClick={gantiLipat} aria-label={lipat ? 'Buka sidebar' : 'Tutup sidebar'} title={lipat ? 'Buka sidebar' : 'Tutup sidebar'} aria-expanded={!lipat}>
-              <svg viewBox="0 0 24 24">
+            {/* Logo = tombol buka/tutup sidebar: kursor di atasnya -> logo berubah jadi ikon panel. */}
+            <button type="button" className="sidebar-logo sidebar-lipat" onClick={gantiLipat} aria-label={lipat ? 'Buka sidebar' : 'Tutup sidebar'} title={lipat ? 'Buka sidebar' : 'Tutup sidebar'} aria-expanded={!lipat}>
+              <img src="/logo-konsulin.png" alt="" width="30" height="30" />
+              <svg className="sidebar-lipat-ikon" viewBox="0 0 24 24" aria-hidden="true">
                 <rect x="3" y="4" width="18" height="16" rx="3" />
                 <path d="M9 4v16" />
                 <path d={lipat ? 'M13 9.5l2.5 2.5-2.5 2.5' : 'M16.5 9.5 14 12l2.5 2.5'} />
               </svg>
             </button>
+            <div className="sidebar-teks">
+              <b>{authWarung?.nama || 'Warungku'}</b>
+              <span>Asisten Warung</span>
+            </div>
           </div>
 
           <nav className="sidenav">

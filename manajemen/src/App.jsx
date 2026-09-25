@@ -252,19 +252,26 @@ function Samping({ halaman, admin, foto, notifBaru, buka }) {
   return (
     <aside className={'adm-samping' + (buka ? ' buka' : '') + (lipat ? ' lipat' : '')} aria-label="Menu utama">
       <div className="adm-merek">
-        <span className="adm-merek-kotak" aria-hidden="true">
+        {/* Logo = tombol buka/tutup sidebar (desktop): kursor di atasnya -> logo berubah jadi ikon panel. Di HP
+            sidebar-nya laci menu, jadi logo cuma logo. */}
+        <button
+          type="button"
+          className="adm-merek-kotak adm-lipat"
+          onClick={() => window.matchMedia('(min-width: 901px)').matches && gantiLipat()}
+          aria-label={lipat ? 'Buka sidebar' : 'Tutup sidebar'}
+          title={lipat ? 'Buka sidebar' : 'Tutup sidebar'}
+          aria-expanded={!lipat}
+        >
           <img src="/logo-konsulin.png" alt="" />
-        </span>
-        <div className="adm-merek-teks">
-          Makalin Ops
-          <small>Workspace internal</small>
-        </div>
-        <button className="adm-lipat" onClick={gantiLipat} aria-label={lipat ? 'Buka sidebar' : 'Tutup sidebar'} title={lipat ? 'Buka sidebar' : 'Tutup sidebar'} aria-expanded={!lipat}>
-          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="square">
+          <svg className="adm-lipat-ikon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="square">
             <path d="M3 4h18v16H3zM9 4v16" />
             <path d={lipat ? 'M13 9l3 3-3 3' : 'M17 9l-3 3 3 3'} />
           </svg>
         </button>
+        <div className="adm-merek-teks">
+          Makalin Ops
+          <small>Workspace internal</small>
+        </div>
       </div>
       <nav>
         <div className="adm-nav-grup">
