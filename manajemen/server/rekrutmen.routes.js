@@ -363,6 +363,9 @@ export const ipPelamar = (req) => {
 const daftarLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   limit: 20,
+  // Yang dihitung cuma kiriman yang beneran masuk. Isian kurang / nomor dobel (400/409) nggak ngabisin jatah -
+  // pelamar yang benerin form-nya berkali-kali nggak ikut kekunci.
+  skipFailedRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => ipKeyGenerator(ipPelamar(req)),
