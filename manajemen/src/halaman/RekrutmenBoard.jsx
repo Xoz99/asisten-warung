@@ -570,6 +570,42 @@ function Putusan({ a }) {
 }
 
 // Langkah sekarang, per kolom.
+// Recruiter tetap ngelolosin kandidat yang kuisnya belum memenuhi syarat - wajib alasan, masuk riwayat kejadian.
+function LolosManual({ kirim }) {
+  const [buka, setBuka] = useState(false);
+  const [alasan, setAlasan] = useState('');
+  if (!buka)
+    return (
+      <div className="adm-tombol">
+        <button className="btn kecil" onClick={() => setBuka(true)}>
+          Tetap lanjut ke Interview
+        </button>
+      </div>
+    );
+  return (
+    <form
+      className="rk-lolos-manual"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (alasan.trim().length >= 5) kirim('/maju-interview', { lewatiKuis: true, alasan: alasan.trim() }, 'Diloloskan ke Interview.');
+      }}
+    >
+      <label className="adm-label" style={{ fontSize: 10 }} htmlFor="lolos-alasan">
+        Alasan tetap diloloskan (masuk riwayat)
+      </label>
+      <input id="lolos-alasan" className="adm-input" value={alasan} onChange={(e) => setAlasan(e.target.value)} maxLength={300} placeholder="Misal: esai bagus, salah di soal hitungan komisi aja" autoFocus />
+      <div className="adm-tombol" style={{ marginTop: 8 }}>
+        <button type="button" className="btn kecil" onClick={() => setBuka(false)}>
+          Batal
+        </button>
+        <button className="btn utama kecil" type="submit" disabled={alasan.trim().length < 5}>
+          Loloskan ke Interview
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function Langkah({ api, l, alur, kirim, setModal, setError }) {
   const k = alur.kolom;
   const a = alur.analisis;
@@ -639,15 +675,16 @@ function Langkah({ api, l, alur, kirim, setModal, setError }) {
             </div>
           </div>
           <p className="adm-redup" style={{ fontSize: 13 }}>
-            Akun APK kebaca otomatis kalau nomor {tampilHp(l.no_hp)} daftar di Asisten Warung. APK ✓ + kuis benar semua = otomatis pindah ke Interview.
+            Akun APK kebaca otomatis kalau nomor {tampilHp(l.no_hp)} daftar di Asisten Warung. APK ✓ + kuis lulus = otomatis pindah ke Interview.
           </p>
           <JawabanEsai esai={alur.esai} />
           {s.lewat && <div className="rk-saran">Udah lewat 3 hari. Keluarkan sebagai No response, atau follow-up dulu kalau masih mau nunggu.</div>}
           {alur.kuis && !alur.kuis.lulus && (
             <>
               <div className="rk-saran">
-                <b>Kuis {alur.kuis.benar}/{alur.kuis.dari}.</b> Syaratnya benar semua. Kasih kesempatan ulang sekali, atau tolak.
+                <b>Kuis {alur.kuis.benar}/{alur.kuis.dari}.</b> Syaratnya {alur.syaratKuis || 'benar semua'}. Kasih kesempatan ulang sekali, tolak, atau tetap loloskan ke Interview kalau jawaban esainya bagus.
               </div>
+              <LolosManual kirim={kirim} />
               <div className="adm-tombol">
                 <button className="btn utama kecil" data-utama onClick={async () => { const r = await kirim('/kuis-ulang', {}, 'Link kuis baru dibikin.'); if (r?.teks) bukaWa(r.hp, r.teks); }}>
                   Kirim ulang kuis via WA
@@ -1178,8 +1215,9 @@ export function KuisMateri({ api }) {
               + Soal
             </button>
           </div>
+          <SyaratLulus api={api} minBenar={data.minBenar} soalAktif={soalAktif} onSimpan={muat} />
           <p className={soalAktif < data.minSoal ? 'adm-error' : 'adm-redup'}>
-            Kuis pakai semua soal aktif (urut dari atas), lulus kalau benar semua. Aktif sekarang: {soalAktif} soal{soalAktif < data.minSoal ? ` - minimal ${data.minSoal} biar kuis bisa dikirim` : ''}. Nonaktifkan soal yang nggak mau dipakai.
+            Kuis pakai semua soal aktif (urut dari atas), lulus kalau {data.minBenar && data.minBenar < soalAktif ? `benar minimal ${data.minBenar}` : 'benar semua'}. Aktif sekarang: {soalAktif} soal{soalAktif < data.minSoal ? ` - minimal ${data.minSoal} biar kuis bisa dikirim` : ''}. Nonaktifkan soal yang nggak mau dipakai.
           </p>
           <ol className="rk-daftar-soal" start={awalSoal + 1}>
             {soalHalIni.map((s) => (
@@ -1268,6 +1306,33 @@ export function KuisMateri({ api }) {
       )}
       {edit?.jenis === 'esai' && <FormEsai api={api} awal={edit.awal} onTutup={() => setEdit(null)} onSelesai={() => (setEdit(null), muat())} />}
     </>
+  );
+}
+
+// Syarat lulus kuis: benar minimal N (kosong = benar semua). Berlaku buat kuis yang dikerjain setelah disimpan.
+function SyaratLulus({ api, minBenar, soalAktif, onSimpan }) {
+  const [n, setN] = useState(minBenar ? String(minBenar) : '');
+  const [pesan, setPesan] = useState('');
+  const simpan = async (e) => {
+    e.preventDefault();
+    try {
+      await api('PUT', '/rekrutmen/kuis-syarat', { minBenar: n.trim() ? Number(n) : null });
+      setPesan('Tersimpan.');
+      onSimpan();
+    } catch (err) {
+      setPesan('Gagal: ' + err.message);
+    }
+  };
+  return (
+    <form className="rk-syarat" onSubmit={simpan}>
+      <label htmlFor="syarat-lulus">Lulus kalau benar minimal</label>
+      <input id="syarat-lulus" className="adm-input" inputMode="numeric" value={n} onChange={(e) => (setN(e.target.value.replace(/\D/g, '').slice(0, 3)), setPesan(''))} placeholder="semua" />
+      <span>dari {soalAktif} soal</span>
+      <button className="btn kecil" type="submit">
+        Simpan
+      </button>
+      {pesan && <span className={pesan.startsWith('Gagal') ? 'adm-error' : 'adm-ok'} style={{ margin: 0 }}>{pesan}</span>}
+    </form>
   );
 }
 

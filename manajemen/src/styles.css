@@ -935,6 +935,9 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 .rk-daftar-soal{padding-left:20px;display:flex;flex-direction:column;gap:12px}
 .rk-daftar-soal ul{margin:6px 0 0;padding-left:18px;font-size:13.5px}
 .rk-daftar-soal li.benar{font-weight:700;color:#138A4B}
+.rk-lolos-manual{display:flex;flex-direction:column;gap:6px;margin:8px 0;padding:10px 12px;border:var(--garis-tipis);background:var(--putih)}
+.rk-syarat{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 0;font-size:13.5px}
+.rk-syarat .adm-input{width:72px;padding:6px 8px}
 .rk-esai-jawab{display:flex;flex-direction:column;gap:10px;margin:4px 0 12px}
 .rk-esai-jawab>div{border:var(--garis-tipis);padding:10px 12px}
 .rk-esai-jawab b{font-size:13.5px}

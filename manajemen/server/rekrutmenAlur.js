@@ -23,6 +23,13 @@ const URL_WARUNG = () => (process.env.WARUNG_PINTAR_URL || 'https://asistenwarun
 // Kuis product pakai SEMUA soal pilihan ganda yang aktif (urut sesuai urutan di Pengaturan), lulus kalau benar
 // semua. Minimal harus ada MIN_SOAL aktif sebelum kandidat bisa dikirimin kuis. Dulu dikunci 5 soal teratas.
 const MIN_SOAL = 5;
+// Syarat lulus kuis bisa diatur di Pengaturan (kunci 'kuis_min_benar' di mj_rek_template): kosong = benar semua.
+async function syaratLulus() {
+  const n = parseInt((await templateAktif()).kuis_min_benar, 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+const lulusKuis = (benar, dari, minBenar) => benar >= (minBenar ? Math.min(minBenar, dari) : dari);
+const teksSyarat = (minBenar, dari) => (minBenar && minBenar < dari ? `benar minimal ${minBenar} dari ${dari}` : 'benar semua');
 // Soal esai: dijawab kandidat di halaman kuis yang sama setelah pilihan ganda. Nggak ikut nentuin lulus (lulus tetap
 // dari pilihan ganda, dinilai otomatis) - jawabannya dibaca rekruter di panel kandidat & jadi bahan interview.
 // Jumlahnya bebas - semua esai yang aktif ikut ditanyain.
@@ -486,6 +493,7 @@ router.get('/rekrutmen/lamaran/:id/alur', async (req, res, next) => {
       keadaan: keadaan(l, x),
       ...x,
       lembar: l.lembar_interview || null,
+      syaratKuis: teksSyarat(await syaratLulus(), x.kuis?.dari || 0),
       pertanyaanProduk: await pertanyaanProduk(),
       link: { kuis: t.kuis ? linkKuis(t.kuis) : null, jadwal: t.jadwal ? linkJadwal(t.jadwal) : null, referral: l.trial_kode ? `${URL_WARUNG()}/?ref=${l.trial_kode}` : null },
       wa: {
@@ -598,13 +606,21 @@ router.post('/rekrutmen/lamaran/:id/kuis-ulang', async (req, res, next) => {
 });
 
 // Lanjut ke Interview walau APK belum kebaca (kuis harus udah lulus).
+// `lewatiKuis` + alasan: recruiter tetap ngelolosin kandidat yang kuisnya belum memenuhi syarat (tercatat di riwayat).
 router.post('/rekrutmen/lamaran/:id/maju-interview', async (req, res, next) => {
   try {
-    const { rows } = await query("SELECT 1 FROM mj_rek_attempt WHERE lamaran_id=$1 AND tahap='product_test' AND hasil='lulus'", [req.params.id]);
-    if (!rows.length) throw salah('Kuis belum lulus (harus benar semua)');
-    const token = await majuKeInterview(req.params.id, req.admin.nama, 'Maju ke Interview (APK belum kebaca, diputusin recruiter)');
+    if (!POLA_UUID.test(req.params.id)) throw salah('Lamaran tidak ditemukan', 404);
+    const { rows } = await query("SELECT hasil, data FROM mj_rek_attempt WHERE lamaran_id=$1 AND tahap='product_test' ORDER BY id DESC", [req.params.id]);
+    let isi = 'Maju ke Interview (APK belum kebaca, diputusin recruiter)';
+    if (!rows.some((r) => r.hasil === 'lulus')) {
+      if (!rows.length) throw salah('Kandidat belum ngerjain kuis');
+      const alasan = teks(req.body?.alasan, 300);
+      if (!req.body?.lewatiKuis || alasan.length < 5) throw salah('Kuis belum lulus. Isi alasan kalau mau tetap diloloskan ke Interview');
+      isi = `Diloloskan ke Interview walau kuis ${rows[0].data?.benar ?? '?'}/${rows[0].data?.dari ?? '?'} - ${alasan}`;
+    }
+    const token = await majuKeInterview(req.params.id, req.admin.nama, isi);
     if (!token) throw salah('Kandidat nggak lagi di tahap Belajar & tes');
-    await catatLog(req, 'rekrutmen.lamaran.maju', { ke: 'interview' });
+    await catatLog(req, 'rekrutmen.lamaran.maju', { ke: 'interview', lewatiKuis: !!req.body?.lewatiKuis });
     res.json({ ok: true });
   } catch (e) {
     next(e);
@@ -803,7 +819,7 @@ router.get('/rekrutmen/materi', async (req, res, next) => {
       query('SELECT * FROM mj_rek_esai ORDER BY urutan, id'),
     ]);
     const t = await templateAktif();
-    res.json({ materi, soal, esai, minSoal: MIN_SOAL, templateMateri: t.materi || TEMPLATE.materi.isi, contohTeks: (await teksMateri('Budi', materi.filter((m) => m.aktif))).replace('{LINK_KUIS}', `${PUBLIK_URL()}/kuis/contoh`) });
+    res.json({ materi, soal, esai, minSoal: MIN_SOAL, minBenar: await syaratLulus(), templateMateri: t.materi || TEMPLATE.materi.isi, contohTeks: (await teksMateri('Budi', materi.filter((m) => m.aktif))).replace('{LINK_KUIS}', `${PUBLIK_URL()}/kuis/contoh`) });
   } catch (e) {
     next(e);
   }
@@ -874,6 +890,26 @@ router.delete('/rekrutmen/soal/:id', async (req, res, next) => {
   try {
     await query('DELETE FROM mj_rek_soal WHERE id=$1', [Number(req.params.id) || 0]);
     res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ---- Syarat lulus kuis ----
+router.put('/rekrutmen/kuis-syarat', async (req, res, next) => {
+  try {
+    const v = req.body?.minBenar;
+    const n = v === null || v === '' || v === undefined ? null : Math.round(Number(v));
+    if (n !== null && !(n >= 1 && n <= 100)) throw salah('Minimal benar harus angka 1 sampai 100 (kosongin = benar semua)');
+    if (n === null) await query("DELETE FROM mj_rek_template WHERE kunci='kuis_min_benar'");
+    else
+      await query(
+        "INSERT INTO mj_rek_template (kunci, isi, diubah_oleh, diubah_at) VALUES ('kuis_min_benar',$1,$2,now()) ON CONFLICT (kunci) DO UPDATE SET isi=EXCLUDED.isi, diubah_oleh=EXCLUDED.diubah_oleh, diubah_at=now()",
+        [String(n), req.admin.nama]
+      );
+    cacheTemplate = null;
+    await catatLog(req, 'rekrutmen.kuis.syarat', { minBenar: n ?? 'semua' });
+    res.json({ ok: true, minBenar: n });
   } catch (e) {
     next(e);
   }
@@ -1080,7 +1116,7 @@ publikAlurRouter.post('/kuis/:token', async (req, res, next) => {
     const kurang = jawabanEsai.filter((e) => e.jawaban.length < MIN_JAWABAN_ESAI);
     if (kurang.length) throw salah(`Jawab soal esai dulu (minimal ${MIN_JAWABAN_ESAI} huruf): "${kurang[0].pertanyaan.slice(0, 60)}"`);
     const benar = soal.filter((s) => Number(jawab[s.id]) === s.jawaban).length;
-    const lulus = benar === soal.length;
+    const lulus = lulusKuis(benar, soal.length, await syaratLulus());
     const r = await transaksi(async (c) => {
       const { rowCount } = await c.query('UPDATE mj_rek_token SET dipakai_at=now() WHERE token=$1 AND dipakai_at IS NULL', [t.token]);
       if (!rowCount) throw salah('Kuis ini udah dikerjain', 409);
