@@ -307,7 +307,13 @@ export default function Lainnya() {
 // midtrans.service.js). Samain juga dengan daftar plan di LisensiHabis.jsx kalau harganya berubah.
 // `jatahAi` juga cuma tampilan - sumber kebenarannya JATAH_TOKEN_HARIAN di aiQuota.service.js
 function SectionLangganan() {
-  const { lisensi, mulaiCheckout, toast } = useApp();
+  const { lisensi, mulaiCheckout, toast, screen, cekLisensi } = useApp();
+  // Angka "Jatah AI" diambil ulang tiap layar Lainnya dibuka. Token dipotong di server oleh SEMUA fitur AI (scan
+  // banyak barang, scan foto, nota, suara, chat) - dulu cuma chat yang nyegerin angka ini, jadi abis scan AI
+  // angkanya kelihatan nggak nambah sampai app dibuka ulang.
+  useEffect(() => {
+    if (screen === 's-lainnya') cekLisensi().catch(() => {});
+  }, [screen, cekLisensi]);
   const [buka, setBuka] = useState(false); // baris status di-tap dulu baru pilihan plan-nya kebuka
   // Tinggi isi akordeon DIUKUR, nggak dipatok angka. Dulu CSS-nya nahan max-height:600px dengan
   // catatan "kontennya nggak akan setinggi itu" - dan itu basi begitu isinya nambah: tombol
