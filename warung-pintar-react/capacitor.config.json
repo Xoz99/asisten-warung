@@ -8,5 +8,11 @@
   },
   "android": {
     "allowMixedContent": false
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_notif",
+      "iconColor": "#FFC001"
+    }
   }
 }

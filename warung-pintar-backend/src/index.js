@@ -34,6 +34,7 @@ import tukarRoutes from './routes/tukar.routes.js';
 import komunitasRoutes from './routes/komunitas.routes.js';
 import katalogRoutes from './routes/katalog.routes.js';
 import { DIR_FOTO_KATALOG } from './services/katalog.service.js';
+import notifHpRoutes from './routes/notifHp.routes.js';
 
 const app = express();
 // Berapa lapis proxy di depan server ini (ngrok/nginx/Cloudflare) - dibaca dari TRUST_PROXY.
@@ -73,6 +74,8 @@ app.use('/api', requireAuth);
 // status & checkout lisensi butuh login TAPI harus tetap bisa diakses walau lisensi lagi kedaluwarsa
 // (justru itu tujuannya — biar bisa perpanjang), makanya dipasang sebelum requireLisensiAktif
 app.use('/api/lisensi', lisensiRoutes);
+// Notifikasi HP juga tetap jalan walau lisensi habis - salah satu isinya justru pengingat perpanjang.
+app.use('/api/notif-hp', notifHpRoutes);
 
 // mulai dari sini baru digembok: akun harus login DAN lisensinya masih aktif
 app.use('/api', requireLisensiAktif);

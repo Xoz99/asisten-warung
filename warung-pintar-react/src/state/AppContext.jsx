@@ -5,6 +5,7 @@ import { bisaDijual, belumDiatur } from '../lib/voice';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
 import { pakaiNotifNative, jadwalkanPengingat, dengarKetukNotif } from '../lib/notifNative';
+import { aturLatar, titipAntrean, bereskanTerkirimLatar, dengarLayarNotifLatar } from '../lib/latarNative';
 import { simpanSemuaKeCache, muatSemuaDariCache } from '../lib/dataCache';
 import { getMeta, setMeta, hapusCacheWarung } from '../lib/localdb';
 import { tambahKeOutbox, hapusDariOutbox, ambilOutboxPending, prosesOutbox } from '../lib/outbox';
@@ -772,10 +773,13 @@ export function AppProvider({ children }) {
               }));
 
             await tambahKeOutbox({ clientId, type: action.type, payload });
+            // Salinannya dititip ke Android juga: kalau HP-nya offline terus aplikasinya ditutup, tetap kekirim.
+            titipAntrean();
 
             try {
               await (isKasbon ? api.transaksi.kasbon(payload) : api.transaksi.bayar(payload));
               await hapusDariOutbox(clientId);
+              titipAntrean();
               await refreshData(); // tarik angka pasti dari server, gantiin yang optimistic tadi
             } catch (e) {
               if (e.status === undefined) {
@@ -873,18 +877,40 @@ export function AppProvider({ children }) {
 
   // ---- coba kirim ulang outbox (Tingkat A) tiap kali koneksi balik ----
   const sinkronkanOutbox = useCallback(async () => {
+    // Yang udah dikirim Android di latar (pas aplikasi ditutup) dibersihin dulu biar nggak dikirim ulang.
+    if (await bereskanTerkirimLatar()) refreshData().catch(() => {});
     await prosesOutbox({ onSukses: () => refreshData().catch(() => {}) });
     const sisa = await ambilOutboxPending();
     setOutboxCount(sisa.length);
+    titipAntrean();
   }, [refreshData]);
+
+  // ---- APK: kerja latar Android (sinkron transaksi offline + notifikasi dari backend) ----
+  useEffect(() => {
+    aturLatar(authed ? sesi.token() : null);
+  }, [authed, authWarung?.id]);
+  useEffect(() => dengarLayarNotifLatar(goTo), [goTo]);
+  useEffect(() => {
+    if (!authed || !Capacitor.isNativePlatform()) return;
+    // Balik ke aplikasi: bersihin yang udah kekirim di latar & coba kirim sisanya. Ditinggal: titip antrean terbaru.
+    const hBalik = CapApp.addListener('resume', () => sinkronkanOutbox());
+    const hPergi = CapApp.addListener('pause', () => titipAntrean());
+    return () => {
+      hBalik.then((x) => x.remove()).catch(() => {});
+      hPergi.then((x) => x.remove()).catch(() => {});
+    };
+  }, [authed, sinkronkanOutbox]);
 
   useEffect(() => {
     if (!authed) return;
     // cek outbox begitu app dibuka (nutup app pas masih ada antrean, baru dibuka lagi online)
-    ambilOutboxPending().then((rows) => {
-      setOutboxCount(rows.length);
-      if (rows.length && navigator.onLine) sinkronkanOutbox();
-    });
+    bereskanTerkirimLatar()
+      .then((n) => n && refreshData().catch(() => {}))
+      .then(() => ambilOutboxPending())
+      .then((rows) => {
+        setOutboxCount(rows.length);
+        if (rows.length && navigator.onLine) sinkronkanOutbox();
+      });
 
     const onOnline = () => {
       sinkronkanOutbox();

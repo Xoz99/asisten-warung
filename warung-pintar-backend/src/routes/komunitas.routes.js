@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query } from '../db.js';
 import { nilaiJudol, PESAN_DIBLOKIR } from '../utils/filterJudol.js';
 import { pastikanKolomProfil } from '../services/profilUsaha.service.js';
+import { kirimNotifHp } from '../services/notifHp.service.js';
 
 const router = Router();
 
@@ -97,6 +98,9 @@ async function buatNotifKomentar({ postId, komentarId, dari, targetWarung }) {
   const pemilikPost = rows[0]?.warung_id;
   if (pemilikPost && pemilikPost !== dari) penerima.set(pemilikPost, 'komentar');
   if (targetWarung && targetWarung !== dari) penerima.set(targetWarung, 'balasan');
+  const { rows: info } = penerima.size
+    ? await query('SELECT w.nama, left(COALESCE(k.teks, \'\'), 140) AS teks FROM warung w LEFT JOIN komunitas_komentar k ON k.id=$2 WHERE w.id=$1', [dari, komentarId])
+    : { rows: [] };
   for (const [warungId, jenis] of penerima) {
     await query('INSERT INTO komunitas_notif (warung_id, dari_warung_id, post_id, komentar_id, jenis) VALUES ($1,$2,$3,$4,$5)', [
       warungId,
@@ -105,6 +109,12 @@ async function buatNotifKomentar({ postId, komentarId, dari, targetWarung }) {
       komentarId,
       jenis,
     ]);
+    // Ikut muncul sebagai notifikasi HP (APK) walau aplikasinya lagi ditutup.
+    await kirimNotifHp(warungId, {
+      judul: `${info[0]?.nama || 'Warung lain'} ${jenis === 'balasan' ? 'membalas komentarmu' : 'mengomentari postinganmu'}`,
+      isi: info[0]?.teks || 'Buka Komunitas buat lihat.',
+      layar: 's-chat',
+    });
   }
 }
 

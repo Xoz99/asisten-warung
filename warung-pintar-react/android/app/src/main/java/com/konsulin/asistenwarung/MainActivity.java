@@ -9,6 +9,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         // Plugin buatan sendiri (bukan dari npm) wajib didaftarin sebelum super.onCreate.
         registerPlugin(PrinterBluetoothPlugin.class);
+        registerPlugin(SinkronLatarPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
