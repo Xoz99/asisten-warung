@@ -19,7 +19,7 @@ router.get('/status', async (req, res, next) => {
   try {
     await pastikanKolomDemo();
     const { rows } = await query(
-      `SELECT plan, lisensi_berlaku_sampai, demo,
+      `SELECT plan, lisensi_berlaku_sampai, demo, nama, username, no_hp,
               CASE WHEN ai_token_tanggal = CURRENT_DATE THEN ai_token_hari_ini ELSE 0 END AS ai_terpakai
        FROM warung WHERE id=$1`,
       [req.warungId]
@@ -34,6 +34,9 @@ router.get('/status', async (req, res, next) => {
       berlakuSampai: w.lisensi_berlaku_sampai,
       aktif,
       demo: !!w.demo,
+      // Data akun terbaru - app nyamain data login yang kesimpan di HP. Dulu nomor HP pemulihan cuma
+      // keganti di HP yang ngeganti; HP lain tetap nampilin nomor lama sampai login ulang.
+      akun: { nama: w.nama, username: w.username, noHp: w.no_hp || null },
       // Katalog paket ikut dikirim di sini (bukan endpoint terpisah) - frontend udah manggil
       // /status buat nampilin status langganan, jadi daftar harganya nebeng sekalian. Satu
       // request, dan yang lebih penting: harga di layar DIJAMIN sama sama yang ditagih Midtrans.

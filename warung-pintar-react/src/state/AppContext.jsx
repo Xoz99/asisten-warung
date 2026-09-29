@@ -381,6 +381,15 @@ export function AppProvider({ children }) {
   // (lihat cekAksesAwal di bawah) tanpa nunggu blocking network call.
   const cekLisensi = useCallback(async () => {
     const st = await api.lisensi.status();
+    // Samain data akun di HP ini sama server (nomor HP / nama warung bisa diganti dari HP lain).
+    if (st.akun) {
+      setAuthWarung((w) => {
+        if (!w || (w.noHp === st.akun.noHp && w.nama === st.akun.nama && w.username === st.akun.username)) return w;
+        const baru = { ...w, ...st.akun };
+        sesi.simpan(sesi.token(), baru);
+        return baru;
+      });
+    }
     const withTs = { ...st, dicekPada: Date.now() };
     setLisensi(withTs);
     await setMeta('lisensi', withTs);
