@@ -3,6 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <script>
+      // APK: pakai ukuran area jam/baterai & navigasi dari pembukaan terakhir, biar isi nggak "loncat" sebelum
+      // Android ngirim ukuran aslinya (MainActivity.java). Di browser nggak ngapa-ngapain.
+      try {
+        var aw = /AsistenWarungApp/.test(navigator.userAgent) && localStorage.getItem('aw_inset');
+        if (aw) {
+          var p = aw.split(',');
+          document.documentElement.style.setProperty('--aman-atas', p[0] + 'px');
+          if (+p[1] > 0) document.documentElement.style.setProperty('--aman-bawah', p[1] + 'px');
+        }
+      } catch (e) {}
+    </script>
     <!-- Warna status bar HP (Android) pas aplikasi dibuka dari ikon layar HP. Disamain sama latar
          aplikasi (tema terang bawaan) biar ikon jam & baterai kebaca gelap di atas terang. Diganti
          otomatis waktu tema diganti - lihat efek theme-color di PhoneShell.jsx. -->

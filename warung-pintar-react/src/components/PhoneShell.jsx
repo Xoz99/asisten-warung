@@ -15,6 +15,7 @@ import Riwayat from '../screens/Riwayat.jsx';
 import Lainnya from '../screens/Lainnya.jsx';
 import Onboarding from '../screens/Onboarding.jsx';
 import SharedSheets from './SharedSheets.jsx';
+import { samakanBarSistem } from '../lib/tampilanNative';
 
 const NAV = [
   {
@@ -103,6 +104,7 @@ export default function PhoneShell() {
       const meta = document.querySelector('meta[name="theme-color"]');
       const warna = el && getComputedStyle(el).getPropertyValue('--bg').trim();
       if (meta && warna) meta.setAttribute('content', warna);
+      samakanBarSistem(warna); // APK: warna ikon jam/baterai ikut tema
     });
     return () => cancelAnimationFrame(id);
   }, [S.tema, authed, lisensi]);

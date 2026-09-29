@@ -25,15 +25,18 @@ body{font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased
   --r:24px; --rbig:30px; --rbtn:20px;
   --f-head:'Bricolage Grotesque'; --h1:34px; --big:52px; --body:18px; --small:15px;
   --frame:#000; --frame2:#333; --tepi:none;
+  /* Tinggi area jam/baterai & tombol navigasi HP. Di browser dari env(); di APK ditimpa Android (MainActivity.java)
+     karena env() di WebView Android sering kebaca 0 padahal tampilannya edge-to-edge. */
+  --aman-atas:env(safe-area-inset-top,0px); --aman-bawah:env(safe-area-inset-bottom,0px);
 }
 
 /* ================= APP SHELL ================= */
-/* padding-top env(safe-area-inset-top): pengaman kalau isi aplikasi sampai naik ke belakang status
+/* padding-top var(--aman-atas): pengaman kalau isi aplikasi sampai naik ke belakang status
    bar / lubang kamera (punch-hole). Manifest sempat display "fullscreen" - status bar HP ilang total,
    jam & baterai nggak kelihatan - dan udah dibalikin ke "standalone" (status bar tampil, isi mulai di
    bawahnya). Di mode itu, di iPhone ("black"), dan di browser biasa nilainya 0, jadi aman dipasang terus. */
 .phone{width:100%;height:100vh;height:100dvh;background:var(--bg);color:var(--ink);position:relative;overflow:hidden;
-  padding-top:env(safe-area-inset-top);
+  padding-top:var(--aman-atas);
   display:flex;flex-direction:column;transition:background .25s,color .25s}
 .layout{flex:1;min-height:0;display:flex;width:100%}
 .main{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}
@@ -41,7 +44,7 @@ body{font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased
 
 .vp{flex:1;overflow-y:auto;scrollbar-width:none;scroll-behavior:smooth;width:100%;max-width:640px;margin:0 auto}
 .vp::-webkit-scrollbar{display:none}
-.screen{display:none;padding:20px 18px calc(140px + env(safe-area-inset-bottom))}
+.screen{display:none;padding:20px 18px calc(140px + var(--aman-bawah))}
 .screen.on{display:block;animation:slidein .28s cubic-bezier(.2,.7,.3,1)}
 @keyframes slidein{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.screen.on{animation:none}}
@@ -271,7 +274,7 @@ img.picon.produk-ikon{display:block;object-fit:cover}
 .nota-status{margin:14px 0 0;text-align:center;font-weight:700;color:var(--abu)}
 /* Komunitas (feed biasa) ikut alur scroll halaman punya .vp/.screen (sama kayak Beranda/Stok dkk) -
    .chat-page dasar nggak butuh padding sendiri, jarak buat nav udah diurus padding-bottom bawaan
-   .screen di atas (sudah termasuk env(safe-area-inset-bottom) buat HP ber-notch). Tapi Mang AI beda
+   .screen di atas (sudah termasuk var(--aman-bawah) buat HP ber-notch). Tapi Mang AI beda
    kebutuhan: chat butuh kotak input nempel FIXED di bawah layar, jadi tetap pakai panel tinggi-penuh
    + scroll internal sendiri (chat-log scroll sendiri, .chat-tail nempel di bawah) lewat
    .chat-page--ai - header tetap di atas, log scroll sendiri, input nempel di bawah, konsisten di
@@ -282,7 +285,7 @@ img.picon.produk-ikon{display:block;object-fit:cover}
 /* Jarak atas dikecilin (20px + 12px margin tab -> 8px) biar tab Mang AI/Komunitas naik & area obrolan
    dapet ruang lebih. Komunitas disamain di bawah - kalau cuma satu yang naik, tabnya loncat
    posisi tiap pindah tab. */
-.chat-page--ai{flex:1;min-height:0;display:flex;flex-direction:column;padding:8px 18px calc(132px + env(safe-area-inset-bottom))}
+.chat-page--ai{flex:1;min-height:0;display:flex;flex-direction:column;padding:8px 18px calc(132px + var(--aman-bawah))}
 .screen.on:has(.chat-page:not(.chat-page--ai)){padding-top:8px}
 .chat-log{flex:1;min-height:0;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column}
 .chat-log::-webkit-scrollbar{display:none}
@@ -513,8 +516,8 @@ img.picon.produk-ikon{display:block;object-fit:cover}
 .badge.show{display:grid;animation:pop .35s}
 
 /* overlay */
-.sheet{position:absolute;inset:0;background:rgba(10,10,10,.6);backdrop-filter:blur(3px);display:none;align-items:flex-end;justify-content:center;z-index:20;padding:18px}
-.sheet.tengah{align-items:center;padding:26px}
+.sheet{position:absolute;inset:0;background:rgba(10,10,10,.6);backdrop-filter:blur(3px);display:none;align-items:flex-end;justify-content:center;z-index:20;padding:calc(18px + var(--aman-atas)) 18px calc(18px + var(--aman-bawah))}
+.sheet.tengah{align-items:center;padding:calc(26px + var(--aman-atas)) 26px calc(26px + var(--aman-bawah))}
 .sheet.show{display:flex;animation:fade .2s}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 .panel{background:var(--surface);border:var(--tepi);border-radius:var(--rbig);padding:26px 22px;width:100%;max-width:440px;
@@ -549,7 +552,7 @@ img.picon.produk-ikon{display:block;object-fit:cover}
    sandi, bayar) dan pas layar pilih penjaga (Login.jsx juga manggil toast). Pemilik warung cuma
    liat aksinya "nggak ngapa-ngapain", padahal pesannya ada - cuma ketimbun.
    pointer-events:none bikin dia nggak pernah ngalangin ketukan walau paling atas. */
-.toast{position:absolute;left:20px;right:20px;bottom:122px;background:var(--ink);color:var(--bg);border-radius:var(--r);padding:17px 20px;
+.toast{position:absolute;left:20px;right:20px;bottom:calc(122px + var(--aman-bawah));background:var(--ink);color:var(--bg);border-radius:var(--r);padding:17px 20px;
   font-size:16px;font-weight:600;z-index:100;opacity:0;transform:translateY(14px);transition:opacity .25s,transform .25s;pointer-events:none;border:var(--tepi)}
 .t-dark .toast{background:var(--surface);color:var(--ink);border:1px solid var(--garis)}
 .toast.show{opacity:1;transform:none}
@@ -597,7 +600,7 @@ img.picon.produk-ikon{display:block;object-fit:cover}
 /* Isi di tengah kalau muat; kalau lebih tinggi dari layar (HP pendek, form daftar dari link/QR sales yang ada kolom
    kode sales) bisa di-scroll dari atas. justify-content:center + tanpa scroll bikin atas & bawahnya kepotong. Spacer
    ::before/::after (tumbuh, nggak nyusut) yang nengahin, karena "safe center" belum didukung semua browser HP. */
-.login{position:absolute;inset:0;background:var(--bg);z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:34px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.login{position:absolute;inset:0;background:var(--bg);z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:calc(34px + var(--aman-atas)) 34px calc(34px + var(--aman-bawah));overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .login::before,.login::after{content:'';flex:1 0 0}
 /* .login sekarang bisa di-scroll: sheet di dalamnya dikunci ke layar biar nggak ikut kegeser. */
 .login>.sheet{position:fixed}
@@ -658,7 +661,7 @@ body{background:#E9E9E6}
 .col.sel i{background:var(--aksen)}
 
 /* ================= NAV FLOATING (iOS liquid glass) ================= */
-.nav{left:14px;right:14px;bottom:calc(16px + env(safe-area-inset-bottom));height:72px;border-radius:36px;padding:0 8px;overflow:visible;
+.nav{left:14px;right:14px;bottom:calc(16px + var(--aman-bawah));height:72px;border-radius:36px;padding:0 8px;overflow:visible;
   background:color-mix(in oklab,var(--surface) 80%,transparent);
   -webkit-backdrop-filter:blur(26px) saturate(180%);backdrop-filter:blur(26px) saturate(180%);
   border:1px solid rgba(255,255,255,.6);
@@ -1121,8 +1124,8 @@ body{background:#E9E9E6}
 
 /* ---------- Ambil dari katalog ---------- */
 .kat-sheet{padding:0;align-items:stretch}
-.kat-panel{max-width:520px;max-height:100%;height:100%;border-radius:0;display:flex;flex-direction:column;padding:18px 18px 0;margin:0 auto;overflow:hidden}
-@media (min-width:560px){.kat-sheet{padding:18px}.kat-panel{border-radius:var(--rbig);height:auto;max-height:100%}}
+.kat-panel{max-width:520px;max-height:100%;height:100%;border-radius:0;display:flex;flex-direction:column;padding:calc(18px + var(--aman-atas)) 18px 0;margin:0 auto;overflow:hidden}
+@media (min-width:560px){.kat-sheet{padding:calc(18px + var(--aman-atas)) 18px calc(18px + var(--aman-bawah))}.kat-panel{border-radius:var(--rbig);height:auto;max-height:100%;padding-top:18px}}
 .kat-kepala{display:flex;align-items:flex-start;gap:12px}
 .kat-kepala>div{flex:1;min-width:0}
 .kat-kepala h3{font-size:24px}
@@ -1172,7 +1175,7 @@ body{background:#E9E9E6}
 .kat-rp input{flex:1;min-width:0;width:100%;border:0;background:none;outline:none;font:inherit;font-size:16px;font-weight:700;color:var(--ink);padding:10px 0}
 .kat-sumber{font-size:12px !important;margin:16px 0 0 !important;line-height:1.5}
 .kat-sumber a{color:var(--ink);font-weight:700}
-.kat-bawah{border-top:var(--tepi);margin:0 -18px;padding:12px 18px calc(12px + env(safe-area-inset-bottom));background:var(--surface)}
+.kat-bawah{border-top:var(--tepi);margin:0 -18px;padding:12px 18px calc(12px + var(--aman-bawah));background:var(--surface)}
 .kat-bawah p{margin:0 0 8px !important;font-size:13px !important;text-align:center;color:var(--abu)}
 .scan.katalog{background:var(--aksen);color:#0A0A0A}
 .scan.katalog .kotak{background:#0A0A0A;color:var(--aksen)}
