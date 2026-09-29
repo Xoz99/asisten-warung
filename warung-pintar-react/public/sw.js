@@ -9,7 +9,8 @@
 //   berkas dari dist/sw-aset.json (dibikin vite.config.js) disimpen sekaligus, biar layar yang belum pernah
 //   dibuka pun tetap bisa kebuka offline. Tiap halaman kebuka online, daftarnya dicek ulang: berkas versi
 //   baru ditambah, yang udah nggak kepakai dibuang.
-// - Model AI (/models/): disimpen begitu pertama dipakai.
+// - Model AI (/models/): disimpen begitu pertama dipakai, atau duluan di latar kalau HP pakai Wi-Fi (pesan
+//   'simpan-model' dari main.jsx) - biar scan foto & kenal wajah langsung bisa offline.
 // - /api/ NGGAK PERNAH di-cache.
 const HALAMAN = 'aw-halaman-v1';
 const ASET = 'aw-aset-v1';
@@ -89,6 +90,25 @@ async function cacheDulu(req, cacheNama) {
   if (res.ok) cache.put(req, res.clone());
   return res;
 }
+
+// Simpan semua model AI (daftar di sw-aset.json) yang belum ada di cache. Satu-satu biar nggak makan memori.
+async function simpanModel() {
+  const res = await fetch('/sw-aset.json', { cache: 'no-store' });
+  if (!res.ok) return;
+  const { model = [] } = await res.json();
+  const cache = await caches.open(MODEL);
+  for (const m of model) {
+    if (await cache.match(m)) continue;
+    try {
+      await cache.add(m);
+    } catch {
+      return; // koneksi putus di tengah jalan - dilanjut lain kali
+    }
+  }
+}
+self.addEventListener('message', (e) => {
+  if (e.data?.jenis === 'simpan-model') e.waitUntil(simpanModel().catch(() => {}));
+});
 
 self.addEventListener('fetch', (e) => {
   const req = e.request;

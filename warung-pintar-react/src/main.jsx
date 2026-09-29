@@ -22,5 +22,11 @@ createRoot(document.getElementById('root')).render(
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
+    // Model AI (±25 MB) disimpen duluan cuma kalau lagi Wi-Fi & mode hemat data mati - biar kuota warung aman.
+    // Pakai data seluler: model tetap disimpen pas scan foto / kenal wajah pertama kali dipakai.
+    const koneksi = navigator.connection;
+    if (koneksi?.type === 'wifi' && !koneksi.saveData) {
+      navigator.serviceWorker.ready.then((reg) => reg.active?.postMessage({ jenis: 'simpan-model' })).catch(() => {});
+    }
   });
 }

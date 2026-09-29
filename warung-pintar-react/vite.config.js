@@ -1,4 +1,5 @@
 import react from '@vitejs/plugin-react'
+import { readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 
@@ -14,7 +15,14 @@ const daftarAsetSw = () => ({
       .filter((f) => !f.endsWith('.map') && !f.endsWith('.html'))
       .map((f) => '/' + f)
       .sort();
-    this.emitFile({ type: 'asset', fileName: 'sw-aset.json', source: JSON.stringify({ versi: Date.now(), aset }) });
+    // Model AI yang beneran dipakai (scan foto barang & kenal wajah) - varian "tiny" nggak dipakai (lib/wajah.js).
+    // Disimpen service worker di latar kalau HP lagi pakai Wi-Fi, biar fitur itu jalan offline tanpa nunggu dipakai dulu.
+    const model = readdirSync(lokal('./public/models'), { recursive: true })
+      .map(String)
+      .filter((f) => /\.(bin|json)$/.test(f) && !/tiny/.test(f))
+      .map((f) => '/models/' + f.split('\\').join('/'))
+      .sort();
+    this.emitFile({ type: 'asset', fileName: 'sw-aset.json', source: JSON.stringify({ versi: Date.now(), aset, model }) });
   },
 })
 
