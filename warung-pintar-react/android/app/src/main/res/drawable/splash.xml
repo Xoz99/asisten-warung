@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Layar pembuka: latar polos + logo Mang Warung kecil di tengah (dulu 26 gambar splash ukuran penuh, ±32 MB). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/splash_latar" />
+    <item android:width="128dp" android:height="128dp" android:gravity="center" android:drawable="@drawable/splash_logo" />
+</layer-list>

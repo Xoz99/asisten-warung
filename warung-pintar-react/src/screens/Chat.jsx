@@ -13,6 +13,7 @@ import { terpasangSebagaiApp } from '../lib/pwa';
 import mangWarungImg from '../assets/mangwarung.webp';
 import TeksBerlink from '../components/TeksBerlink.jsx';
 import { labelJenisUsaha } from '../lib/profilUsaha';
+import { pakaiSuaraNative, SuaraNative } from '../lib/suaraNative';
 
 // formatBot & saranLanjutan ada di lib/formatChat.js (dipisah biar bisa diuji langsung).
 
@@ -271,10 +272,12 @@ function TanyaAI() {
       matikanDikte();
       return;
     }
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    // Di APK pakai pengenal suara native Android (versi browser nggak jalan di WebView) - lib/suaraNative.js.
+    const native = pakaiSuaraNative();
+    const SR = native ? SuaraNative : window.SpeechRecognition || window.webkitSpeechRecognition;
     // iPhone dari ikon layar HP: jangan buang-buang percobaan ke SpeechRecognition yang udah
     // pasti ditolak - langsung ke jalur rekam.
-    if ((!SR || (perangkatIOS() && terpasangSebagaiApp())) && rekamanDidukung()) {
+    if (!native && (!SR || (perangkatIOS() && terpasangSebagaiApp())) && rekamanDidukung()) {
       mulaiRekamChat();
       return;
     }

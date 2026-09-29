@@ -1,6 +1,6 @@
 {
-  "name": "Warung Pintar",
-  "short_name": "Warung Pintar",
+  "name": "Asisten Warung",
+  "short_name": "Asisten Warung",
   "description": "Kasir & pencatatan warung kelontong: stok, kasbon, laporan untung rugi, dibantu Mang AI.",
   "id": "/",
   "start_url": "/",

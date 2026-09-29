@@ -1,0 +1,12 @@
+{
+  "appId": "com.konsulin.asistenwarung",
+  "appName": "Asisten Warung",
+  "webDir": "capacitor-web",
+  "server": {
+    "url": "https://asistenwarung.konsulin.com",
+    "errorPath": "offline.html"
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Asisten Warung</string>
+    <string name="title_activity_main">Asisten Warung</string>
+    <string name="package_name">com.konsulin.asistenwarung</string>
+    <string name="custom_url_scheme">com.konsulin.asistenwarung</string>
+</resources>

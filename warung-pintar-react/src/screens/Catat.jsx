@@ -16,6 +16,7 @@ import { perbaruiWajahLama, perluPerbaruiWajah } from '../lib/wajahLama';
 import { buatPengumpulSampel, layakDitampilkan } from '../lib/sampelWajah';
 import SheetStruk from '../components/SheetStruk.jsx';
 import { tungguReferensiKatalog } from '../lib/referensiKatalog';
+import { pakaiSuaraNative, SuaraNative } from '../lib/suaraNative';
 
 // Instance SpeechRecognition yang lagi AKTIF saat ini, kalau ada — sengaja modul-level (di luar
 // komponen React), bukan state/ref biasa, biar tetap "keinget" lintas mount/unmount SheetVoice.
@@ -149,14 +150,16 @@ export default function Catat() {
   // desktop yang lebih longgar) - persis gejala "sheet kebuka tapi macet selamanya di 'Dengar…'"
   // yang cuma kejadian di HP, nggak di desktop.
   const bukaVoice = () => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    // Di APK pakai pengenal suara native Android (versi browser nggak jalan di WebView) - lib/suaraNative.js.
+    const native = pakaiSuaraNative();
+    const SR = native ? SuaraNative : window.SpeechRecognition || window.webkitSpeechRecognition;
 
     // iPhone yang dibuka dari IKON LAYAR HP: SpeechRecognition-nya ADA (jadi `SR` di atas nggak
     // null) tapi SELALU ditolak WebKit, walau izin mikrofonnya udah dikasih. Jadi jangan dicoba
     // dulu - percobaan itu cuma ngasih dialog error yang nggak ada obatnya. Langsung ke jalur
     // rekam + transkrip AI, yang di situ jalan normal. Lihat lib/rekam.js.
     const iosTerpasang = perangkatIOS() && terpasangSebagaiApp();
-    if ((!SR || iosTerpasang) && rekamanDidukung()) {
+    if (!native && (!SR || iosTerpasang) && rekamanDidukung()) {
       setVoiceRec('rekam');
       setVoiceOpen(true);
       return;

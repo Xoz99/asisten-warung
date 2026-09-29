@@ -2,6 +2,9 @@ import { createContext, useContext, useEffect, useMemo, useState, useRef, useCal
 import { api, sesi } from '../lib/api';
 import { inisial, escapeHtml } from '../lib/format';
 import { bisaDijual, belumDiatur } from '../lib/voice';
+import { Capacitor } from '@capacitor/core';
+import { App as CapApp } from '@capacitor/app';
+import { pakaiNotifNative, jadwalkanPengingat, dengarKetukNotif } from '../lib/notifNative';
 import { simpanSemuaKeCache, muatSemuaDariCache } from '../lib/dataCache';
 import { getMeta, setMeta, hapusCacheWarung } from '../lib/localdb';
 import { tambahKeOutbox, hapusDariOutbox, ambilOutboxPending, prosesOutbox } from '../lib/outbox';
@@ -297,6 +300,27 @@ export function AppProvider({ children }) {
   }, []);
 
   const goTo = useCallback((id) => setScreen(id), []);
+
+  // ---- Khusus APK (Capacitor) - di browser semua efek ini nggak ngapa-ngapain ----
+  // Pengingat harian (stok hampir habis 07.00, kasbon belum lunas 19.00) dijadwal ulang tiap datanya berubah.
+  useEffect(() => {
+    if (!authed || !pakaiNotifNative()) return;
+    const t = setTimeout(() => jadwalkanPengingat({ produk: S.produk, kasbon: S.kasbon }).catch(() => {}), 3000);
+    return () => clearTimeout(t);
+  }, [authed, S.produk, S.kasbon]);
+  useEffect(() => dengarKetukNotif(goTo), [goTo]);
+  // Tombol Kembali Android: dari layar lain balik ke Beranda dulu, dari Beranda baru aplikasinya diminimalkan
+  // (bawaan WebView: langsung nutup aplikasi, bikin kaget pas penjaga cuma mau balik).
+  const layarRef = useRef(screen);
+  layarRef.current = screen;
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const h = CapApp.addListener('backButton', () => {
+      if (layarRef.current !== 's-home') setScreen('s-home');
+      else CapApp.minimizeApp();
+    });
+    return () => h.then((x) => x.remove()).catch(() => {});
+  }, []);
   const openOk = useCallback((judul, pesan) => setOkInfo({ judul, pesan }), []);
   // Panduan buka izin kamera/mikrofon yang terlanjur diblokir. Ditaruh di level aplikasi (bukan di
   // dalam layar yang manggil) karena yang paling butuh justru muncul DI ATAS sheet lain - "Sebut
