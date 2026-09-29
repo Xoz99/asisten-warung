@@ -1,22 +1,110 @@
-// Service worker MINIMAL - syarat teknis biar aplikasi bisa di-install ke layar HP.
+// Service worker Asisten Warung: bikin aplikasinya bisa DIBUKA TANPA INTERNET setelah sekali kebuka online
+// (di browser & di APK). Data warung sendiri tetap disimpen lewat IndexedDB (lib/localdb.js + outbox.js).
 //
-// Chrome baru mau nawarin "install" kalau situsnya punya manifest + service worker yang punya
-// handler fetch. Jadi berkas ini ADA buat memenuhi syarat itu, bukan buat nyimpen cache.
-//
-// SENGAJA NGGAK NGE-CACHE APA PUN. Alasannya: service worker yang nyimpen cache itu sumber bug
-// paling nyebelin di aplikasi yang masih sering di-deploy - user nyangkut di versi lama berhari-
-// hari, dan dia nggak punya cara buat maksa refresh. Aplikasi ini juga UDAH punya penyimpanan
-// offline sendiri lewat IndexedDB (lihat lib/localdb.js + outbox.js) buat data warungnya, yang
-// jauh lebih tepat sasaran daripada nge-cache berkas mentah.
-//
-// Kalau nanti beneran butuh offline penuh (buka aplikasi tanpa internet sama sekali), itu
-// perubahan tersendiri yang harus dipikir mateng - jangan ditempel diam-diam di sini.
+// Dulu berkas ini sengaja nggak nyimpen apa-apa, karena cache yang salah bikin user nyangkut di versi lama
+// berhari-hari. Aturan di bawah dibikin biar itu NGGAK kejadian:
+// - Halaman (index.html): SELALU ambil dari internet dulu. Cache cuma dipakai kalau offline / internetnya mati.
+//   Jadi tiap deploy langsung kebaca begitu ada sinyal.
+// - Berkas /assets/ (JS/CSS): namanya ber-hash (isi beda = nama beda), jadi aman disimpen permanen. Semua
+//   berkas dari dist/sw-aset.json (dibikin vite.config.js) disimpen sekaligus, biar layar yang belum pernah
+//   dibuka pun tetap bisa kebuka offline. Tiap halaman kebuka online, daftarnya dicek ulang: berkas versi
+//   baru ditambah, yang udah nggak kepakai dibuang.
+// - Model AI (/models/): disimpen begitu pertama dipakai.
+// - /api/ NGGAK PERNAH di-cache.
+const HALAMAN = 'aw-halaman-v1';
+const ASET = 'aw-aset-v1';
+const MODEL = 'aw-model-v1';
+const DAFTAR = '/__aw-daftar-aset';
 
-// Langsung ambil alih tanpa nunggu tab lama ditutup - biar versi baru service worker nggak
-// ngantre di belakang versi lama waktu ada deploy.
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+self.addEventListener('install', (e) => {
+  self.skipWaiting();
+  e.waitUntil(Promise.all([segarkanAset(), simpanHalaman()]).catch(() => {}));
+});
 
-// Diteruskan apa adanya ke jaringan. Handler ini HARUS ada (itu syarat installable-nya), tapi
-// nggak boleh ngubah apa pun.
-self.addEventListener('fetch', () => {});
+self.addEventListener('activate', (e) => {
+  e.waitUntil(
+    (async () => {
+      const dipakai = [HALAMAN, ASET, MODEL];
+      for (const k of await caches.keys()) if (!dipakai.includes(k)) await caches.delete(k);
+      await self.clients.claim();
+    })()
+  );
+});
+
+async function simpanHalaman() {
+  const res = await fetch('/', { cache: 'no-store' });
+  if (res.ok) await (await caches.open(HALAMAN)).put('/', res);
+}
+
+// Samain isi cache aset dengan daftar build terbaru (dist/sw-aset.json).
+let lagiSegarkan = null;
+function segarkanAset() {
+  if (!lagiSegarkan) {
+    lagiSegarkan = (async () => {
+      const res = await fetch('/sw-aset.json', { cache: 'no-store' });
+      if (!res.ok) return;
+      const { versi, aset } = await res.json();
+      const cache = await caches.open(ASET);
+      const lama = await cache.match(DAFTAR);
+      if (lama && (await lama.json()).versi === versi) return;
+      const ada = new Set((await cache.keys()).map((r) => new URL(r.url).pathname));
+      await Promise.allSettled(aset.filter((a) => !ada.has(a)).map((a) => cache.add(a)));
+      const baru = new Set(aset);
+      for (const r of await cache.keys()) {
+        const p = new URL(r.url).pathname;
+        if (p !== DAFTAR && !baru.has(p)) await cache.delete(r);
+      }
+      await cache.put(DAFTAR, new Response(JSON.stringify({ versi })));
+    })().finally(() => {
+      lagiSegarkan = null;
+    });
+  }
+  return lagiSegarkan;
+}
+
+// Internet dulu (maks `batas` ms); gagal/kelamaan -> cache.
+async function internetDulu(req, cacheNama, kunci, batas) {
+  const cache = await caches.open(cacheNama);
+  const dariInternet = fetch(req).then((res) => {
+    if (res.ok) cache.put(kunci, res.clone());
+    return res;
+  });
+  const waktuHabis = new Promise((r) => setTimeout(r, batas));
+  try {
+    const res = await Promise.race([dariInternet, waktuHabis]);
+    if (res) return res;
+  } catch {
+    /* offline */
+  }
+  const simpanan = await cache.match(kunci);
+  if (simpanan) return simpanan;
+  return dariInternet; // nggak ada cache: tunggu internetnya aja (atau error aslinya)
+}
+
+async function cacheDulu(req, cacheNama) {
+  const cache = await caches.open(cacheNama);
+  const simpanan = await cache.match(req);
+  if (simpanan) return simpanan;
+  const res = await fetch(req);
+  if (res.ok) cache.put(req, res.clone());
+  return res;
+}
+
+self.addEventListener('fetch', (e) => {
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
+
+  if (req.mode === 'navigate') {
+    // Satu halaman buat semua alamat (aplikasinya SPA). Sekalian cek berkas versi terbaru di belakang layar.
+    e.respondWith(internetDulu(req, HALAMAN, '/', 4000));
+    e.waitUntil(segarkanAset().catch(() => {}));
+    return;
+  }
+  if (url.pathname.startsWith('/assets/')) return e.respondWith(cacheDulu(req, ASET));
+  if (url.pathname.startsWith('/models/')) return e.respondWith(cacheDulu(req, MODEL));
+  if (url.pathname === '/sw-aset.json') return;
+  // Ikon, manifest, dsb: internet dulu, cache kalau offline.
+  e.respondWith(internetDulu(req, HALAMAN, url.pathname, 4000));
+});

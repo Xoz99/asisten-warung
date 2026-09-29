@@ -121,7 +121,9 @@ if (fs.existsSync(path.join(DIST, 'index.html'))) {
     express.static(DIST, {
       index: false,
       setHeaders: (res, berkas) => {
-        if (berkas.endsWith('index.html')) res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+        // sw.js & daftar asetnya juga WAJIB selalu dicek ulang - kalau ke-cache lama, service worker nggak pernah
+        // tau ada versi baru (lihat public/sw.js di frontend).
+        if (/(index\.html|sw\.js|sw-aset\.json|\.webmanifest)$/.test(berkas)) res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
         else res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
       },
     })

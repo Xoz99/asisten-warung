@@ -4,9 +4,23 @@ import { defineConfig } from 'vite'
 
 const lokal = (p) => fileURLToPath(new URL(p, import.meta.url))
 
+// Daftar semua berkas hasil build (JS/CSS/gambar ber-hash) -> dist/sw-aset.json. Dibaca service worker (public/sw.js)
+// buat nyimpen SEMUA layar ke cache pas pertama online, biar aplikasinya bisa dibuka tanpa internet.
+const daftarAsetSw = () => ({
+  name: 'daftar-aset-sw',
+  apply: 'build',
+  generateBundle(_, bundle) {
+    const aset = Object.keys(bundle)
+      .filter((f) => !f.endsWith('.map') && !f.endsWith('.html'))
+      .map((f) => '/' + f)
+      .sort();
+    this.emitFile({ type: 'asset', fileName: 'sw-aset.json', source: JSON.stringify({ versi: Date.now(), aset }) });
+  },
+})
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), daftarAsetSw()],
   resolve: {
     alias: [
       // face-api versi TANPA bundel. Versi bawaannya (face-api.esm.js, 1,3 MB) ngebawa TensorFlow.js

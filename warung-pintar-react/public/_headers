@@ -17,3 +17,9 @@
 # udah di-deploy ulang.
 /index.html
   Cache-Control: public, max-age=0, must-revalidate
+
+# Service worker & daftar asetnya: selalu dicek ulang, biar versi baru aplikasi langsung kebaca (lihat sw.js).
+/sw.js
+  Cache-Control: public, max-age=0, must-revalidate
+/sw-aset.json
+  Cache-Control: public, max-age=0, must-revalidate
