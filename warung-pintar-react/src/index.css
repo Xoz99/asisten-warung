@@ -203,7 +203,7 @@ img.picon.produk-ikon{display:block;object-fit:cover}
 .cari{margin-top:12px;background:var(--surface);border:var(--tepi);border-radius:var(--r);padding:18px;color:var(--abu);font-weight:600;font-size:17px;display:flex;gap:12px}
 .cari-scan{flex:none;width:34px;height:34px;margin:-6px -6px -6px 2px;display:grid;place-items:center;border:0;border-radius:10px;background:var(--bg);color:var(--ink);cursor:pointer}
 .cari-scan svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round}
-.scan-hasil{margin:0 0 4px !important;padding:10px 12px;border-radius:12px;background:var(--bg);color:var(--ink) !important;font-weight:700 !important;font-size:15px !important}
+.scan-hasil{margin:0 0 4px;padding:10px 12px;border-radius:12px;background:var(--bg);color:var(--ink) !important;font-weight:700 !important;font-size:15px !important}
 .cari input{flex:1;min-width:0;border:0;background:none;outline:none;padding:0;font:inherit;color:var(--ink)}
 .cari input::placeholder{color:var(--abu);font-weight:600}
 .cari-clear{flex:none;width:24px;height:24px;border:0;border-radius:50%;background:var(--bg);color:var(--abu);cursor:pointer;display:grid;place-items:center;padding:0}

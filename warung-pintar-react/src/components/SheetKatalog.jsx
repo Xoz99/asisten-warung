@@ -11,7 +11,7 @@ const NAMA_KATEGORI = { lainnya: 'Lainnya', 'mie instan': 'Mie instan' };
 const namaKategori = (k) => NAMA_KATEGORI[k] || k.charAt(0).toUpperCase() + k.slice(1);
 const PER_HALAMAN = 60;
 
-export default function SheetKatalog({ onClose }) {
+export default function SheetKatalog({ onClose, onTambahBarang }) {
   const { toast, refreshData } = useApp();
   const [ketik, setKetik] = useState('');
   const [q, setQ] = useState('');
@@ -74,7 +74,21 @@ export default function SheetKatalog({ onClose }) {
     try {
       b = await api.katalog.barcode(kode);
     } catch (e) {
-      if (e.status === 404 || e.status === 400) return `✗ ${kode} belum ada di katalog - tambahin lewat Stok > Tambah/kelola barang`;
+      if (e.status === 404 || e.status === 400) {
+        if (!onTambahBarang) return `✗ ${kode} belum ada di katalog - tambahin lewat Stok > Tambah/kelola barang`;
+        // Barang belum ada di katalog: langsung buka form "Barang belum terdaftar" dengan barcode keisi. Katalog &
+        // centangannya tetap kebuka di belakang.
+        return {
+          teks: `✗ ${kode} belum ada di katalog`,
+          aksi: {
+            label: '+ Tambah barang ini',
+            jalan: () => {
+              setScan(false);
+              onTambahBarang(kode);
+            },
+          },
+        };
+      }
       throw new Error('Nggak bisa nyambung ke server, coba lagi');
     }
     if (b.sudahPunya) return `• ${b.nama} udah ada di Stok`;

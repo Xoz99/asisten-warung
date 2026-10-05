@@ -6,7 +6,8 @@ import KontrolKamera from './KontrolKamera.jsx';
 // Layar scan barcode serbaguna: cuma baca kodenya, yang ngolah pemanggilnya lewat onKode(kode).
 // - Sekali scan (default): dipakai kolom cari Stok.
 // - terus: kamera tetap nyala buat barang berikutnya (Ambil dari katalog - nyecan satu rak). onKode boleh balikin
-//   teks/Promise<teks> yang ditampilin sebagai hasil terakhir ("✓ Indomie Goreng dicentang").
+//   teks/Promise<teks> yang ditampilin sebagai hasil terakhir ("✓ Indomie Goreng dicentang"), atau
+//   { teks, aksi: { label, jalan } } kalau perlu tombol (mis. "Tambah barang ini" buat barcode yang belum ada).
 export default function SheetScanBarcode({ judul = 'Scan barcode', onKode, onClose, terus = false, tombolSelesai = 'Batal' }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -14,16 +15,16 @@ export default function SheetScanBarcode({ judul = 'Scan barcode', onKode, onClo
   const kontrolRef = useRef(null);
   const [status, setStatus] = useState('memuat'); // memuat | scan | error
   const [pesan, setPesan] = useState('');
-  const [hasil, setHasil] = useState('');
+  const [hasil, setHasil] = useState(null); // { teks, aksi? }
   const [kap, setKap] = useState(null);
   const [manual, setManual] = useState('');
 
   const proses = async (kode) => {
     try {
       const t = await onKode(kode);
-      if (terus && t) setHasil(t);
+      if (terus && t) setHasil(typeof t === 'string' ? { teks: t } : t);
     } catch (e) {
-      if (terus) setHasil(e.message || 'Gagal');
+      if (terus) setHasil({ teks: e.message || 'Gagal' });
     }
     // Mode terus: kasih jeda sebentar biar barcode yang sama nggak kebaca dobel, lalu scan lagi.
     if (terus && !matiRef.current) setTimeout(() => !matiRef.current && mulai(), 1200);
@@ -75,7 +76,16 @@ export default function SheetScanBarcode({ judul = 'Scan barcode', onKode, onClo
           <video ref={videoRef} muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           {status === 'scan' && <KontrolKamera streamRef={streamRef} kap={kap} />}
         </div>
-        {hasil && <p className="scan-hasil" role="status">{hasil}</p>}
+        {hasil && (
+          <div className="scan-hasil" role="status">
+            {hasil.teks}
+            {hasil.aksi && (
+              <button type="button" className="btn utama" style={{ width: '100%', marginTop: 10 }} onClick={hasil.aksi.jalan}>
+                {hasil.aksi.label}
+              </button>
+            )}
+          </div>
+        )}
         <p>
           {status === 'error'
             ? pesan

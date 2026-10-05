@@ -266,7 +266,15 @@ export default function Stok() {
         ))}
       </div>
 
-      {katalogBuka && <SheetKatalog onClose={() => setKatalogBuka(false)} />}
+      {katalogBuka && (
+        <SheetKatalog
+          onClose={() => setKatalogBuka(false)}
+          onTambahBarang={(kode) => {
+            setKodeBaru(kode);
+            setBarcodeMode('barcode');
+          }}
+        />
+      )}
       {aturBuka && <SheetAturBarang barang={perluDiatur} onClose={() => setAturBuka(false)} />}
       {barcodeMode && (
         <SheetBarcode
