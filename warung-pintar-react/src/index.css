@@ -1,3 +1,7 @@
+/* Tinggi area jam/baterai & tombol navigasi HP. Di browser dari env(); di APK ditimpa Android (MainActivity.java)
+   karena env() di WebView Android sering kebaca 0. Dipasang di :root (BUKAN di kelas tema) - dulu cuma ada di
+   .t-dark, jadi di tema terang variabelnya kosong: menu bawah loncat ke atas & jarak sheet/login jadi nol. */
+:root{--aman-atas:env(safe-area-inset-top,0px);--aman-bawah:env(safe-area-inset-bottom,0px)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%}
 body{font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
@@ -25,9 +29,6 @@ body{font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased
   --r:24px; --rbig:30px; --rbtn:20px;
   --f-head:'Bricolage Grotesque'; --h1:34px; --big:52px; --body:18px; --small:15px;
   --frame:#000; --frame2:#333; --tepi:none;
-  /* Tinggi area jam/baterai & tombol navigasi HP. Di browser dari env(); di APK ditimpa Android (MainActivity.java)
-     karena env() di WebView Android sering kebaca 0 padahal tampilannya edge-to-edge. */
-  --aman-atas:env(safe-area-inset-top,0px); --aman-bawah:env(safe-area-inset-bottom,0px);
 }
 
 /* ================= APP SHELL ================= */

@@ -1005,8 +1005,8 @@ function SheetVisual({ onClose }) {
           await videoRef.current.play();
         }
         if (batal) return;
-        // Fokus otomatis dipasang ulang + zoom 1,5x (barcode & foto barang tetap muat, HP nggak perlu mepet).
-        siapkanKamera(stream, { zoom: 1.5 }).then((k) => !batal && setKapKamera(k));
+        // Fokus otomatis dipasang ulang + zoom 1,25x (barcode & foto barang tetap muat, HP nggak perlu mepet).
+        siapkanKamera(stream, { zoom: 1.25 }).then((k) => !batal && setKapKamera(k));
         mulaiBarcode();
         setStatus('siap');
       } catch (e) {

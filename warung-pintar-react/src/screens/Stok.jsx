@@ -640,9 +640,9 @@ function SheetBarcode({ mode, onClose, onKelola }) {
           await videoRef.current.play();
         }
         if (batal) return;
-        // Fokus otomatis dipasang ulang; mode barcode zoom 2x biar HP bisa dipegang agak jauh (di jarak yang masih
+        // Fokus otomatis dipasang ulang; mode barcode zoom 1,5x biar HP bisa dipegang agak jauh (di jarak yang masih
         // bisa fokus) - dulu orang nyodorin HP mepet ke barcode & hasilnya blur.
-        siapkanKamera(stream, { zoom: mode === 'barcode' ? 2 : 1.3 }).then((k) => !batal && setKapKamera(k));
+        siapkanKamera(stream, { zoom: mode === 'barcode' ? 1.5 : 1.2 }).then((k) => !batal && setKapKamera(k));
         if (mode === 'barcode') mulaiScanBarcode();
         setStep('scan');
       } catch (e) {
