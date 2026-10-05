@@ -11,6 +11,7 @@ import PilihIkon from '../components/PilihIkon.jsx';
 import KonfirmasiHapus from '../components/KonfirmasiHapus.jsx';
 import { bukaKamera, tutupKamera, jepretFrame, keWebp, siapkanKamera } from '../lib/kamera';
 import KontrolKamera from '../components/KontrolKamera.jsx';
+import SheetScanBarcode from '../components/SheetScanBarcode.jsx';
 import { ambilEmbedding } from '../lib/visualScan';
 import { useModelVisual } from '../lib/useModelVisual';
 import { FORMAT_RETAIL, ambilCanvasROI, buatDekoderZxing, mulaiScanBarcode as mulaiScanBarcodeShared } from '../lib/barcodeScan';
@@ -77,76 +78,6 @@ function cariByBarcode(produk, kode) {
   const inti = intiBarcode(kode);
   if (!inti) return null;
   return produk.find((p) => p.barcode && intiBarcode(p.barcode) === inti) || produk.find((p) => p.barcode && String(p.barcode).trim() === String(kode).trim()) || null;
-}
-
-// Scan barcode buat nyari barang di Stok (tombol di kolom cari). Cuma baca kodenya - nyocokinnya di Stok().
-function SheetScanCari({ onKode, onClose }) {
-  const videoRef = useRef(null);
-  const streamRef = useRef(null);
-  const matiRef = useRef(false);
-  const kontrolRef = useRef(null);
-  const [status, setStatus] = useState('memuat'); // memuat | scan | error
-  const [pesan, setPesan] = useState('');
-  const [kap, setKap] = useState(null);
-  const [manual, setManual] = useState('');
-  useEffect(() => {
-    let batal = false;
-    matiRef.current = false;
-    (async () => {
-      try {
-        const stream = await bukaKamera('environment');
-        if (batal) return tutupKamera(stream);
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-        if (batal) return;
-        siapkanKamera(stream, { zoom: 1.5 }).then((k) => !batal && setKap(k));
-        kontrolRef.current = mulaiScanBarcodeShared({ videoRef, matiRef, onDetect: (kode) => onKode(kode) });
-        setStatus('scan');
-      } catch (e) {
-        if (!batal) {
-          setPesan(e.message || 'Gagal membuka kamera');
-          setStatus('error');
-        }
-      }
-    })();
-    return () => {
-      batal = true;
-      matiRef.current = true;
-      kontrolRef.current?.stop();
-      tutupKamera(streamRef.current);
-      streamRef.current = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  return (
-    <div className="sheet tengah show">
-      <div className="panel mid">
-        <h3>Cari pakai barcode</h3>
-        <div className="viewfinder" style={{ marginTop: 14 }}>
-          <div className="frame" />
-          <video ref={videoRef} muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          {status === 'scan' && <KontrolKamera streamRef={streamRef} kap={kap} />}
-        </div>
-        <p>{status === 'error' ? pesan : status === 'memuat' ? 'Membuka kamera…' : 'Arahkan ke barcode barang - kebaca otomatis.'}</p>
-        <form
-          className="cari"
-          style={{ marginTop: 12 }}
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (manual.replace(/\D/g, '').length >= 6) onKode(manual.trim());
-          }}
-        >
-          <input inputMode="numeric" placeholder="Atau ketik nomor barcode" value={manual} onChange={(e) => setManual(e.target.value.replace(/[^\d]/g, '').slice(0, 20))} aria-label="Nomor barcode" />
-        </form>
-        <button className="btn" style={{ width: '100%', marginTop: 12 }} onClick={onClose}>
-          Batal
-        </button>
-      </div>
-    </div>
-  );
 }
 
 export default function Stok() {
@@ -348,7 +279,7 @@ export default function Stok() {
           onKelola={(p) => mintaPin(() => setOpnameProduk(p))}
         />
       )}
-      {scanCari && <SheetScanCari onKode={hasilScanCari} onClose={() => setScanCari(false)} />}
+      {scanCari && <SheetScanBarcode judul="Cari pakai barcode" onKode={hasilScanCari} onClose={() => setScanCari(false)} />}
       {opnameProduk && <SheetOpname produk={opnameProduk} onClose={() => setOpnameProduk(null)} />}
       {tambahVarianGrup && (
         <SheetTambahVarian grup={tambahVarianGrup.nama} contoh={tambahVarianGrup.contoh} onClose={() => setTambahVarianGrup(null)} />

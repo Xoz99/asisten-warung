@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { api } from '../lib/api';
 import { escapeHtml, rupiah } from '../lib/format';
+import SheetScanBarcode from './SheetScanBarcode.jsx';
 
 // "Ambil dari katalog": centang banyak barang sekaligus dari Katalog Barang Bersama, langsung masuk Stok tanpa ngisi
 // apa-apa di sini. Harga jual, modal/HPP & stok awalnya diatur belakangan di Stok (kotak "Perlu diatur" -> Atur
@@ -20,6 +21,11 @@ export default function SheetKatalog({ onClose }) {
   const [gagal, setGagal] = useState('');
   const [pilihan, setPilihan] = useState({}); // id -> barang katalog
   const [simpan, setSimpan] = useState(false);
+  const [scan, setScan] = useState(false);
+  // Layar scan manggil hasilScan berkali-kali dari fungsi yang sama (dibikin sekali) - status centang dibaca
+  // lewat ref biar selalu yang terbaru.
+  const pilihanRef = useRef(pilihan);
+  pilihanRef.current = pilihan;
   const minta = useRef(0);
 
   // Ketikan dicari setelah berhenti ngetik sebentar, biar nggak nembak server tiap huruf.
@@ -61,6 +67,23 @@ export default function SheetKatalog({ onClose }) {
       return x;
     });
 
+  // Scan barcode (kamera tetap nyala, bisa nyecan satu rak): barang ketemu di katalog -> langsung dicentang &
+  // ditaruh paling atas daftar. Balikin teks hasil buat ditampilin di layar scan.
+  const hasilScan = async (kode) => {
+    let b;
+    try {
+      b = await api.katalog.barcode(kode);
+    } catch (e) {
+      if (e.status === 404 || e.status === 400) return `✗ ${kode} belum ada di katalog - tambahin lewat Stok > Tambah/kelola barang`;
+      throw new Error('Nggak bisa nyambung ke server, coba lagi');
+    }
+    if (b.sudahPunya) return `• ${b.nama} udah ada di Stok`;
+    setData((d) => ({ ...d, barang: [b, ...d.barang.filter((x) => x.id !== b.id)] }));
+    const udah = !!pilihanRef.current[b.id];
+    setPilihan((p) => (p[b.id] ? p : { ...p, [b.id]: b }));
+    return udah ? `• ${b.nama} udah dicentang` : `✓ ${b.nama} dicentang`;
+  };
+
   const tambah = async () => {
     if (!dipilih.length) return;
     setSimpan(true);
@@ -83,7 +106,7 @@ export default function SheetKatalog({ onClose }) {
         <div className="kat-kepala">
           <div>
             <h3>Ambil dari katalog</h3>
-            <p>Centang aja barang yang kamu jual. Harga & HPP-nya diatur nanti di Stok.</p>
+            <p>Centang aja barang yang kamu jual, atau scan barcodenya. Harga & HPP-nya diatur nanti di Stok.</p>
           </div>
           <button type="button" className="kat-tutup" onClick={onClose} aria-label="Tutup">
             <svg viewBox="0 0 24 24">
@@ -98,6 +121,12 @@ export default function SheetKatalog({ onClose }) {
             <path d="m15.6 15.6 4.4 4.4" />
           </svg>
           <input type="search" placeholder="Cari: indomie, aqua, kecap…" value={ketik} onChange={(e) => setKetik(e.target.value)} />
+          <button type="button" className="cari-scan" onClick={() => setScan(true)} aria-label="Scan barcode barang" title="Scan barcode">
+            <svg viewBox="0 0 24 24">
+              <path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2" />
+              <path d="M8 8v8M11 8v8M14 8v8M17 8v8" />
+            </svg>
+          </button>
         </div>
         <div className="tabs" style={{ marginTop: 10 }}>
           <button className={'tab' + (!kategori ? ' act' : '')} onClick={() => setKategori('')}>
@@ -167,6 +196,16 @@ export default function SheetKatalog({ onClose }) {
             , serta barang yang diverifikasi tim atau dipakai banyak warung. Harga & stok warungmu nggak pernah dibagikan.
           </p>
         </div>
+
+        {scan && (
+          <SheetScanBarcode
+            judul="Scan barang dari katalog"
+            terus
+            tombolSelesai={`Selesai${dipilih.length ? ` (${dipilih.length} dicentang)` : ''}`}
+            onKode={hasilScan}
+            onClose={() => setScan(false)}
+          />
+        )}
 
         <div className="kat-bawah">
           <button className="btn utama" style={{ width: '100%' }} disabled={!dipilih.length || simpan} onClick={tambah}>
