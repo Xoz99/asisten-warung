@@ -7,7 +7,8 @@ import { mulaiRekam, rekamanDidukung } from '../lib/rekam';
 import { terpasangSebagaiApp } from '../lib/pwa';
 import { rupiah, inisial, escapeHtml } from '../lib/format';
 import { api } from '../lib/api';
-import { bukaKamera, tutupKamera, jepretFrame, keWebp } from '../lib/kamera';
+import { bukaKamera, tutupKamera, jepretFrame, keWebp, siapkanKamera } from '../lib/kamera';
+import KontrolKamera from '../components/KontrolKamera.jsx';
 import { ambilEmbedding } from '../lib/visualScan';
 import { useModelVisual } from '../lib/useModelVisual';
 import { mulaiScanBarcode } from '../lib/barcodeScan';
@@ -926,6 +927,7 @@ function SheetVisual({ onClose }) {
   const { tambah, toast, tanganiErrorAi } = useApp();
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const [kapKamera, setKapKamera] = useState(null); // hasil siapkanKamera() - buat tombol senter & ketuk fokus
   const controlsRef = useRef(null); // {stop()} loop scan barcode yang lagi jalan di background
   const matiRef = useRef(false); // true kalau sheet ini udah ditutup/unmount
   const [status, setStatus] = useState('memuat'); // memuat | siap | memindai | hasil | tidak-ketemu | error | memindai-banyak | hasil-banyak
@@ -1003,6 +1005,8 @@ function SheetVisual({ onClose }) {
           await videoRef.current.play();
         }
         if (batal) return;
+        // Fokus otomatis dipasang ulang + zoom 1,5x (barcode & foto barang tetap muat, HP nggak perlu mepet).
+        siapkanKamera(stream, { zoom: 1.5 }).then((k) => !batal && setKapKamera(k));
         mulaiBarcode();
         setStatus('siap');
       } catch (e) {
@@ -1111,6 +1115,7 @@ function SheetVisual({ onClose }) {
             playsInline
             style={sedangLive ? { width: '100%', height: '100%', objectFit: 'cover' } : { visibility: 'hidden', position: 'absolute' }}
           />
+          {sedangLive && <KontrolKamera streamRef={streamRef} kap={kapKamera} />}
           {!sedangLive && (
             <div className="isi">
               {fotoJepretan ? (

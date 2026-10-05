@@ -31,6 +31,57 @@ export async function bukaKamera(facingMode = 'environment') {
   throw new Error('Gagal membuka kamera: ' + (errTerakhir?.message || 'tidak diketahui'));
 }
 
+// Atur kamera SETELAH kebuka: banyak HP Android ngabaikan focusMode yang dikirim lewat getUserMedia, baru nurut
+// kalau dipasang lagi lewat applyConstraints. `zoom` (opsional, mis. 2) buat scan barcode: HP bisa dipegang agak
+// jauh (di jarak yang lensanya masih bisa fokus) tapi barcodenya tetap kelihatan gede - dulu orang nyodorin HP
+// mepet ke barcode, dan di jarak segitu kamera HP nggak bisa fokus, jadinya blur. Semua langkah dicoba aja: kamera
+// yang nggak dukung cukup dilewat. Balikin kemampuan kamera ({ senter, fokusTitik }) buat nentuin tombol yang tampil.
+export async function siapkanKamera(stream, { zoom } = {}) {
+  const track = stream?.getVideoTracks?.()[0];
+  const kap = track?.getCapabilities?.() || {};
+  const coba = async (c) => {
+    try {
+      await track.applyConstraints({ advanced: [c] });
+    } catch {
+      /* nggak didukung kamera ini */
+    }
+  };
+  if (kap.focusMode?.includes('continuous')) await coba({ focusMode: 'continuous' });
+  if (kap.exposureMode?.includes('continuous')) await coba({ exposureMode: 'continuous' });
+  if (zoom && kap.zoom && kap.zoom.max > 1) await coba({ zoom: Math.min(zoom, kap.zoom.max) });
+  return {
+    senter: !!kap.torch,
+    fokusTitik: !!(kap.focusMode?.includes('single-shot') || kap.pointsOfInterest),
+  };
+}
+
+// Ketuk layar = fokus ke titik itu (x, y: 0-1 dari kiri-atas video), lalu balik ke fokus otomatis terus-menerus.
+export async function fokusKeTitik(stream, x, y) {
+  const track = stream?.getVideoTracks?.()[0];
+  const kap = track?.getCapabilities?.() || {};
+  if (!track) return;
+  try {
+    const c = {};
+    if (kap.pointsOfInterest) c.pointsOfInterest = [{ x, y }];
+    if (kap.focusMode?.includes('single-shot')) c.focusMode = 'single-shot';
+    if (Object.keys(c).length) await track.applyConstraints({ advanced: [c] });
+    if (kap.focusMode?.includes('continuous')) setTimeout(() => track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {}), 1500);
+  } catch {
+    /* nggak didukung */
+  }
+}
+
+// Senter (lampu flash) buat warung yang raknya gelap. Balikin true kalau berhasil.
+export async function aturSenter(stream, nyala) {
+  const track = stream?.getVideoTracks?.()[0];
+  try {
+    await track.applyConstraints({ advanced: [{ torch: !!nyala }] });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function tutupKamera(stream) {
   stream?.getTracks().forEach((t) => t.stop());
 }

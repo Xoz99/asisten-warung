@@ -72,12 +72,9 @@ export async function buatDekoderZxing() {
   let lum = null;
   let lumPutar = null;
 
-  // Balikin teks barcode, atau null kalau nggak ketemu.
-  const dekode = (canvas, putar = false) => {
-    const w = canvas.width;
-    const h = canvas.height;
+  // Balikin teks barcode, atau null kalau nggak ketemu. `data` = piksel RGBA (ImageData.data).
+  const dekodePiksel = (data, w, h, putar = false) => {
     if (!w || !h) return null;
-    const data = canvas.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, w, h).data;
     const n = w * h;
     if (!lum || lum.length !== n) lum = new Uint8ClampedArray(n);
     // Rumus abu-abunya sama persis kayak yang dipakai ZXing versi browser sendiri. HARUS
@@ -106,8 +103,14 @@ export async function buatDekoderZxing() {
       reader.reset();
     }
   };
+  const dekode = (canvas, putar = false) => {
+    const w = canvas.width;
+    const h = canvas.height;
+    if (!w || !h) return null;
+    return dekodePiksel(canvas.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, w, h).data, w, h, putar);
+  };
 
-  return { dekode };
+  return { dekode, dekodePiksel };
 }
 
 // --- Pengatur beban loop ---------------------------------------------------------------------
@@ -159,6 +162,39 @@ export function mulaiScanBarcode({ videoRef, matiRef, onDetect }) {
   };
 
   const canvasScan = document.createElement('canvas'); // 1 canvas dipakai ULANG tiap putaran
+
+  // ZXing di worker (lib/barcodeWorker.js): jalan terus bareng detektor bawaan sejak detik pertama, tanpa
+  // ngeganggu layar. Worker gagal dibikin -> balik ke cara lama (ZXing di thread tampilan + jeda).
+  let worker = null;
+  let workerSibuk = false;
+  let idKirim = 0;
+  try {
+    worker = new Worker(new URL('./barcodeWorker.js', import.meta.url), { type: 'module' });
+    worker.onmessage = (e) => {
+      workerSibuk = false;
+      const kode = e.data?.kode;
+      if (kode && !berhenti && !matiRef.current) {
+        berhenti = true;
+        worker.terminate();
+        onDetect(kode);
+      }
+    };
+    worker.onerror = () => {
+      worker?.terminate();
+      worker = null;
+      workerSibuk = false;
+    };
+  } catch {
+    worker = null;
+  }
+  const kirimKeWorker = (video) => {
+    const canvas = ambilCanvasROI(video, 800, canvasScan);
+    const { data } = canvas.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, canvas.width, canvas.height);
+    zxingPutar = !zxingPutar;
+    workerSibuk = true;
+    worker.postMessage({ id: ++idKirim, data: data.buffer, w: canvas.width, h: canvas.height, putar: zxingPutar }, [data.buffer]);
+  };
+
   let berhenti = false;
   let putaran = 0;
   let nativeKosong = 0;
@@ -170,7 +206,10 @@ export function mulaiScanBarcode({ videoRef, matiRef, onDetect }) {
   };
 
   const loop = async () => {
-    if (matiRef.current || berhenti) return;
+    if (matiRef.current || berhenti) {
+      worker?.terminate(); // sheet ditutup tanpa stop() - jangan biarin worker nyangkut
+      return;
+    }
     // Aplikasi lagi di latar (pindah aplikasi, layar HP mati): jangan ngedekode apa-apa. Kamera
     // di latar nggak ngirim gambar baru, jadi kerjaannya sia-sia & cuma nguras baterai.
     if (document.hidden) return lanjut(300);
@@ -200,6 +239,11 @@ export function mulaiScanBarcode({ videoRef, matiRef, onDetect }) {
         console.log('[barcode] detect() error, lanjut pakai ZXing:', e.name, e.message);
         detector = null;
       }
+    }
+
+    if (worker) {
+      if (!workerSibuk) kirimKeWorker(video);
+      return lanjut(detector ? JEDA_NATIVE_MS : 50);
     }
 
     const perluZxing = !detector || nativeKosong >= BATAS_KOSONG_NATIVE;
@@ -232,5 +276,10 @@ export function mulaiScanBarcode({ videoRef, matiRef, onDetect }) {
   };
 
   loop();
-  return { stop: () => (berhenti = true) };
+  return {
+    stop: () => {
+      berhenti = true;
+      worker?.terminate();
+    },
+  };
 }

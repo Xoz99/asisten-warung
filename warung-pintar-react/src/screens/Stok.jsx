@@ -9,7 +9,8 @@ import { PIN_GAMPANG, hashPinLokal, errorJaringan } from '../lib/pin';
 import { IKON_PRODUK, tebakIkon } from '../lib/ikonProduk';
 import PilihIkon from '../components/PilihIkon.jsx';
 import KonfirmasiHapus from '../components/KonfirmasiHapus.jsx';
-import { bukaKamera, tutupKamera, jepretFrame, keWebp } from '../lib/kamera';
+import { bukaKamera, tutupKamera, jepretFrame, keWebp, siapkanKamera } from '../lib/kamera';
+import KontrolKamera from '../components/KontrolKamera.jsx';
 import { ambilEmbedding } from '../lib/visualScan';
 import { useModelVisual } from '../lib/useModelVisual';
 import { FORMAT_RETAIL, ambilCanvasROI, buatDekoderZxing, mulaiScanBarcode as mulaiScanBarcodeShared } from '../lib/barcodeScan';
@@ -554,6 +555,7 @@ function SheetBarcode({ mode, onClose, onKelola }) {
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const [kapKamera, setKapKamera] = useState(null); // hasil siapkanKamera() - buat tombol senter & ketuk fokus
   const controlsRef = useRef(null);
   const matiRef = useRef(false); // true kalau sheet ini udah ditutup/unmount - dicek loop biar gak terus jalan setelah itu
   const fotoAsliRef = useRef(null); // foto res-penuh dari jepretan visual terakhir - dipakai lagi kalau nyoba cadangan AI
@@ -638,6 +640,9 @@ function SheetBarcode({ mode, onClose, onKelola }) {
           await videoRef.current.play();
         }
         if (batal) return;
+        // Fokus otomatis dipasang ulang; mode barcode zoom 2x biar HP bisa dipegang agak jauh (di jarak yang masih
+        // bisa fokus) - dulu orang nyodorin HP mepet ke barcode & hasilnya blur.
+        siapkanKamera(stream, { zoom: mode === 'barcode' ? 2 : 1.3 }).then((k) => !batal && setKapKamera(k));
         if (mode === 'barcode') mulaiScanBarcode();
         setStep('scan');
       } catch (e) {
@@ -977,6 +982,7 @@ function SheetBarcode({ mode, onClose, onKelola }) {
           <div className="viewfinder" style={step === 'memindai' ? { visibility: 'hidden', position: 'absolute' } : undefined}>
             <div className="frame" />
             <video ref={videoRef} muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            {step !== 'memuat' && <KontrolKamera streamRef={streamRef} kap={kapKamera} />}
           </div>
         )}
         {step === 'memindai' && mode === 'barcode' && (
