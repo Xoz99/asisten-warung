@@ -71,11 +71,91 @@ function BarisProduk({ p, onTap }) {
   );
 }
 
+// Barcode sama walau beda format: angka doang, nol di depan nggak dihitung (UPC-A 12 digit = EAN-13 berawalan 0).
+const intiBarcode = (k) => String(k || '').replace(/\D/g, '').replace(/^0+/, '');
+function cariByBarcode(produk, kode) {
+  const inti = intiBarcode(kode);
+  if (!inti) return null;
+  return produk.find((p) => p.barcode && intiBarcode(p.barcode) === inti) || produk.find((p) => p.barcode && String(p.barcode).trim() === String(kode).trim()) || null;
+}
+
+// Scan barcode buat nyari barang di Stok (tombol di kolom cari). Cuma baca kodenya - nyocokinnya di Stok().
+function SheetScanCari({ onKode, onClose }) {
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+  const matiRef = useRef(false);
+  const kontrolRef = useRef(null);
+  const [status, setStatus] = useState('memuat'); // memuat | scan | error
+  const [pesan, setPesan] = useState('');
+  const [kap, setKap] = useState(null);
+  const [manual, setManual] = useState('');
+  useEffect(() => {
+    let batal = false;
+    matiRef.current = false;
+    (async () => {
+      try {
+        const stream = await bukaKamera('environment');
+        if (batal) return tutupKamera(stream);
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+        if (batal) return;
+        siapkanKamera(stream, { zoom: 1.5 }).then((k) => !batal && setKap(k));
+        kontrolRef.current = mulaiScanBarcodeShared({ videoRef, matiRef, onDetect: (kode) => onKode(kode) });
+        setStatus('scan');
+      } catch (e) {
+        if (!batal) {
+          setPesan(e.message || 'Gagal membuka kamera');
+          setStatus('error');
+        }
+      }
+    })();
+    return () => {
+      batal = true;
+      matiRef.current = true;
+      kontrolRef.current?.stop();
+      tutupKamera(streamRef.current);
+      streamRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return (
+    <div className="sheet tengah show">
+      <div className="panel mid">
+        <h3>Cari pakai barcode</h3>
+        <div className="viewfinder" style={{ marginTop: 14 }}>
+          <div className="frame" />
+          <video ref={videoRef} muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          {status === 'scan' && <KontrolKamera streamRef={streamRef} kap={kap} />}
+        </div>
+        <p>{status === 'error' ? pesan : status === 'memuat' ? 'Membuka kamera…' : 'Arahkan ke barcode barang - kebaca otomatis.'}</p>
+        <form
+          className="cari"
+          style={{ marginTop: 12 }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (manual.replace(/\D/g, '').length >= 6) onKode(manual.trim());
+          }}
+        >
+          <input inputMode="numeric" placeholder="Atau ketik nomor barcode" value={manual} onChange={(e) => setManual(e.target.value.replace(/[^\d]/g, '').slice(0, 20))} aria-label="Nomor barcode" />
+        </form>
+        <button className="btn" style={{ width: '100%', marginTop: 12 }} onClick={onClose}>
+          Batal
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Stok() {
-  const { S, authWarung, lisensi } = useApp();
+  const { S, authWarung, lisensi, toast } = useApp();
   const [filter, setFilter] = useState('all');
   const [cari, setCari] = useState('');
   const [barcodeMode, setBarcodeMode] = useState(null); // null | 'barcode' | 'foto'
+  const [scanCari, setScanCari] = useState(false); // scan barcode dari kolom cari
+  const [kodeBaru, setKodeBaru] = useState(null); // barcode hasil scan yang belum terdaftar -> form tambah barang
   const [opnameProduk, setOpnameProduk] = useState(null);
   const [pinCallback, setPinCallback] = useState(null);
   const [tambahVarianGrup, setTambahVarianGrup] = useState(null); // {nama, contoh} - kartu grup mana yang lagi nambah varian baru
@@ -103,6 +183,19 @@ export default function Stok() {
   }
 
   const jumlahKritis = S.produk.filter(kritisQ).length;
+  // Hasil scan di kolom cari: barang ketemu -> daftar disaring ke barang itu; belum ada -> form tambah barang.
+  const hasilScanCari = (kode) => {
+    setScanCari(false);
+    const p = cariByBarcode(S.produk, kode);
+    if (p) {
+      setFilter('all');
+      setCari(p.nama);
+      toast(`Ketemu: <b>${escapeHtml(p.nama)}</b> · sisa ${p.stok} ${escapeHtml(p.satuan)}`);
+    } else {
+      setKodeBaru(kode);
+      setBarcodeMode('barcode');
+    }
+  };
   // Barang yang harga jual atau modal/HPP-nya belum ada - belum bisa dijual di Catat jualan sampai diatur.
   const perluDiatur = S.produk.filter((p) => !bisaDijual(p));
   const [aturBuka, setAturBuka] = useState(false);
@@ -170,7 +263,7 @@ export default function Stok() {
           <circle cx="11" cy="11" r="6.2" />
           <path d="m15.6 15.6 4.4 4.4" />
         </svg>
-        <input type="text" placeholder="Cari barang…" value={cari} onChange={(e) => setCari(e.target.value)} />
+        <input type="text" placeholder="Cari barang atau scan barcode…" value={cari} onChange={(e) => setCari(e.target.value)} />
         {cari && (
           <button className="cari-clear" onClick={() => setCari('')} aria-label="Hapus pencarian">
             <svg viewBox="0 0 24 24">
@@ -178,6 +271,12 @@ export default function Stok() {
             </svg>
           </button>
         )}
+        <button className="cari-scan" onClick={() => setScanCari(true)} aria-label="Cari pakai scan barcode" title="Scan barcode">
+          <svg viewBox="0 0 24 24">
+            <path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2" />
+            <path d="M8 8v8M11 8v8M14 8v8M17 8v8" />
+          </svg>
+        </button>
       </div>
 
       <div className="tabs">
@@ -238,7 +337,18 @@ export default function Stok() {
 
       {katalogBuka && <SheetKatalog onClose={() => setKatalogBuka(false)} />}
       {aturBuka && <SheetAturBarang barang={perluDiatur} onClose={() => setAturBuka(false)} />}
-      {barcodeMode && <SheetBarcode mode={barcodeMode} onClose={() => setBarcodeMode(null)} onKelola={(p) => mintaPin(() => setOpnameProduk(p))} />}
+      {barcodeMode && (
+        <SheetBarcode
+          mode={barcodeMode}
+          kodeAwal={kodeBaru}
+          onClose={() => {
+            setBarcodeMode(null);
+            setKodeBaru(null);
+          }}
+          onKelola={(p) => mintaPin(() => setOpnameProduk(p))}
+        />
+      )}
+      {scanCari && <SheetScanCari onKode={hasilScanCari} onClose={() => setScanCari(false)} />}
       {opnameProduk && <SheetOpname produk={opnameProduk} onClose={() => setOpnameProduk(null)} />}
       {tambahVarianGrup && (
         <SheetTambahVarian grup={tambahVarianGrup.nama} contoh={tambahVarianGrup.contoh} onClose={() => setTambahVarianGrup(null)} />
@@ -505,7 +615,7 @@ function grupOtomatis(namaBaru, produkList) {
   return cocok?.grup || null;
 }
 
-function SheetBarcode({ mode, onClose, onKelola }) {
+function SheetBarcode({ mode, onClose, onKelola, kodeAwal = null }) {
   const { S, dispatch, toast, refreshData, tanganiErrorAi } = useApp();
   const [step, setStep] = useState('memuat'); // memuat|scan|memindai|pilih|tidak-ketemu-visual|barcode-gagal|detected|tambah|baru|tambah-sudut|error
   const [errorMsg, setErrorMsg] = useState('');
@@ -643,6 +753,8 @@ function SheetBarcode({ mode, onClose, onKelola }) {
         // Fokus otomatis dipasang ulang; mode barcode zoom 1,5x biar HP bisa dipegang agak jauh (di jarak yang masih
         // bisa fokus) - dulu orang nyodorin HP mepet ke barcode & hasilnya blur.
         siapkanKamera(stream, { zoom: mode === 'barcode' ? 1.5 : 1.2 }).then((k) => !batal && setKapKamera(k));
+        // Dibuka dari scan di kolom cari dengan barcode yang belum terdaftar: langsung ke form barang baru.
+        if (kodeAwal) return handleBarcode(kodeAwal);
         if (mode === 'barcode') mulaiScanBarcode();
         setStep('scan');
       } catch (e) {
