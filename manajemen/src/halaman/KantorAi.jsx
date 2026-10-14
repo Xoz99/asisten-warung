@@ -4,12 +4,15 @@ import TeksMarkdown from '../komponen/TeksMarkdown.jsx';
 import { Konfirmasi, Modal } from '../komponen/Ui.jsx';
 import { unggahBerkas } from '../lib/api.js';
 import { kirimKeAiChat } from '../lib/drafAi.js';
-import { AGEN } from '../lib/kantor.js';
+import { AGEN, ROOM, angkaRoom } from '../lib/kantor.js';
 import { TEMPLATE_ANALISA } from '../lib/kantorTemplate.js';
 import { ambilRekomendasi, buatPdf, namaFile, pesanEksekusi, tabelKeCsv, unduhBlob } from '../lib/laporan.js';
 
 const agenDari = (id) => AGEN.find((a) => a.id === id);
-const TAHAPAN = ['Rencana', 'Riset data', 'Implementasi', 'Review', 'Hasil akhir'];
+const TAHAPAN = { tim: ['Rencana', 'Room divisi', 'Riset lintas room', 'Implementasi', 'Review', 'Hasil akhir'], room: ['Analisa room', 'Hasil akhir'] };
+// Judul langkah -> nama tahapan (semua room divisi jadi satu tahapan).
+const tahapanDari = (judul, mode) => (judul === 'Revisi implementasi' ? 'Implementasi' : judul.startsWith('Room ') ? (mode === 'room' ? 'Analisa room' : 'Room divisi') : judul);
+const roomDariTemplate = (t) => ROOM.find((r) => t === `room-${r.id}`);
 const FOLDER_LAPORAN = 'Laporan Kantor Konsulin';
 const lamaTeks = (dtk) => (dtk < 60 ? `${dtk} dtk` : `${Math.floor(dtk / 60)} mnt ${dtk % 60} dtk`);
 const tanggalTeks = (t) => new Date(t).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -71,6 +74,104 @@ function EksekusiModal({ lap, onTutup }) {
         </button>
       </div>
     </Modal>
+  );
+}
+
+// Room divisi: tiap room punya analis & data wajib sendiri. Room bisa dipilih dari kartu ini atau diklik di lantai
+// kantor (keadaan.roomDipilih), lalu ditanya langsung: analis room jawab pakai datanya, Writer ngerapihin jadi laporan.
+function RoomDivisi({ k, kantor, onMulai }) {
+  const [teks, setTeks] = useState('');
+  const kartu = useRef(null);
+  const room = ROOM.find((r) => r.id === k.roomDipilih);
+  useEffect(() => {
+    if (k.roomDipilih) kartu.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [k.roomDipilih]);
+  const kirim = (e) => {
+    e.preventDefault();
+    if (!teks.trim() || k.jalan) return;
+    kantor.kasihTugas(teks.trim(), { room: room.id, judul: room.nama });
+    setTeks('');
+    kantor.pilihRoom(null);
+    onMulai();
+  };
+  return (
+    <section className="adm-kartu kantor-room-kartu" ref={kartu}>
+      <div className="adm-kartu-kepala">
+        <h2>Room divisi</h2>
+        <span className="adm-redup">Klik room di lantai bawah buat nanya</span>
+      </div>
+      <div className="kantor-room">
+        {ROOM.map((r) => {
+          const a = agenDari(r.karakter);
+          const s = k.agen[r.karakter] || {};
+          const angka = angkaRoom(r.id, k.fakta);
+          const dipilih = k.roomDipilih === r.id;
+          return (
+            <article key={r.id} className={'kantor-room-item' + (dipilih ? ' on' : '') + (k.roomKerja === r.id ? ' kerja' : '')} style={{ '--warna': a.warna }}>
+              <header>
+                <b>{r.label}</b>
+                {k.roomKerja === r.id && <span className="adm-chip kuning">Analisa</span>}
+              </header>
+              <div className="kantor-room-analis">
+                <Avatar id={a.id} />
+                <span>
+                  <b>{a.nama}</b>
+                  <small>{s.kegiatan || a.peran}</small>
+                </span>
+              </div>
+              {angka.length ? (
+                <dl className="kantor-room-angka">
+                  {angka.map(([l, v]) => (
+                    <div key={l}>
+                      <dt>{l}</dt>
+                      <dd className="p-num">{v}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : (
+                <p className="adm-redup kantor-room-kosong">Angka belum kemuat</p>
+              )}
+              <button className="btn kecil" type="button" onClick={() => kantor.pilihRoom(dipilih ? null : r.id)} aria-expanded={dipilih} aria-controls="kantor-room-tanya">
+                {dipilih ? 'Tutup' : 'Tanya room ini'}
+              </button>
+            </article>
+          );
+        })}
+      </div>
+      {room && (
+        <form id="kantor-room-tanya" className="kantor-room-tanya" onSubmit={kirim} style={{ '--warna': agenDari(room.karakter).warna }}>
+          <label className="adm-label" htmlFor="kantor-room-teks">
+            Tanya {room.nama}
+          </label>
+          <div className="kantor-room-saran">
+            {room.saran.map((x) => (
+              <button key={x} type="button" onClick={() => setTeks(x)} disabled={k.jalan}>
+                {x}
+              </button>
+            ))}
+          </div>
+          <textarea
+            id="kantor-room-teks"
+            className="adm-input"
+            value={teks}
+            onChange={(e) => setTeks(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && (e.ctrlKey || e.metaKey) && kirim(e)}
+            maxLength={4000}
+            placeholder={`Pertanyaan buat ${agenDari(room.karakter).nama}…`}
+            disabled={k.jalan}
+          />
+          <p className="adm-redup kantor-room-sumber">
+            Data yang langsung dibaca:{' '}
+            {[...new Set(room.sumber({ ini: '', lalu: '' }).map(([p]) => p))].map((p) => (
+              <code key={p}>{p}</code>
+            ))}
+          </p>
+          <button className="btn utama" type="submit" disabled={k.jalan || !teks.trim()}>
+            {k.jalan ? 'Tim lagi kerja…' : 'Tanya sekarang'}
+          </button>
+        </form>
+      )}
+    </section>
   );
 }
 
@@ -147,8 +248,11 @@ export default function KantorAi({ api, admin, kantor }) {
   };
   const tampil = lihat || (k.langkah.length || k.error ? sekarang : null);
   const dariRiwayat = Boolean(lihat);
-  const tahapanSelesai = new Set((tampil?.langkah || []).map((l) => (l.judul === 'Revisi implementasi' ? 'Implementasi' : l.judul)));
-  const tahapanSekarang = !dariRiwayat && k.jalan ? TAHAPAN.find((t) => !tahapanSelesai.has(t)) : null;
+  const tahapan = TAHAPAN[k.mode] || TAHAPAN.tim;
+  const tahapanSelesai = new Set((tampil?.langkah || []).map((l) => tahapanDari(l.judul, k.mode)));
+  // Room divisi bisa lebih dari satu: tahapannya baru beres pas Researcher udah mulai kebagian.
+  if (k.jalan && !tahapanSelesai.has('Riset lintas room')) tahapanSelesai.delete('Room divisi');
+  const tahapanSekarang = !dariRiwayat && k.jalan ? tahapan.find((t) => !tahapanSelesai.has(t)) : null;
   const csv = tampil?.hasil_md ? tabelKeCsv(tampil.hasil_md) : null;
 
   const kabar = (t) => {
@@ -213,7 +317,7 @@ export default function KantorAi({ api, admin, kantor }) {
       <header className="kantor-kepala">
         <div>
           <h1>Kantor Konsulin</h1>
-          <p className="adm-sub">Tim analis AI: bedah data asli Makalin jadi laporan yang bisa diunduh & disimpan. Buat tanya cepat atau ngubah data, pakai AI Chat.</p>
+          <p className="adm-sub">Tim analis AI + 4 room divisi: bedah data asli Makalin jadi laporan yang bisa diunduh & disimpan. Klik karakter buat nyolek, klik room buat nanya langsung. Buat ngubah data, pakai AI Chat.</p>
         </div>
         <div className="kantor-status">
           {k.status && (
@@ -249,7 +353,7 @@ export default function KantorAi({ api, admin, kantor }) {
           <div ref={wadah} className="kantor-wadah" />
           <p className="kantor-geser">Geser ke samping buat lihat seluruh kantor</p>
           <ul className="kantor-agen">
-            {AGEN.filter((a) => a.id !== 'bos').map((a) => {
+            {AGEN.filter((a) => a.id !== 'bos' && !a.room).map((a) => {
               const s = k.agen[a.id] || {};
               return (
                 <li key={a.id} className={s.st === 'kerja' ? 'kerja' : ''}>
@@ -265,6 +369,15 @@ export default function KantorAi({ api, admin, kantor }) {
             })}
           </ul>
         </section>
+
+        <RoomDivisi
+          k={k}
+          kantor={kantor}
+          onMulai={() => {
+            setLihat(null);
+            document.querySelector('.kantor-hasil')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }}
+        />
 
         <section className="adm-kartu kantor-hasil">
           <div className="adm-kartu-kepala kuning">
@@ -287,7 +400,7 @@ export default function KantorAi({ api, admin, kantor }) {
               </blockquote>
               {!dariRiwayat && (
                 <ol className="kantor-tahapan" aria-label="Kemajuan">
-                  {TAHAPAN.map((t) => (
+                  {tahapan.map((t) => (
                     <li key={t} className={tahapanSelesai.has(t) ? 'beres' : t === tahapanSekarang ? 'sekarang' : ''}>
                       {t}
                     </li>
@@ -407,6 +520,7 @@ export default function KantorAi({ api, admin, kantor }) {
               <ul>
                 {riwayat.map((r) => {
                   const t = TEMPLATE_ANALISA.find((x) => x.id === r.template);
+                  const rm = roomDariTemplate(r.template);
                   return (
                     <li key={r.id} className={lihat?.id === r.id ? 'on' : ''}>
                       <button type="button" className="kantor-riwayat-buka" onClick={() => bukaRiwayat(r)} disabled={sibuk === 'buka' + r.id}>
@@ -417,6 +531,7 @@ export default function KantorAi({ api, admin, kantor }) {
                         </small>
                         <span className="kantor-riwayat-chip">
                           {t && <span className="adm-chip ungu">{t.label}</span>}
+                          {rm && <span className="adm-chip biru">{rm.nama}</span>}
                           {r.meta?.terjadwal && <span className="adm-chip oranye">Terjadwal</span>}
                           {r.artifact_id && <span className="adm-chip hijau">Artifact</span>}
                           {r.meta?.demo && <span className="adm-chip kuning">Demo</span>}

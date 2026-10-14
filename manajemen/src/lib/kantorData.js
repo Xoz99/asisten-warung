@@ -65,7 +65,7 @@ export function ringkasFakta(f) {
   return b.join('; ');
 }
 
-const GAYA_JAWAB = { bos: 'Hmm, setau gw ', planner: 'Per hari ini, ', researcher: 'Menurut data, ', coder: 'Bentar gw cek... oke, ', reviewer: 'Tepatnya, ', writer: 'Ah... ' };
+const GAYA_JAWAB = { bos: 'Hmm, setau gw ', planner: 'Per hari ini, ', researcher: 'Menurut data, ', coder: 'Bentar gw cek... oke, ', reviewer: 'Tepatnya, ', writer: 'Ah... ', akuntan: 'Sesuai pembukuan, ', sales: 'Dari lapangan nih, ', produk: 'Kalo liat datanya, ', hrd: 'Gini sayang, ' };
 
 const NANYA = {
   langganan: {

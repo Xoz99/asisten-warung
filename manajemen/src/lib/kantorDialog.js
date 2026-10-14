@@ -7,6 +7,11 @@
 //   Coder      : introvert, kecanduan kopi, sarkas, headphone, bug & deploy
 //   Reviewer   : judes, teliti banget, alergi typo, sebenernya baik hati
 //   Writer     : dramatis, lebay, puitis, tukang curhat
+//   Room divisi (analis di ruangan bawah):
+//   Akuntan    : Room Keuangan. Pelit, hemat, semua dihitung sampe receh, "itu masuk pos mana?"
+//   Sales      : Room Sales & CRM. Optimis kebangetan, "bentar lagi closing", jarang di kantor
+//   Produk     : Room Warung Pintar. Obsesi user, "iterasi", wireframe di tisu
+//   HRD        : Room Tim & Rekrutmen. Ramah, keibuan, ngingetin absen & cuti
 
 export const SIFAT = {
   bos: {
@@ -190,7 +195,130 @@ export const SIFAT = {
     ngambek: ['Gw butuh waktu sendiri', 'Hati gw retak, tapi gw tetap profesional'],
     rayakan: ['Akhirnya! Ini kayak ending film yang bahagia', 'Gw terharu sama kerja tim ini', 'Ini bab terbaik kita'],
   },
+  akuntan: {
+    gosip: [
+      '{b}, struk kopi kemarin udah lo setor belum? Gw butuh buat pembukuan',
+      'Lo tau nggak {b}, AC nyala seharian itu berapa duit? Gw udah ngitung',
+      '{b}, {c} kemarin beli spidol warna-warni. Itu masuk pos mana coba?',
+      'Gw nemu selisih tiga ribu di kas kecil. Gw nggak bisa tidur',
+      '{b}, kalo mau traktiran, pake duit pribadi ya. Bukan kas kantor',
+      'Bulan ini gw mau bikin aturan: printer cuma boleh hitam putih',
+      '{b}, lo pernah liat saldo minus? Gw pernah. Di mimpi. Serem',
+      'Sales minta diskon gede lagi. Mereka pikir duit tumbuh di pohon',
+    ],
+    balas: ['Itu harus ada kuitansinya', 'Hmm, bisa, asal budget-nya ada', 'Gw catet dulu, nanti gw cek ke pembukuan', 'Mahal. Ada yang lebih murah?', 'Oke, tapi jangan sering-sering', 'Masuk pos apa itu?'],
+    lanjut: ['Pokoknya hemat itu pangkal kaya', 'Receh juga duit', 'Semua harus balance, kayak neraca', 'Gw cuma jagain dompet perusahaan'],
+    penutup: ['Gw balik ke spreadsheet dulu', 'Oke, gw rekap dulu ya', 'Jangan lupa kuitansi!', 'Gw mau nyocokin mutasi rekening'],
+    sendiri: ['Debit, kredit, debit, kredit...', 'Ini kenapa kolomnya nggak balance', 'Kalkulator gw butuh baterai baru. Pake yang murah aja', 'Saldo awal ditambah masuk dikurang keluar...', 'Gw curiga ada yang beli galon dobel'],
+    kopi: ['Kopi sachet aja, yang premium nggak ada di budget', 'Kopi gratis kantor, harus dimanfaatin', 'Satu gelas aja. Hemat'],
+    pegel: ['Duduk ngitung terus, punggung gw defisit', 'Mata gw capek liat angka', 'Peregangan gratis, nggak perlu gym'],
+    kepo: ['{c}, itu pengeluaran apa? Ada notanya?', '{c}, lagi ngerjain apa? Butuh budget nggak? Semoga nggak', 'Gimana {c}, aman? Jangan beli-beli dulu ya'],
+    jawabKepo: ['Lagi rekonsiliasi. Jangan ganggu, nanti selisih', 'Lagi ngitung. Kalo salah satu digit, kacau semua', 'Rahasia keuangan. Hehe, nggak deng, cuma rekap'],
+    dipanggil: ['Bentar, gw save spreadsheet dulu', 'Oke, gw ke situ'],
+    ditinggal: ['Ditinggal. Kayak tagihan yang nggak dibayar', 'Ya udah, gw balik ngitung'],
+    gakAda: ['{c} nggak ada. Gw taro di mejanya, jangan ilang', 'Mejanya kosong, kayak kas kecil akhir bulan'],
+    nonton: ['Hati-hati! Barang kantor jangan sampe rusak, gw yang ganti!', 'Ribut itu nggak ada di anggaran!'],
+    lerai: ['Stop! Kalo ada yang rusak, potong gaji!', 'Udah, udah. Berantem itu mahal', 'Damai aja, gratis'],
+    ngambek: ['Gw nggak mau ngomong. Ngomong juga butuh energi', 'Ini kerugian immaterial'],
+    rayakan: ['Mantap! Tapi traktirannya sederhana aja ya', 'Kerja bagus! Semoga pemasukan ikut naik', 'Hore! Gw tetap catet pengeluaran pestanya'],
+  },
+  sales: {
+    gosip: [
+      '{b}! Barusan gw dari lapangan, pemilik warung pada antusias banget!',
+      'Bentar lagi closing nih {b}, tinggal dikit lagi. Percaya deh',
+      '{b}, gw kasih bonus gratis sebulan ke warung tadi. Boleh kan? Udah terlanjur',
+      'Hari ini gw kunjungin 12 warung. Kaki gw tinggal setengah',
+      '{b}, lo tau rahasia closing? Senyum. Sama gorengan',
+      'Pelanggan bilang "nanti dulu". Itu artinya "iya" dalam bahasa sales',
+      '{b}, {c} kemarin nyuruh gw input CRM. Gw kan orang lapangan!',
+      'Target bulan ini? Gampang. Bulan depan juga gampang. Semua gampang',
+    ],
+    balas: ['Siap! Gas terus!', 'Wah, itu peluang!', 'Tenang, gw yang urus', 'Pasti closing, percaya sama gw', 'Mantap, gw follow-up besok', 'Itu tinggal dikit lagi'],
+    lanjut: ['Pokoknya optimis!', 'Lapangan itu guru terbaik', 'Penolakan itu awal dari closing', 'Gw udah punya feeling bagus'],
+    penutup: ['Gw cabut ke lapangan dulu ya!', 'Ada janji ketemu pemilik warung nih', 'Oke, gw telpon prospek dulu', 'Gas!'],
+    sendiri: ['Halo Pak, warungnya udah coba aplikasi kita?', 'Lead ini panas, panas banget', 'Hmm, CRM-nya harus diisi. Nanti aja', 'Gw butuh sepatu baru, yang ini udah tipis', 'Target, target, target'],
+    kopi: ['Kopi dulu, abis itu keliling lagi', 'Gw biasa ngopi di warung pelanggan, sambil pitching', 'Kopi itu bahan bakar closing'],
+    pegel: ['Kaki gw pegel abis keliling', 'Motor gw butuh servis, gw juga', 'Capek, tapi seru'],
+    kepo: ['{c}! Ada lead baru nggak? Bagi dong', '{c}, lagi ngapain? Mau ikut gw ke lapangan?', 'Gimana {c}, ada kabar bagus?'],
+    jawabKepo: ['Lagi follow-up prospek. Bentar lagi closing', 'Nyusun rute kunjungan besok', 'Lagi telponan sama pemilik warung'],
+    dipanggil: ['Siap, meluncur!', 'Oke, gw ke situ, cepet'],
+    ditinggal: ['Lah, kabur. Kayak prospek yang nggak angkat telpon', 'Oke, gw follow-up nanti'],
+    gakAda: ['{c} nggak ada. Pasti lagi di lapangan juga', 'Gw taro sini ya {c}'],
+    nonton: ['Wih seru! Gw jual tiket nontonnya', 'Eh, eh, damai, damai'],
+    lerai: ['Udah, udah! Kita win-win solution aja', 'Damai yuk, gw traktir gorengan', 'Berantem nggak bikin closing!'],
+    ngambek: ['Gw butuh motivasi. Dan bonus', 'Mood gw turun kayak target yang nggak tembus'],
+    rayakan: ['Closing! Eh, maksudnya selesai!', 'Ini baru namanya tim juara!', 'Mantap! Gw sebarin ke grup sales!'],
+  },
+  produk: {
+    gosip: [
+      '{b}, user Warung Pintar minta fitur hutang pelanggan. Gimana menurut lo?',
+      'Gw abis baca feedback user. Ada yang bilang tombolnya kekecilan',
+      '{b}, kita harus iterasi lagi. Iterasi itu hidup',
+      'Gw gambar wireframe baru di tisu. Jangan dibuang ya',
+      '{b}, menurut lo pemilik warung lebih suka warna biru atau hijau?',
+      '{c} bilang fitur itu gampang. Gw nggak mau bilang Coder, tapi...',
+      'Hipotesis gw: warung berhenti langganan karena lupa bayar, bukan nggak suka',
+      '{b}, kita harus ngobrol langsung sama user. Data aja nggak cukup',
+    ],
+    balas: ['Menarik. Masukin backlog', 'Hmm, itu perlu divalidasi ke user', 'Nice insight!', 'Kita A/B test aja', 'Bisa jadi, tapi user-nya maunya apa?', 'Oke, iterasi berikutnya'],
+    lanjut: ['User first, selalu', 'Fitur bagus itu yang dipake, bukan yang banyak', 'Gw bikin user story-nya nanti', 'Semua harus ada datanya'],
+    penutup: ['Gw lanjut bikin wireframe dulu', 'Oke, gw catet di roadmap', 'Gw mau telpon user dulu', 'Nanti kita sprint planning ya'],
+    sendiri: ['Kalo gw pemilik warung, gw maunya apa ya', 'Roadmap Q4 masih kosong...', 'Tombol ini kegedean atau kekecilan sih', 'Churn, churn, kenapa kamu churn', 'Gw butuh tisu lagi buat wireframe'],
+    kopi: ['Kopi sambil mikirin user journey', 'Kopi itu fitur wajib di kantor', 'Satu kopi, satu ide'],
+    pegel: ['Kebanyakan mikir, badan gw ikut pegel', 'Gw butuh standing desk', 'Peregangan dulu, biar ide ngalir'],
+    kepo: ['{c}, lagi ngerjain fitur apa? Udah dites ke user?', '{c}, butuh masukan? Gw punya banyak feedback user', 'Gimana {c}, ada insight baru?'],
+    jawabKepo: ['Lagi nyusun prioritas fitur', 'Lagi baca feedback user, banyak banget', 'Gambar alur aplikasi. Lagi seru'],
+    dipanggil: ['Oke, gw ke situ', 'Bentar, gw simpen wireframe dulu'],
+    ditinggal: ['Ditinggal. Kayak user yang uninstall', 'Oke, kita lanjut async aja'],
+    gakAda: ['{c} nggak ada. Gw taro di meja ya', 'Mejanya kosong. Gw tinggalin catetan'],
+    nonton: ['Ini bisa jadi user research. Konflik tim', 'Wah, ada drama. Fokus, fokus'],
+    lerai: ['Stop! Kita ngobrolin masalahnya, bukan orangnya', 'Udah, kita retrospektif aja nanti', 'Damai dulu, debat pake data'],
+    ngambek: ['Gw butuh me-time. Kayak maintenance server', 'Feedback lo gw terima. Dengan berat hati'],
+    rayakan: ['Shipped! Eh, maksudnya beres!', 'Kerja tim terbaik! User pasti seneng', 'Mantap, ini masuk changelog!'],
+  },
+  hrd: {
+    gosip: [
+      '{b}, jangan lupa absen ya. Kemarin lo lupa lagi',
+      'Bulan depan ada yang ulang tahun! Kita bikin kejutan yuk',
+      '{b}, lo udah ambil cuti belum tahun ini? Jangan lupa istirahat',
+      '{c} kayaknya lagi banyak pikiran. Gw mau ajak ngobrol nanti',
+      'Gw lagi nyusun acara outing. Mau ke pantai atau puncak?',
+      '{b}, kandidat Sales Partner kemarin semangat banget loh',
+      'Ada yang naro jaket di ruang meeting dari minggu lalu. Punya siapa ya',
+      '{b}, kamu udah makan? Jangan sampe telat makan',
+    ],
+    balas: ['Aduh, kasian. Nanti gw ajak ngobrol', 'Wah, seru! Gw catet', 'Iya, yang penting sehat dulu', 'Nanti gw bantu urus ya', 'Bener banget', 'Hihi, bisa aja'],
+    lanjut: ['Kita kan keluarga', 'Jangan dipendem sendiri ya', 'Kesehatan mental itu penting', 'Gw selalu ada kalo butuh cerita'],
+    penutup: ['Gw ke ruangan dulu ya, ada interview', 'Jangan lupa minum air putih!', 'Oke, semangat kerjanya!', 'Gw cek data absen dulu'],
+    sendiri: ['Siapa ya yang belum isi form cuti', 'Kandidat jam 2 udah konfirmasi belum ya', 'Kue ulang tahun pesen di mana ya', 'Rekap absen bulan ini... hmm', 'Semoga semua betah di sini'],
+    kopi: ['Teh aja deh, kopi bikin deg-degan', 'Gw bikinin kopi buat yang lagi lembur', 'Kopi sambil baca CV pelamar'],
+    pegel: ['Peregangan yuk semua! Kesehatan itu penting', 'Leher gw kaku abis baca CV', 'Ayo jalan dulu, jangan duduk terus'],
+    kepo: ['{c}, kamu baik-baik aja? Kok keliatan capek', '{c}, udah makan siang belum?', 'Gimana {c}, kerjaannya lancar? Ada yang bisa gw bantu?'],
+    jawabKepo: ['Lagi jadwalin interview', 'Lagi nyusun rekap absen', 'Baca-baca CV pelamar. Ada yang bagus loh'],
+    dipanggil: ['Iya, gw ke sana', 'Oke, bentar ya'],
+    ditinggal: ['Lho, kok pergi. Ya udah, nanti kita lanjut', 'Gpp, gw ngerti kok, lagi sibuk'],
+    gakAda: ['{c} nggak ada. Gw tinggal di mejanya ya', 'Mejanya kosong. Semoga {c} lagi istirahat'],
+    nonton: ['Ya ampun, kalian kenapa?', 'Eh, eh, jangan berantem!'],
+    lerai: ['Udah ya, kita omongin baik-baik di ruangan gw', 'Tarik napas dulu semua. Nanti kita mediasi', 'Nggak ada masalah yang nggak bisa diselesain. Ayo duduk'],
+    ngambek: ['Gw sedih liat tim kayak gini', 'Gw butuh waktu sebentar'],
+    rayakan: ['Yay! Kalian hebat semua!', 'Gw bangga sama tim ini', 'Nanti kita rayain bareng ya!'],
+  },
 };
+
+// Dicolek (karakter diklik di lantai kantor). Bos = kamu sendiri.
+export const COLEK = {
+  bos: ['Ngapain colek-colek gw?! Kerja sana!', 'Apa?! Gw lagi mikir strategi!', 'Kalo nggak penting, jangan ganggu!'],
+  planner: ['Eh, ada apa? Ini nggak ada di jadwal', 'Bentar, gw catet dulu di to-do', 'Lima menit ya, abis itu balik kerja'],
+  researcher: ['Hmm? Lo mau tau gosip terbaru?', 'Menurut data, lo barusan nyolek gw', 'Ada apa? Gw lagi baca sesuatu yang menarik'],
+  coder: ['Apa. Gw lagi pake headphone', 'Kalo bug, bikin tiket aja', 'Jangan colek. Gw lagi fokus'],
+  reviewer: ['Ada apa? Typo di mana?', 'Jangan colek. Itu nggak sopan', 'Hmm. Ada yang mau gw review?'],
+  writer: ['Ah! Lo ngagetin inspirasi gw', 'Sentuhanmu... mengganggu paragraf gw', 'Ada apa, kawan?'],
+  akuntan: ['Colek gratis. Kalo dua kali, bayar', 'Ada apa? Mau ngajuin reimburse?', 'Bentar, gw lagi ngitung'],
+  sales: ['Halo! Mau dengerin pitching gw?', 'Ada lead baru? Kasih gw!', 'Siap! Ada yang bisa dibantu?'],
+  produk: ['Hai! Lo user? Gw butuh feedback', 'Ada ide fitur? Cerita dong', 'Eh, mau liat wireframe gw?'],
+  hrd: ['Iya? Ada yang mau diceritain?', 'Hai! Udah minum air putih hari ini?', 'Ada apa sayang? Butuh bantuan?'],
+};
+export const COLEK_KERJA = ['Bentar! Lagi kerja!', 'Nanti dulu, lagi ngerjain tugas Bos', 'Jangan ganggu, lagi fokus nih'];
 
 // Gosip soal yang lagi kerja (dari sudut pandang siapa pun).
 export const SOAL_YANG_KERJA = [
@@ -211,6 +339,9 @@ export const GOSIP_KEJADIAN = {
   revise: ['{c} kena revisi lagi sama Reviewer', 'Reviewer galak banget hari ini, {c} sampe lemes', 'Kasian {c}, revisi mulu'],
   approved: ['Akhirnya kerjaan Coder lolos juga', 'Reviewer tumben baik hari ini'],
   final: ['Akhirnya tugas Bos kelar juga', 'Abis ini traktiran nggak sih?'],
+  brief: ['{c} keliling room bawa brief. Rajin amat', 'Planner masuk room divisi tuh, bakal ada kerjaan'],
+  room: ['Room divisi udah setor hasil. Cepet juga', '{c} keluar room bawa laporan tebel'],
+  tanyaRoom: ['Bos nanya langsung ke room. Serius nih', 'Bos masuk room divisi. Semoga nggak marah'],
 };
 
 // Serah terima dokumen per jenis: yang ngasih & yang nerima udah pasti perannya.
@@ -241,7 +372,19 @@ export const SERAH = {
   },
   final: {
     kasih: ['Bos, ini hasil akhirnya. Dibuat dengan sepenuh hati', 'Tadaa, udah selesai Bos. Semoga berkenan', 'Ini dia, Bos. Mahakarya tim kita'],
-    terima: ['Mantap! Kerja bagus tim!', 'Wih cepet juga. Good job semuanya', 'Ini yang gw mau. Excellent!'],
+    terima: ['Nah! Gini dong dari tadi', 'Hmm. Oke, lumayan. Lain kali lebih cepet!', 'Ini yang gw mau. Excellent!'],
+  },
+  brief: {
+    kasih: ['Ini brief buat room lo. Datanya dicek yang bener ya', 'Bos minta ini. Fokus ke bidang lo aja', 'Nih, pertanyaan buat room lo. Deadline-nya kemarin'],
+    terima: ['Siap, gw bedah datanya sekarang', 'Oke, data room gw lengkap kok', 'Taro situ, gw langsung kerjain'],
+  },
+  room: {
+    kasih: ['Ini hasil dari room gw. Angkanya dari data asli', 'Nih, analisa room gw udah jadi', 'Room gw udah beres. Silakan'],
+    terima: ['Oke, gw sambungin sama room lain', 'Makasih. Gw baca dulu', 'Sip, taro situ'],
+  },
+  tanyaRoom: {
+    kasih: ['Gw butuh jawaban dari room lo. SEKARANG', 'Ini pertanyaan gw. Jangan lama-lama!', 'Cek data lo, gw tunggu di sini. Eh nggak deng, di ruangan gw'],
+    terima: ['Siap Bos, gw cek datanya', 'Oke Bos, langsung gw kerjain', 'Baik Bos, nggak lama kok'],
   },
 };
 
@@ -254,6 +397,20 @@ export const PENONTON = {
 
 // Adegan ribut per pasangan yang emang sering bentrok. Baris: [siapa ('a'|'b'), kalimat].
 export const RIBUT = [
+  { a: 'akuntan', b: 'sales', baris: [
+    ['a', 'Lo kasih gratis sebulan ke berapa warung?!'],
+    ['b', 'Dikit kok. Lima belas'],
+    ['a', 'LIMA BELAS?! Itu nggak ada di anggaran!'],
+    ['b', 'Itu investasi! Bentar lagi mereka bayar!'],
+    ['a', 'Bentar lagi lo itu kapan?!'],
+  ] },
+  { a: 'produk', b: 'coder', baris: [
+    ['a', 'User minta tombolnya geser dikit ke kiri'],
+    ['b', 'Kemarin minta geser ke kanan'],
+    ['a', 'Ya itu kan kemarin. User berubah'],
+    ['b', 'Gw juga bisa berubah. Jadi galak'],
+    ['a', 'Ini demi user!'],
+  ] },
   { a: 'reviewer', b: 'coder', baris: [
     ['a', 'Ini variabel namanya "data2". Data2 itu apa?!'],
     ['b', 'Ya data. Yang kedua. Jelas kan'],
@@ -376,5 +533,33 @@ export const PS = {
     menang: ['Kemenangan ini gw dedikasikan buat semua yang pernah kalah', 'Indah! Kayak ending film'],
     kalah: ['Kekalahan ini... tragis tapi indah', 'Gw kalah, tapi jiwa gw menang'],
     sendiri: ['Main game cerita dulu, cari inspirasi', 'Tokoh ini ngerti perasaan gw banget'],
+  },
+  akuntan: {
+    ajak: ['{b}, main yuk. Gratis kan? Oke', 'Ayo {b}, satu ronde. Listriknya kantor yang bayar sih'],
+    main: ['Strategi gw: hemat nyawa', 'Jangan buang-buang peluru!', 'Itung dulu baru nyerang'],
+    menang: ['Untung bersih!', 'Neraca kemenangan: balance'],
+    kalah: ['Ini kerugian. Gw catet', 'Kalah. Kayak investasi yang salah'],
+    sendiri: ['Main yang gratisan aja', 'Game ini mahal, tapi udah dibeli. Sayang kalo nggak dipake'],
+  },
+  sales: {
+    ajak: ['{b}! Main yuk, yang kalah beliin gorengan', 'Ayo {b}, gw lagi on fire hari ini!'],
+    main: ['Gas gas gas!', 'Ini kayak closing, harus agresif!', 'Bentar lagi menang, percaya!'],
+    menang: ['CLOSING! Eh, MENANG!', 'Target tercapai!'],
+    kalah: ['Ini cuma penundaan kemenangan', 'Besok gw follow-up ronde balasan'],
+    sendiri: ['Latihan dulu sebelum ke lapangan', 'Main sambil nunggu prospek bales chat'],
+  },
+  produk: {
+    ajak: ['{b}, main yuk. Gw mau riset UX game ini', 'Ayo {b}, gw butuh tester'],
+    main: ['Menu game ini UX-nya bagus loh', 'Tombolnya responsif, gw suka', 'Hmm, onboarding-nya kepanjangan'],
+    menang: ['Menang! Hipotesis gw terbukti', 'Iterasi strategi berhasil'],
+    kalah: ['Ini masuk retrospektif', 'Oke, gw perlu iterasi lagi'],
+    sendiri: ['Riset kompetitor. Iya, ini kerja', 'Gw nyatet fitur yang bisa ditiru'],
+  },
+  hrd: {
+    ajak: ['{b}, main yuk, biar nggak stres', 'Ayo {b}, team bonding dikit'],
+    main: ['Hihi, seru juga', 'Eh, ini tombol apa ya?', 'Pelan-pelan, jangan emosi ya'],
+    menang: ['Lho, gw menang? Hihi', 'Yang penting kita seneng ya'],
+    kalah: ['Gpp, yang penting kebersamaan', 'Kamu jago banget, gw bangga'],
+    sendiri: ['Istirahat sebentar, biar fresh', 'Main dikit sebelum interview berikutnya'],
   },
 };

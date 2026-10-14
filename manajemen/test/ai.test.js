@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import router, { validateAction, redact, sanitasiAi, bacaGosip, jadwalBerikutnya, bacaJadwal, isiPlaceholder } from '../server/ai.routes.js';
+import { bulanKunci, pilihRoom, ringkasData, teksDataRoom } from '../server/kantorRoom.js';
 
 test('jadwal laporan Kantor: waktu jalan berikutnya dihitung pakai jam WIB', () => {
   // 14 Okt 2026 (Rabu) 10:00 WIB = 03:00 UTC
@@ -150,6 +151,11 @@ test('kantor: peran dicek, kerja & gosip lewat Groq, gosip dijatah per admin', a
       assert.equal(body.tools, undefined);
       return Response.json({ choices: [{ message: { role: 'assistant', content: '[{"who":"A","text":"Eh tau gak"},{"who":"B","text":"Apa?"}]' } }] });
     }
+    // Planner nggak baca data (datanya diambil room), jadi dipanggil tanpa alat.
+    if (body.messages[0].content.includes('Planner')) {
+      assert.equal(body.tools, undefined);
+      return Response.json({ choices: [{ message: { role: 'assistant', content: 'Rencana: 1. Riset' } }] });
+    }
     assert.deepEqual(body.tools.map((t) => t.function.name), ['fitur', 'baca']);
     const hasilAlat = body.messages.filter((m) => m.role === 'tool');
     if (body.messages[1].content.includes('rekrutmen') && hasilAlat.length === 0)
@@ -188,6 +194,76 @@ test('kantor: peran dicek, kerja & gosip lewat Groq, gosip dijatah per admin', a
     assert.match(alat[0], /error/);
     assert.match(alat[1], /••••7890/);
     assert.doesNotMatch(alat[1], /6281234567890|3201/);
+  } finally {
+    globalThis.fetch = original;
+    if (oldKey === undefined) delete process.env.GROQ_API_KEY; else process.env.GROQ_API_KEY = oldKey;
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+test('room kantor: room dipilih dari baris ROOM Planner, ditebak dari tugas kalau nggak ada', () => {
+  assert.deepEqual(pilihRoom('1. Cek kas\n- **ROOM: keuangan, Warung**'), ['keuangan', 'warung']);
+  assert.deepEqual(pilihRoom('ROOM: gudang', 'Analisa funnel rekrutmen Sales Partner'), ['tim']);
+  assert.deepEqual(pilihRoom('', 'halo'), ['keuangan', 'sales', 'warung', 'tim']);
+  // Bulan pakai WIB: 31 Okt 20.00 UTC udah 1 Nov di Jakarta
+  assert.deepEqual(bulanKunci(new Date('2026-10-31T20:00:00Z')), { ini: '2026-11', lalu: '2026-10' });
+  assert.deepEqual(bulanKunci(new Date('2026-01-10T00:00:00Z')), { ini: '2026-01', lalu: '2025-12' });
+});
+test('room kantor: data diringkas (jumlah + rekap + contoh), UUID dibuang, teks dipotong per sumber', () => {
+  const lead = Array.from({ length: 30 }, (_, i) => ({ id: `0b5e7c1a-1111-4222-8333-${String(i).padStart(12, '0')}`, perusahaan: `Toko ${i}`, tahap: i < 20 ? 'trial' : 'stuck', nilai: 1000 }));
+  const r = ringkasData({ lead, total: 30 });
+  assert.equal(r.total, 30);
+  assert.equal(r.lead.jumlah, 30);
+  assert.deepEqual(r.lead.rekap, { tahap: { trial: 20, stuck: 10 } });
+  assert.equal(r.lead.contoh_12_pertama.length, 12);
+  assert.deepEqual(r.lead.contoh_12_pertama[0], { perusahaan: 'Toko 0', tahap: 'trial', nilai: 1000 });
+  assert.doesNotMatch(JSON.stringify(r), /0b5e7c1a/);
+  const teks = teksDataRoom([{ sumber: '/leads', ok: true, data: 'x'.repeat(500) }, { sumber: '/keuangan?bulan=2026-10', ok: false, status: 403, data: { error: 'Ditolak' } }], 300);
+  assert.match(teks, /### \/leads\n"x+ …\[DIPOTONG\]/);
+  assert.match(teks, /### \/keuangan\?bulan=2026-10\nGAGAL dibaca \(status 403\): "Ditolak"/);
+});
+test('room kantor: data wajib room dibaca server pakai sesi pengguna sebelum analis mikir', async () => {
+  const app = express(); app.use(express.json());
+  app.use((req, res, next) => { req.admin = { id: 'room', nama: 'Andri' }; next(); });
+  app.use(router);
+  app.use((err, req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const original = globalThis.fetch;
+  const oldKey = process.env.GROQ_API_KEY;
+  process.env.GROQ_API_KEY = 'test';
+  const dibaca = [];
+  const dikirim = [];
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).startsWith(origin)) return original(url, opts);
+    if (String(url).includes('/api/')) {
+      dibaca.push({ url: new URL(url).pathname + new URL(url).search, auth: opts.headers.Authorization });
+      if (String(url).includes('/komisi')) return Response.json({ error: 'Khusus owner' }, { status: 403 });
+      return Response.json({ masuk: 1500000, keluar: 400000, kontak: { no_hp: '6281234567890' } });
+    }
+    dikirim.push(JSON.parse(opts.body));
+    return Response.json({ choices: [{ message: { role: 'assistant', content: '## Room Keuangan\n- Pemasukan Rp 1,5 jt' } }] });
+  };
+  const post = (path, body) => fetch(origin + path, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer sesi-admin' }, body: JSON.stringify(body) }).then(async (r) => ({ status: r.status, body: await r.json() }));
+  try {
+    assert.equal((await post('/ai/kantor/room/gudang', { isi: 'x' })).status, 404);
+    assert.equal((await post('/ai/kantor/room/constructor', { isi: 'x' })).status, 404);
+    assert.equal((await post('/ai/kantor/room/keuangan', { isi: '' })).status, 400);
+    const r = await post('/ai/kantor/room/keuangan', { isi: 'Gimana kas bulan ini?', langsung: true });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.teks, '## Room Keuangan\n- Pemasukan Rp 1,5 jt');
+    const { ini, lalu } = bulanKunci();
+    assert.deepEqual(r.body.dibaca, [`/keuangan?bulan=${ini}`, `/keuangan?bulan=${lalu}`, '/warung-pintar/pembayaran', `/komisi?periode=${ini}`]);
+    assert.deepEqual(dibaca.map((d) => d.url).sort(), [`/api/keuangan?bulan=${ini}`, `/api/keuangan?bulan=${lalu}`, `/api/komisi?periode=${ini}`, '/api/warung-pintar/pembayaran'].sort());
+    assert.ok(dibaca.every((d) => d.auth === 'Bearer sesi-admin'));
+    // Satu panggilan model: sistem analis room + data room udah nempel di pesan, data pribadi disamarkan.
+    assert.equal(dikirim.length, 1);
+    assert.match(dikirim[0].messages[0].content, /Akuntan di Room Keuangan/);
+    const pesan = dikirim[0].messages[1].content;
+    assert.match(pesan, /^Gimana kas bulan ini\?\n\nDATA ROOM/);
+    assert.match(pesan, /"masuk":1500000/);
+    assert.match(pesan, /GAGAL dibaca \(status 403\)/);
+    assert.doesNotMatch(pesan, /6281234567890/);
   } finally {
     globalThis.fetch = original;
     if (oldKey === undefined) delete process.env.GROQ_API_KEY; else process.env.GROQ_API_KEY = oldKey;

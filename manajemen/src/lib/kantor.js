@@ -1,18 +1,50 @@
 // Mesin halaman Kantor Konsulin: lantai kantor pixel art di <canvas>, karakter yang jalan, kerja, dan ngegosip.
 // Teks (nama, balon obrolan, emote) ditaruh di lapisan HTML di atas canvas biar tetap tajam waktu canvas diperbesar.
-import { GOSIP_KEJADIAN, PENONTON, PS, RIBUT, SERAH, SIFAT, SOAL_YANG_KERJA, TERIAK_RIBUT } from './kantorDialog.js';
+import { ID_ROOM, ROOM_KANTOR, pilihRoom, promptTim } from '../../server/kantorRoom.js';
+import { COLEK, COLEK_KERJA, GOSIP_KEJADIAN, PENONTON, PS, RIBUT, SERAH, SIFAT, SOAL_YANG_KERJA, TERIAK_RIBUT } from './kantorDialog.js';
 import { obrolanData, ringkasFakta, rupiahPendek } from './kantorData.js';
+// Lantai utama 320x200, di bawahnya tembok (y 200-208) lalu baris 4 room divisi selebar 80px (y 208-300).
 const W = 320;
-const H = 200;
+const H = 300;
+const TEMBOK = 200;
+const LANTAI_ROOM = 208;
+const LEBAR_ROOM = 80;
 
 export const AGEN = [
   { id: 'bos', nama: 'Bos', warna: '#FACC15', teks: '#000', peran: 'Pemberi tugas (kamu)', meja: { x: 40, y: 124 }, kulit: '#e0ac69', rambut: '#3b2a1a', aksesori: 'dasi' },
-  { id: 'planner', nama: 'Planner', warna: '#C4B5FD', teks: '#000', peran: 'Mecah tugas jadi langkah', meja: { x: 100, y: 62 }, kulit: '#f1c27d', rambut: '#2b1b10', aksesori: '' },
-  { id: 'researcher', nama: 'Researcher', warna: '#4ADE80', teks: '#000', peran: 'Ngumpulin insight', meja: { x: 220, y: 62 }, kulit: '#c68642', rambut: '#111', aksesori: 'kacamata' },
-  { id: 'coder', nama: 'Coder', warna: '#1D4ED8', teks: '#fff', peran: 'Bikin implementasi', meja: { x: 280, y: 124 }, kulit: '#ffdbac', rambut: '#7a4b1e', aksesori: 'headphone' },
-  { id: 'reviewer', nama: 'Reviewer', warna: '#FB923C', teks: '#000', peran: 'Ngecek kualitas', meja: { x: 220, y: 172 }, kulit: '#8d5524', rambut: '#222', aksesori: 'kacamata' },
-  { id: 'writer', nama: 'Writer', warna: '#DC2626', teks: '#fff', peran: 'Nyusun jawaban final', meja: { x: 100, y: 172 }, kulit: '#f1c27d', rambut: '#a0522d', aksesori: 'rambutPanjang' },
+  { id: 'planner', nama: 'Planner', warna: '#C4B5FD', teks: '#000', peran: 'Bikin rencana & milih room', meja: { x: 100, y: 62 }, kulit: '#f1c27d', rambut: '#2b1b10', aksesori: '' },
+  { id: 'researcher', nama: 'Researcher', warna: '#4ADE80', teks: '#000', peran: 'Nyambungin temuan antar room', meja: { x: 220, y: 62 }, kulit: '#c68642', rambut: '#111', aksesori: 'kacamata' },
+  { id: 'coder', nama: 'Coder', warna: '#1D4ED8', teks: '#fff', peran: 'Ngitung & bikin tabel', meja: { x: 280, y: 124 }, kulit: '#ffdbac', rambut: '#7a4b1e', aksesori: 'headphone' },
+  { id: 'reviewer', nama: 'Reviewer', warna: '#FB923C', teks: '#000', peran: 'Ngecek angka', meja: { x: 220, y: 172 }, kulit: '#8d5524', rambut: '#222', aksesori: 'kacamata' },
+  { id: 'writer', nama: 'Writer', warna: '#DC2626', teks: '#fff', peran: 'Nyusun laporan final', meja: { x: 100, y: 172 }, kulit: '#f1c27d', rambut: '#a0522d', aksesori: 'rambutPanjang' },
+  { id: 'akuntan', nama: 'Akuntan', warna: '#15803D', teks: '#fff', peran: 'Analis Room Keuangan', meja: { x: 44, y: 268 }, kulit: '#f1c27d', rambut: '#111', aksesori: 'kacamata', room: 'keuangan' },
+  { id: 'sales', nama: 'Sales', warna: '#7DD3FC', teks: '#000', peran: 'Analis Room Sales & CRM', meja: { x: 124, y: 268 }, kulit: '#c68642', rambut: '#3b2a1a', aksesori: 'dasi', room: 'sales' },
+  { id: 'produk', nama: 'Produk', warna: '#A3E635', teks: '#000', peran: 'Analis Room Warung Pintar', meja: { x: 204, y: 268 }, kulit: '#ffdbac', rambut: '#4a3426', aksesori: '', room: 'warung' },
+  { id: 'hrd', nama: 'HRD', warna: '#F9A8D4', teks: '#000', peran: 'Analis Room Tim & Rekrutmen', meja: { x: 284, y: 268 }, kulit: '#8d5524', rambut: '#2b1b10', aksesori: 'rambutPanjang', room: 'tim' },
 ];
+
+// Room divisi (urutan kiri ke kanan). Data & prompt-nya di server/kantorRoom.js, di sini cuma tampilan.
+const TAMPIL_ROOM = {
+  keuangan: { label: 'Keuangan', satuan: 'masuk', lantai: '#5f7a5a', karpet: '#4d6a49', saran: ['Gimana arus kas bulan ini dibanding bulan lalu?', 'Tagihan mana yang paling perlu ditagih minggu ini?'] },
+  sales: { label: 'Sales & CRM', satuan: 'lead', lantai: '#5a6d86', karpet: '#4a5c75', saran: ['Lead mana yang stuck paling lama dan harus diapain?', 'Sales siapa yang paling produktif bulan ini?'] },
+  warung: { label: 'Warung Pintar', satuan: 'langganan', lantai: '#8a7550', karpet: '#7a6542', saran: ['Berapa konversi trial ke langganan sekarang?', 'Warung trial habis mana yang perlu di-follow-up?'] },
+  tim: { label: 'Tim & Rekrutmen', satuan: 'pelamar', lantai: '#86607a', karpet: '#744f69', saran: ['Kandidat mana yang perlu di-follow-up minggu ini?', 'Gimana funnel rekrutmen Sales Partner sekarang?'] },
+};
+export const ROOM = ID_ROOM.map((id, i) => ({ id, ...ROOM_KANTOR[id], ...TAMPIL_ROOM[id], kiri: i * LEBAR_ROOM, pintu: i * LEBAR_ROOM + LEBAR_ROOM / 2 }));
+// Angka live di papan room (dari ringkasan dashboard yang sama kayak obrolan karyawan). null = belum kemuat.
+export function angkaRoom(id, f) {
+  if (!f) return [];
+  const ada = (v) => v != null;
+  const daftar = {
+    keuangan: [ada(f.pemasukanBulanIni) && ['Masuk bulan ini', rupiahPendek(f.pemasukanBulanIni)], ada(f.pengeluaranBulanIni) && ['Keluar bulan ini', rupiahPendek(f.pengeluaranBulanIni)], ada(f.saldo) && ['Saldo', rupiahPendek(f.saldo)], ada(f.tagihanN) && ['Tagihan pending', `${f.tagihanN} (${rupiahPendek(f.tagihanTotal)})`]],
+    sales: [ada(f.leadAktif) && ['Lead jalan', f.leadAktif], ada(f.leadStuck) && ['Stuck', f.leadStuck], ada(f.leadKonversi) && ['Konversi', f.leadKonversi], ada(f.leadNilai) && ['Nilai pipeline', rupiahPendek(f.leadNilai)]],
+    warung: [ada(f.warungLangganan) && ['Langganan', f.warungLangganan], ada(f.warungTrial) && ['Trial', f.warungTrial], ada(f.warungTrialHabis) && ['Trial habis', f.warungTrialHabis], ada(f.warungBaru30) && ['Baru 30 hari', f.warungBaru30]],
+    tim: [ada(f.pelamarAktif) && ['Pelamar diproses', f.pelamarAktif], ada(f.pelamarMingguIni) && ['Masuk minggu ini', f.pelamarMingguIni], ada(f.pelamarFollowup) && ['Perlu follow-up', f.pelamarFollowup], ada(f.karyawanAktif) && ['Karyawan aktif', f.karyawanAktif]],
+  };
+  return (daftar[id] || []).filter(Boolean);
+}
+// Zona: -1 = lantai utama, 0..3 = room divisi. Pindah zona lewat pintu di tengah tiap room.
+const zonaDi = (x, y) => (y >= LANTAI_ROOM - 2 ? Math.max(0, Math.min(ROOM.length - 1, Math.floor(x / LEBAR_ROOM))) : -1);
 
 const ARTI_KEJADIAN = {
   task: 'Bos baru ngasih tugas ke Planner.',
@@ -22,6 +54,9 @@ const ARTI_KEJADIAN = {
   revise: 'Reviewer nolak kerjaan Coder dan minta revisi.',
   approved: 'Reviewer approve kerjaan Coder, lanjut ke Writer.',
   final: 'Writer nyerahin hasil akhir ke Bos, tugas selesai!',
+  brief: 'Planner nganter brief ke room divisi di lantai bawah.',
+  room: 'Analis room divisi nyerahin hasil analisa datanya.',
+  tanyaRoom: 'Bos turun sendiri nanya langsung ke salah satu room divisi.',
 };
 const TEMPAT = [
   { x: 110, y: 40, arah: 'atas' }, { x: 210, y: 40, arah: 'atas' }, { x: 296, y: 50, arah: 'atas' },
@@ -148,11 +183,110 @@ function gambarRuang() {
     kotak(g, b.warna, b.x - 7, b.y - 8, 14, 6);
     kotak(g, 'rgba(255,255,255,.25)', b.x - 5, b.y - 7, 4, 1);
   }
+  gambarRoom(g);
   return c;
 }
 
+// Baris room divisi di bawah tembok: lantai beda warna per room, sekat, pintu, dan perabot sesuai bidangnya.
+function gambarRoom(g) {
+  for (const r of ROOM) {
+    const k = r.kiri;
+    kotak(g, r.lantai, k, LANTAI_ROOM, LEBAR_ROOM, H - LANTAI_ROOM);
+    for (let y = LANTAI_ROOM + 8; y < H; y += 8) kotak(g, r.karpet, k, y, LEBAR_ROOM, 1);
+    kotak(g, r.karpet, k + 16, 252, 48, 40);
+    kotak(g, 'rgba(255,255,255,.08)', k + 18, 254, 44, 36);
+    kotak(g, 'rgba(0,0,0,.18)', k, LANTAI_ROOM, LEBAR_ROOM, 3);
+  }
+  // tembok pemisah lantai utama & room, pintu di tengah tiap room
+  kotak(g, '#46557a', 0, TEMBOK, W, LANTAI_ROOM - TEMBOK);
+  kotak(g, '#2c3550', 0, LANTAI_ROOM - 1, W, 1);
+  kotak(g, '#5b6b93', 0, TEMBOK, W, 1);
+  for (const r of ROOM) {
+    kotak(g, r.lantai, r.pintu - 8, TEMBOK, 16, LANTAI_ROOM - TEMBOK);
+    kotak(g, '#2c3550', r.pintu - 9, TEMBOK, 1, LANTAI_ROOM - TEMBOK);
+    kotak(g, '#2c3550', r.pintu + 8, TEMBOK, 1, LANTAI_ROOM - TEMBOK);
+    if (r.kiri > 0) {
+      kotak(g, '#2c3550', r.kiri - 1, LANTAI_ROOM, 2, H - LANTAI_ROOM);
+      kotak(g, '#46557a', r.kiri - 1, LANTAI_ROOM, 1, H - LANTAI_ROOM);
+    }
+  }
+  const tanaman = (x, y) => {
+    kotak(g, '#b5532e', x, y + 6, 7, 5);
+    kotak(g, '#2e8b57', x - 1, y, 4, 7);
+    kotak(g, '#3cb371', x + 2, y - 2, 4, 9);
+    kotak(g, '#2e8b57', x + 5, y + 1, 3, 6);
+  };
+  // Keuangan: brankas, papan grafik, lemari arsip
+  kotak(g, '#4b5563', 6, 214, 16, 19);
+  kotak(g, '#6b7280', 8, 216, 12, 15);
+  kotak(g, '#d1d5db', 12, 220, 4, 4);
+  kotak(g, '#111', 13, 221, 2, 2);
+  kotak(g, '#9ca3af', 18, 222, 1, 4);
+  kotak(g, '#57534e', 28, 211, 26, 18);
+  kotak(g, '#f5f5f4', 29, 212, 24, 16);
+  kotak(g, '#16a34a', 32, 222, 3, 5);
+  kotak(g, '#16a34a', 37, 219, 3, 8);
+  kotak(g, '#16a34a', 42, 216, 3, 11);
+  kotak(g, '#dc2626', 47, 220, 3, 7);
+  kotak(g, '#57534e', 33, 229, 1, 6);
+  kotak(g, '#57534e', 48, 229, 1, 6);
+  kotak(g, '#78716c', 60, 213, 14, 21);
+  for (const y of [219, 226]) kotak(g, '#57534e', 60, y, 14, 1);
+  for (const y of [216, 222, 229]) kotak(g, '#d6d3d1', 66, y, 2, 1);
+  tanaman(68, 280);
+  // Sales & CRM: whiteboard pipeline + sticky note, papan dart, tumpukan brosur
+  kotak(g, '#475569', 86, 211, 42, 22);
+  kotak(g, '#f8fafc', 87, 212, 40, 20);
+  ['#fde047', '#f9a8d4', '#86efac', '#93c5fd'].forEach((w, i) => {
+    kotak(g, '#cbd5e1', 89 + i * 10, 214, 7, 1);
+    for (let j = 0; j < 3 - (i % 2); j++) kotak(g, w, 89 + i * 10, 217 + j * 5, 6, 4);
+  });
+  kotak(g, '#475569', 92, 233, 1, 5);
+  kotak(g, '#475569', 122, 233, 1, 5);
+  kotak(g, '#dc2626', 136, 213, 11, 11);
+  kotak(g, '#f8fafc', 138, 215, 7, 7);
+  kotak(g, '#dc2626', 140, 217, 3, 3);
+  kotak(g, '#a16207', 138, 236, 13, 8);
+  kotak(g, '#fef3c7', 139, 235, 11, 2);
+  tanaman(150, 280);
+  // Warung Pintar: etalase warung, kulkas minuman, banner
+  kotak(g, '#92400e', 166, 211, 32, 27);
+  for (let s = 0; s < 3; s++) {
+    kotak(g, '#78350f', 166, 219 + s * 8, 32, 1);
+    for (let i = 0; i < 7; i++) kotak(g, ['#ef4444', '#facc15', '#22c55e', '#3b82f6', '#f97316', '#a855f7', '#f5f5f4'][(i + s * 2) % 7], 168 + i * 4, 213 + s * 8, 3, 5);
+  }
+  kotak(g, '#e5e7eb', 204, 211, 15, 26);
+  kotak(g, '#bae6fd', 206, 213, 11, 15);
+  for (let i = 0; i < 3; i++) {
+    kotak(g, ['#dc2626', '#16a34a', '#f59e0b'][i], 207 + i * 3, 215, 2, 5);
+    kotak(g, ['#2563eb', '#dc2626', '#16a34a'][i], 207 + i * 3, 221, 2, 5);
+  }
+  kotak(g, '#dc2626', 204, 230, 15, 2);
+  kotak(g, '#f59e0b', 224, 212, 13, 9);
+  kotak(g, '#fff', 226, 215, 2, 2);
+  kotak(g, '#fff', 230, 215, 5, 2);
+  tanaman(228, 280);
+  // Tim & Rekrutmen: papan kandidat, kalender, kursi interview
+  kotak(g, '#b45309', 246, 211, 30, 21);
+  kotak(g, '#d6a35c', 247, 212, 28, 19);
+  for (let i = 0; i < 4; i++) {
+    const x = 249 + i * 7;
+    const y = 214 + (i % 2) * 7;
+    kotak(g, '#fff', x, y, 5, 6);
+    kotak(g, ['#f1c27d', '#c68642', '#8d5524', '#ffdbac'][i], x + 1, y + 1, 3, 3);
+    kotak(g, '#dc2626', x + 2, y - 1, 1, 1);
+  }
+  kotak(g, '#fff', 280, 212, 9, 9);
+  kotak(g, '#dc2626', 280, 212, 9, 2);
+  for (let i = 0; i < 3; i++) kotak(g, '#9ca3af', 281 + i * 3, 216, 1, 1);
+  kotak(g, '#4b4b63', 292, 224, 7, 7);
+  kotak(g, '#4b4b63', 308, 224, 7, 7);
+  kotak(g, '#c48a52', 300, 226, 7, 4);
+  tanaman(306, 280);
+}
+
 const jam = () => new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-const JUDUL_LANGKAH = { planner: 'Rencana', researcher: 'Riset data', coder: 'Implementasi', reviewer: 'Review', writer: 'Hasil akhir' };
+const JUDUL_LANGKAH = { planner: 'Rencana', researcher: 'Riset lintas room', coder: 'Implementasi', reviewer: 'Review', writer: 'Hasil akhir' };
 
 // Satu kantor per sesi login, hidup di level aplikasi: karakter tetap jalan & tugas tetap dikerjain walau halaman
 // Kantor ditutup. Halaman cuma nempelin `elemen` (canvas + lapisan teks) dan baca `keadaan` lewat langganan.
@@ -192,6 +326,12 @@ function buatKantor(namaBos) {
     errorSimpan: '',
     versiRiwayat: 0,
     error: '',
+    // mode tugas: 'tim' (alur lengkap) atau 'room' (Bos nanya langsung satu room); room = id room-nya.
+    mode: 'tim',
+    room: null,
+    roomKerja: null,
+    roomDipilih: null,
+    fakta: null,
   };
   const pendengar = new Set();
   const ubah = (fn) => {
@@ -224,12 +364,23 @@ function buatKantor(namaBos) {
       this.balon = Object.assign(document.createElement('div'), { className: 'kantor-balon' });
       lapisan.append(this.tag, this.balon);
     }
+    // Pindah zona (lantai utama <-> room, atau antar room) lewat pintu: keluar pintu room asal, masuk pintu room tujuan.
     jalanKe(x, y, duduk = false) {
       if (this._sampai) this._sampai(false);
-      Object.assign(this, { tx: x, ty: y, dudukNanti: duduk, keadaan: 'jalan', diBeanbag: false, mainPS: false });
+      const dari = zonaDi(this.x, this.y);
+      const ke = zonaDi(x, y);
+      const rute = [];
+      if (dari !== ke) {
+        if (dari >= 0) rute.push({ x: ROOM[dari].pintu, y: LANTAI_ROOM + 8 }, { x: ROOM[dari].pintu, y: TEMBOK - 6 });
+        if (ke >= 0) rute.push({ x: ROOM[ke].pintu, y: TEMBOK - 6 }, { x: ROOM[ke].pintu, y: LANTAI_ROOM + 8 });
+      }
+      rute.push({ x, y });
+      const [awal, ...sisa] = rute;
+      Object.assign(this, { tx: awal.x, ty: awal.y, rute: sisa, dudukNanti: duduk, keadaan: 'jalan', diBeanbag: false, mainPS: false });
       return new Promise((r) => (this._sampai = r));
     }
     berhenti() {
+      this.rute = [];
       if (this._sampai) {
         const r = this._sampai;
         this._sampai = null;
@@ -245,7 +396,12 @@ function buatKantor(namaBos) {
       const s = 55 * dt;
       if (Math.abs(dx) > Math.abs(dy)) this.arah = dx < 0 ? 'kiri' : 'kanan';
       else this.arah = dy < 0 ? 'atas' : 'bawah';
-      if (d <= s) {
+      if (d <= s && this.rute?.length) {
+        this.x = this.tx;
+        this.y = this.ty;
+        const p = this.rute.shift();
+        Object.assign(this, { tx: p.x, ty: p.y });
+      } else if (d <= s) {
         this.x = this.tx;
         this.y = this.ty;
         this.keadaan = this.dudukNanti ? 'duduk' : 'berdiri';
@@ -982,6 +1138,11 @@ function buatKantor(namaBos) {
   function jawabDemo(id, tugas) {
     const f = setelan.fakta || {};
     const ada = (v) => v != null;
+    const room = ROOM.find((r) => r.karakter === id);
+    if (room) {
+      const angka = angkaRoom(room.id, setelan.fakta);
+      return `## ${room.nama}\nAngka kunci (ringkasan dashboard):\n${angka.map(([k, v]) => `- ${k}: ${v}`).join('\n') || '- data belum kemuat'}\n\nMode demo: analisa room lengkap butuh AI aktif.`;
+    }
     if (id === 'planner') return `Pertanyaan analisa buat: "${tugas.slice(0, 80)}"\n1. Berapa warung langganan, trial, dan trial habis?\n2. Gimana arus kas bulan ini?\n3. Gimana kondisi pipeline CRM?\n4. Gimana funnel rekrutmen Sales Partner?\n5. Apa 3 tindakan paling penting minggu ini?`;
     if (id === 'researcher') return `Data yang kebaca (ringkasan dashboard):\n- ${ringkasFakta(setelan.fakta) || 'data belum kemuat'}`;
     if (id === 'coder') {
@@ -1001,7 +1162,9 @@ function buatKantor(namaBos) {
     return `# Laporan analisa Konsulin\n\n## Ringkasan eksekutif\nIni contoh laporan dari mode demo, disusun dari ringkasan dashboard Makalin. Analisa mendalam per data butuh AI aktif.\n\n## Angka kunci\n${angka}\n\n## Temuan\n- ${ada(f.warungLangganan) ? `Baru ${f.warungLangganan} warung yang langganan.` : 'Data warung belum kemuat.'}\n- ${ada(f.leadStuck) ? `${f.leadStuck} lead CRM nyangkut di tahap stuck.` : 'Data CRM belum kemuat.'}\n\n## Rekomendasi\n1. Follow-up warung yang trial-nya habis.\n2. Tindak lanjuti lead yang stuck minggu ini.\n\n## Catatan data\nMode demo: belum dianalisa AI. Isi GROQ_API_KEY buat laporan lengkap.`;
   }
 
-  async function kerjakan(id, prompt, judul = JUDUL_LANGKAH[id]) {
+  // room: id room kalau yang kerja analis room divisi (datanya dibaca server lewat /ai/kantor/room/:id);
+  // langsung: Bos nanya langsung ke room itu (langkah pertama tugas, dihitung jatah harian).
+  async function kerjakan(id, prompt, judul = JUDUL_LANGKAH[id], { room = null, langsung = false } = {}) {
     const o = orang[id];
     const tadinyaPergi = ambilKerja(o);
     if (jarak(o, o.kursi) > 1) {
@@ -1012,13 +1175,13 @@ function buatKantor(namaBos) {
     Object.assign(o, { keadaan: 'duduk', arah: 'atas', kerja: true });
     dunia.kerja = id;
     ubahAgen(id, { st: 'kerja', kegiatan: `Ngerjain: ${judul}` });
-    ubah(() => ({ tahap: `${o.nama}: ${judul}` }));
+    ubah(() => ({ tahap: `${o.nama}: ${judul}`, roomKerja: room }));
     const mulai = Date.now();
     let hasil;
     let dibaca = [];
     try {
       if (setelan.ai) {
-        const r = await setelan.ai.kerja(id, prompt);
+        const r = room ? await setelan.ai.room(room, prompt, langsung) : await setelan.ai.kerja(id, prompt);
         hasil = r.teks;
         dibaca = r.dibaca || [];
         if (dibaca.length) {
@@ -1032,6 +1195,7 @@ function buatKantor(namaBos) {
     } finally {
       o.kerja = false;
       dunia.kerja = null;
+      if (room) ubah(() => ({ roomKerja: null }));
     }
     const putusan = id === 'reviewer' ? (/^\s*APPROVED/i.test(hasil) ? 'APPROVED' : 'REVISE') : null;
     ubah((k) => ({
@@ -1081,28 +1245,47 @@ function buatKantor(namaBos) {
     }
   }
 
-  async function jalankan(tugas, { revisi = true } = {}) {
+  // Alur sama kayak timKantor di server (prompt dari promptTim). room diisi = Bos nanya langsung satu room:
+  // Bos -> analis room -> Writer -> Bos, cuma 2 panggilan AI.
+  async function jalankan(tugas, { revisi = true, room: tanyaRoom = null } = {}) {
     if (dunia.jalan) throw new Error('Tim masih ngerjain tugas sebelumnya.');
     Object.assign(dunia, { jalan: true, tugas, kejadian: null });
     putaranReview = 0;
     try {
-      await serahkan('bos', 'planner', tugas, 'task');
-      const rencana = await kerjakan('planner', `Tugas dari Bos:\n${tugas}`);
-      await serahkan('planner', 'researcher', rencana, 'plan');
-      const riset = await kerjakan('researcher', `Tugas: ${tugas}\n\nRencana dari Planner:\n${rencana}`);
-      await serahkan('researcher', 'coder', riset, 'research');
-      let kode = await kerjakan('coder', `Tugas: ${tugas}\n\nRencana:\n${rencana}\n\nRiset:\n${riset}`);
-      let review;
-      let putaran = 0;
-      for (;;) {
-        await serahkan('coder', 'reviewer', kode, 'code');
-        review = await kerjakan('reviewer', `Tugas: ${tugas}\n\nHasil Coder:\n${kode}`);
-        if (/^\s*APPROVED/i.test(review) || !revisi || ++putaran >= 2) break;
-        await serahkan('reviewer', 'coder', review, 'revise');
-        kode = await kerjakan('coder', `Tugas: ${tugas}\n\nHasil sebelumnya:\n${kode}\n\nFeedback Reviewer:\n${review}\n\nPerbaiki.`, 'Revisi implementasi');
+      let akhir;
+      if (tanyaRoom) {
+        const r = ROOM.find((x) => x.id === tanyaRoom);
+        await serahkan('bos', r.karakter, tugas, 'tanyaRoom');
+        const hasilRoom = await kerjakan(r.karakter, promptTim.room(tugas), r.nama, { room: r.id, langsung: true });
+        await serahkan(r.karakter, 'writer', hasilRoom, 'room');
+        akhir = await kerjakan('writer', promptTim.akhir(tugas, hasilRoom));
+      } else {
+        await serahkan('bos', 'planner', tugas, 'task');
+        const rencana = await kerjakan('planner', promptTim.rencana(tugas));
+        const hasilRoom = [];
+        for (const id of pilihRoom(rencana, tugas)) {
+          const r = ROOM.find((x) => x.id === id);
+          await serahkan('planner', r.karakter, rencana, 'brief');
+          const h = await kerjakan(r.karakter, promptTim.room(tugas, rencana), r.nama, { room: id });
+          hasilRoom.push(h);
+          await serahkan(r.karakter, 'researcher', h, 'room');
+        }
+        const room = hasilRoom.join('\n\n');
+        const riset = await kerjakan('researcher', promptTim.riset(tugas, rencana, room));
+        await serahkan('researcher', 'coder', riset, 'research');
+        let kode = await kerjakan('coder', promptTim.kode(tugas, rencana, room, riset));
+        let review;
+        let putaran = 0;
+        for (;;) {
+          await serahkan('coder', 'reviewer', kode, 'code');
+          review = await kerjakan('reviewer', promptTim.review(tugas, room, kode));
+          if (/^\s*APPROVED/i.test(review) || !revisi || ++putaran >= 2) break;
+          await serahkan('reviewer', 'coder', review, 'revise');
+          kode = await kerjakan('coder', promptTim.revisi(tugas, kode, review), 'Revisi implementasi');
+        }
+        await serahkan('reviewer', 'writer', review, 'approved');
+        akhir = await kerjakan('writer', promptTim.akhir(tugas, room, riset, kode, review));
       }
-      await serahkan('reviewer', 'writer', review, 'approved');
-      const akhir = await kerjakan('writer', `Tugas: ${tugas}\n\nRencana:\n${rencana}\n\nRiset:\n${riset}\n\nImplementasi:\n${kode}\n\nReview:\n${review}`);
       ambilKerja(orang.bos);
       pulang(orang.bos);
       await serahkan('writer', 'bos', akhir, 'final');
@@ -1122,17 +1305,19 @@ function buatKantor(namaBos) {
     }
   }
 
-  // opsi: { revisi, template, judul } - template & judul dari tombol "Analisa siap pakai".
+  // opsi: { revisi, template, judul, room } - template & judul dari tombol "Analisa siap pakai", room dari "Tanya room".
   async function kasihTugas(tugas, opsi = {}) {
     if (keadaan.jalan) return;
     ubah((k) => ({
       tugas,
+      mode: opsi.room ? 'room' : 'tim',
+      room: opsi.room || null,
       jalan: true,
       mulai: Date.now(),
       selesai: null,
       hasil: '',
       judul: '',
-      template: opsi.template || null,
+      template: opsi.template || (opsi.room ? `room-${opsi.room}` : null),
       laporanId: null,
       errorSimpan: '',
       error: '',
@@ -1175,6 +1360,60 @@ function buatKantor(namaBos) {
   for (const a of AGEN) orang[a.id] = new Orang(a, a.id === 'bos' ? namaBos : a.nama);
   const papan = Object.assign(document.createElement('div'), { className: 'kantor-papan', textContent: 'KONSULIN' });
   lapisan.append(papan);
+
+  // Papan nama tiap room + satu angka live; nyala kedip waktu analisnya lagi kerja, ditandain waktu room dipilih.
+  const papanRoom = Object.fromEntries(
+    ROOM.map((r) => {
+      const el = Object.assign(document.createElement('div'), { className: 'kantor-papan-room' });
+      el.style.left = ((r.kiri + 3) / W) * 100 + '%';
+      el.style.top = ((H - 10) / H) * 100 + '%';
+      el.style.maxWidth = ((LEBAR_ROOM - 6) / W) * 100 + '%';
+      el.style.setProperty('--warna', AGEN.find((a) => a.id === r.karakter).warna);
+      el.append(Object.assign(document.createElement('b'), { textContent: r.label }), document.createElement('span'));
+      el.addEventListener('click', () => ubah(() => ({ roomDipilih: r.id })));
+      lapisan.append(el);
+      return [r.id, el];
+    })
+  );
+  let papanTerakhir = '';
+  function sinkronPapan() {
+    const kunci = JSON.stringify([keadaan.fakta, keadaan.roomKerja, keadaan.roomDipilih]);
+    if (kunci === papanTerakhir) return;
+    papanTerakhir = kunci;
+    for (const r of ROOM) {
+      const el = papanRoom[r.id];
+      const [label, nilai] = angkaRoom(r.id, keadaan.fakta)[0] || [];
+      el.lastChild.textContent = keadaan.roomKerja === r.id ? 'analisa…' : label ? `${nilai} ${r.satuan}` : '';
+      el.title = label ? `${label}: ${nilai}` : '';
+      el.classList.toggle('kerja', keadaan.roomKerja === r.id);
+      el.classList.toggle('dipilih', keadaan.roomDipilih === r.id);
+    }
+  }
+  pendengar.add(sinkronPapan);
+  sinkronPapan();
+
+  // Klik di lantai: karakter dicolek (ngomong sesuai sifatnya), klik di room = milih room itu buat ditanya.
+  function colek(o) {
+    if (o.kerja || (o.sibuk && dunia.jalan)) {
+      o.emote('sebel', 1500);
+      o.bilang(pilih(COLEK_KERJA));
+      return;
+    }
+    if (o.id === 'bos') o.marahSampai = performance.now() + 2000;
+    o.emote(o.id === 'bos' ? 'marah' : pilih(['kaget', 'halo', 'senang']), 2000);
+    o.bilang(pilih(COLEK[o.id] || COLEK.planner));
+  }
+  kanvas.addEventListener('click', (e) => {
+    const kotakKanvas = kanvas.getBoundingClientRect();
+    const x = ((e.clientX - kotakKanvas.left) / kotakKanvas.width) * W;
+    const y = ((e.clientY - kotakKanvas.top) / kotakKanvas.height) * H;
+    const kena = semua()
+      .filter((o) => !o.sembunyi && Math.abs(o.x - x) <= 6 && y >= o.y - 21 && y <= o.y + 3)
+      .sort((a, b) => b.y - a.y)[0];
+    if (kena) return colek(kena);
+    const z = zonaDi(x, y);
+    if (z >= 0) ubah(() => ({ roomDipilih: ROOM[z].id }));
+  });
   raf = requestAnimationFrame(bingkai);
 
   return {
@@ -1188,7 +1427,9 @@ function buatKantor(namaBos) {
     atur: (s) => {
       Object.assign(setelan, s);
       if ('status' in s) ubah(() => ({ status: s.status }));
+      if ('fakta' in s) ubah(() => ({ fakta: s.fakta }));
     },
+    pilihRoom: (id) => ubah(() => ({ roomDipilih: id })),
     gantiNamaBos: (nama) => {
       orang.bos.nama = nama;
       orang.bos.tag.textContent = nama;

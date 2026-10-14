@@ -126,6 +126,7 @@ export default function App() {
     let batal = false;
     const ai = {
       kerja: (peran, isi) => api('POST', '/ai/kantor/kerja', { peran, isi }),
+      room: (id, isi, langsung) => api('POST', `/ai/kantor/room/${id}`, { isi, langsung }),
       gosip: (a, b, situasi, terakhir) => api('POST', '/ai/kantor/gosip', { a, b, situasi, terakhir }).then((r) => r.baris),
     };
     k.atur({ simpanLaporan: (laporan) => api('POST', '/ai/kantor/laporan', laporan) });

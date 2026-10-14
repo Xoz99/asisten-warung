@@ -1368,14 +1368,23 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 @keyframes kantor-kedip{50%{opacity:.2}}
 .kantor-wadah{margin:0 -4px}
 .kantor-geser{display:none;font-size:11px;color:var(--redup);margin:6px 0 0}
-.kantor-ruang{position:relative;border:var(--garis);background:#a87c4f;max-width:max(560px,calc((100vh - 230px) * 1.6));margin:0 auto}
-.kantor-ruang canvas{display:block;width:100%;height:auto;image-rendering:pixelated}
+.kantor-ruang{position:relative;border:var(--garis);background:#a87c4f;max-width:max(560px,calc((100vh - 230px) * 320 / 300));margin:0 auto}
+.kantor-ruang canvas{display:block;width:100%;height:auto;image-rendering:pixelated;cursor:pointer}
 .kantor-lapisan{position:absolute;inset:0;pointer-events:none}
 .kantor-tag{position:absolute;transform:translate(-50%,0);font-size:9px;font-weight:700;line-height:1;padding:2px 3px;border:1.5px solid var(--hitam);white-space:nowrap;text-transform:uppercase;letter-spacing:.04em}
 .kantor-balon{position:absolute;transform:translate(-50%,-100%) scale(.6);transform-origin:bottom center;opacity:0;transition:opacity .15s,transform .15s;background:var(--putih);color:var(--tinta);font-size:13px;font-weight:600;line-height:1.3;padding:5px 9px;border:var(--garis-tipis);box-shadow:3px 3px 0 var(--hitam);width:max-content;max-width:200px;text-align:center;z-index:2}
 .kantor-balon.tampil{opacity:1;transform:translate(-50%,-100%) scale(1);z-index:3}
 .kantor-balon::after{content:"";position:absolute;left:50%;bottom:-10px;margin-left:-5px;border:5px solid transparent;border-top-color:var(--hitam)}
-.kantor-papan{position:absolute;left:50%;top:2.5%;transform:translateX(-50%);background:var(--kuning);border:var(--garis-tipis);font-size:12px;font-weight:700;letter-spacing:.14em;padding:2px 10px}
+.kantor-papan{position:absolute;left:50%;top:1.6%;transform:translateX(-50%);background:var(--kuning);border:var(--garis-tipis);font-size:12px;font-weight:700;letter-spacing:.14em;padding:2px 10px}
+/* Papan room divisi di pojok kiri bawah tiap room: nama + satu angka live, bisa diklik buat milih room */
+.kantor-papan-room{position:absolute;pointer-events:auto;cursor:pointer;display:flex;align-items:baseline;gap:4px;overflow:hidden;white-space:nowrap;background:var(--putih);border:1.5px solid var(--hitam);border-left:5px solid var(--warna);font-size:9px;line-height:1.2;padding:1px 4px;box-shadow:2px 2px 0 var(--hitam)}
+.kantor-papan-room b{text-transform:uppercase;letter-spacing:.06em}
+.kantor-papan-room span{color:var(--redup);font-weight:600;overflow:hidden;text-overflow:ellipsis}
+.kantor-papan-room.dipilih{background:var(--kuning)}
+.kantor-papan-room.dipilih span{color:var(--tinta)}
+.kantor-papan-room.kerja{animation:kantor-papan-kedip 1s steps(2,end) infinite}
+@keyframes kantor-papan-kedip{50%{background:var(--kuning)}}
+@media (prefers-reduced-motion:reduce){.kantor-papan-room.kerja{animation:none;background:var(--kuning)}}
 
 .kantor-avatar{width:28px;height:28px;flex:none;display:grid;place-items:center;border:2px solid var(--hitam);font-weight:700;font-size:13px;background:var(--kertas);text-transform:uppercase}
 .kantor-agen{list-style:none;margin:14px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px}
@@ -1402,9 +1411,33 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 .kantor-aksi{display:flex;gap:8px}
 .kantor-tugas-kutip{margin:0 0 14px;padding:10px 14px;border-left:6px solid var(--biru);background:var(--kertas);font-size:16px;font-weight:600;display:flex;flex-direction:column;gap:4px;overflow-wrap:anywhere}
 .kantor-tugas-kutip .adm-label{font-size:10px;color:var(--redup)}
-.kantor-tahapan{list-style:none;margin:0 0 12px;padding:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border:var(--garis-tipis)}
+.kantor-tahapan{list-style:none;margin:0 0 12px;padding:0;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);border:var(--garis-tipis)}
 .kantor-tahapan li{padding:8px 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;text-align:center;border-right:var(--garis-tipis);background:var(--putih);color:var(--redup)}
 .kantor-tahapan li:last-child{border-right:0}
+/* Kartu room divisi */
+.kantor-room{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.kantor-room-item{display:flex;flex-direction:column;gap:8px;min-width:0;border:var(--garis-tipis);border-top:6px solid var(--warna);background:var(--kertas);padding:8px}
+.kantor-room-item.on{background:#FFFBEA;box-shadow:3px 3px 0 var(--hitam)}
+.kantor-room-item.kerja{background:#FFFBEA}
+.kantor-room-item header{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:22px}
+.kantor-room-item header b{font-size:13px;line-height:1.2}
+.kantor-room-analis{display:flex;align-items:center;gap:8px;min-width:0}
+.kantor-room-analis>span{display:flex;flex-direction:column;min-width:0}
+.kantor-room-analis b{font-size:12.5px}
+.kantor-room-analis small{font-size:11px;line-height:1.3;color:var(--redup);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.kantor-room-angka{margin:0;display:flex;flex-direction:column;gap:3px;flex:1}
+.kantor-room-angka>div{display:flex;justify-content:space-between;gap:6px;font-size:12px;border-bottom:1px dashed #d4d4d8;padding-bottom:2px}
+.kantor-room-angka dt{color:var(--redup);min-width:0}
+.kantor-room-angka dd{margin:0;font-weight:700;white-space:nowrap}
+.kantor-room-kosong{flex:1;margin:0;font-size:12px}
+.kantor-room-tanya{display:flex;flex-direction:column;gap:8px;margin-top:12px;border:var(--garis-tipis);border-left:6px solid var(--warna);padding:10px 12px;background:var(--putih)}
+.kantor-room-tanya .adm-label{margin:0}
+.kantor-room-saran{display:flex;flex-wrap:wrap;gap:6px}
+.kantor-room-saran button{font:inherit;font-size:12.5px;text-align:left;padding:5px 8px;border:var(--garis-tipis);background:var(--kertas);color:var(--tinta);cursor:pointer;min-height:32px}
+.kantor-room-saran button:hover:not(:disabled){background:var(--kuning)}
+.kantor-room-tanya textarea{min-height:70px}
+.kantor-room-sumber{margin:0;font-size:12px;display:flex;flex-wrap:wrap;align-items:center;gap:4px}
+.kantor-room-sumber code{font-size:11px;background:#F1F0E8;padding:1px 4px}
 .kantor-tahapan li.beres{background:var(--hijau);color:var(--tinta)}
 .kantor-tahapan li.sekarang{background:var(--kuning);color:var(--tinta)}
 .kantor-meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
@@ -1471,12 +1504,13 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
   .kantor-isi{display:flex;flex-direction:column}
   .kantor-kiri,.kantor-kanan{display:contents}
   .kantor-lantai{order:1}
-  .kantor-tugas{order:2}
-  .kantor-hasil{order:3}
-  .kantor-alur{order:4}
-  .kantor-obrolan{order:5}
-  .kantor-jadwal{order:6}
-  .kantor-riwayat{order:7}
+  .kantor-room-kartu{order:2}
+  .kantor-tugas{order:3}
+  .kantor-hasil{order:4}
+  .kantor-alur{order:5}
+  .kantor-obrolan{order:6}
+  .kantor-jadwal{order:7}
+  .kantor-riwayat{order:8}
   .kantor-feed{height:300px}
 }
 @media (max-width:700px){
@@ -1488,4 +1522,7 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
   .kantor-balon{font-size:12px;max-width:170px}
   .kantor-template{grid-template-columns:1fr}
   .kantor-template button{min-height:0}
+  .kantor-room{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kantor-tahapan{grid-auto-flow:row;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .kantor-tahapan li{border-bottom:var(--garis-tipis);margin-bottom:-2px}
 }
