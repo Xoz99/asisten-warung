@@ -1,6 +1,7 @@
 // Kamus omongan karyawan Kantor Konsulin, per peran & sifatnya. Tanpa emoji: reaksi digambar di muka karakter (REAKSI di kantor.js).
 // {b} = lawan bicara, {c} = orang ketiga yang diomongin.
-//   Bos        : sok asik, nongol tiba-tiba, hobi istilah Inggris, janji traktir tapi lupa, "udah sampe mana?"
+//   Bos        : galak, gampang marah-marah, nggak sabaran, nongol tiba-tiba nagih "udah sampe mana?!", hobi istilah
+//                Inggris, janji traktir tapi lupa. Marahnya lucu, bukan kasar
 //   Planner    : perfeksionis jadwal, to-do list, timeline, rapat, agak bossy
 //   Researcher : kepo, tau semua gosip, "menurut data...", sumber & survei
 //   Coder      : introvert, kecanduan kopi, sarkas, headphone, bug & deploy
@@ -10,34 +11,34 @@
 export const SIFAT = {
   bos: {
     gosip: [
-      'Guys, gimana progress hari ini? Udah sampe mana nih?',
-      '{b}, gw lagi mikirin ide besar. Kita harus lebih agile, lebih synergy gitu loh',
-      'Eh {b}, {c} kerjanya oke kan? Gw liat dia serius banget belakangan',
-      'Gimana kalo Jumat kita team building? Main futsal atau karaoke',
-      '{b}, menurut lo kantor kita butuh beanbag nggak? Biar kayak startup Silicon Valley',
-      'Gw abis ikut seminar, katanya kunci sukses itu mindset. Kita harus growth mindset!',
-      'Bulan depan target kita naik dua kali lipat ya. Gampang lah itu',
-      '{b}, kemarin gw ketemu investor. Dia suka banget sama Warung Pintar',
-      'Nanti kalo target tembus, gw traktir semua. Janji!',
-      'Lo tau nggak {b}, dulu gw mulai bisnis cuma modal laptop sama semangat',
-      'Kenapa ruangan sepi banget? Kita butuh energi! Energi!',
-      '{c} tadi bilang ke gw butuh libur. Menurut lo dia capek nggak?',
+      'UDAH SAMPE MANA?! Dari pagi gw nanya nggak ada yang jawab!',
+      '{b}, angka bulan ini kok segini doang?! Kalian ngapain aja?!',
+      'Eh {b}, {c} dari tadi ngopi mulu. Itu kerja apa nongkrong?!',
+      'Gw mau laporan di meja gw SEKARANG. Bukan nanti, bukan besok!',
+      '{b}, kita ini harus agile! AGILE! Bukan lelet kayak siput!',
+      'Target bulan depan naik dua kali lipat. Nggak ada tapi-tapian!',
+      'Siapa yang naro gelas kopi di meja gw?! Ngaku!',
+      'Gw nggak mau denger alasan. Gw maunya hasil!',
+      '{b}, lo tau nggak kompetitor udah sampe mana? Kita masih di sini-sini aja!',
+      'Kalo target tembus gw traktir. Kalo nggak tembus, lembur semua!',
+      'Kenapa ruangan sepi banget?! Kerja! Bukan bengong!',
+      '{c} minta libur lagi? Libur mulu, kerjaannya kapan?!',
     ],
-    balas: ['Mantap, mantap. Itu yang gw mau denger', 'Hmm, oke noted. Nanti kita bahas di meeting', 'Wah serius? Kok gw baru tau', 'Iya iya, gw paham. Intinya kita harus semangat', 'Good point! Lo emang aset perusahaan', 'Nah itu dia. Out of the box!', 'Oke, kita take offline ya', 'Hahaha bisa aja lo'],
-    lanjut: ['Pokoknya gw percaya sama kalian semua', 'Nanti gw bikinin reward deh', 'Gw udah bilang dari awal kan', 'Jangan lupa, kita ini keluarga'],
-    penutup: ['Oke, lanjut kerja ya guys!', 'Gw ke ruangan dulu, ada call penting', 'Semangat! Gw liat dari jauh', 'Nanti kabarin progresnya ya'],
-    sendiri: ['Hmm, enaknya ekspansi ke kota mana ya', 'Ini laporan kok angkanya kecil semua', 'Kayaknya gw perlu ganti foto profil LinkedIn', 'Meeting jam berapa ya tadi', 'Harusnya kita punya maskot', 'Kopi gw mana ya, perasaan tadi di sini', 'Gw mau bikin podcast kantor kayaknya'],
-    kopi: ['Kopi itu bahan bakar pemimpin', 'Siapa yang beli kopi sachet ini? Kita harus upgrade', 'Pagi-pagi enaknya kopi sambil mikir strategi'],
-    pegel: ['Duduk terus, punggung gw protes', 'Abis ini gw mau olahraga. Mungkin besok', 'Capek juga jadi pemimpin'],
-    kepo: ['Wih {c}, serius amat. Udah sampe mana?', '{c}, butuh bantuan? Gw bisa kasih arahan', 'Lagi ngerjain apa {c}? Jelasin dong singkat aja', 'Gimana {c}, aman? Ada blocker?'],
-    jawabKepo: ['Bentar, gw lagi mikir strategi', 'Ini rahasia perusahaan, hehe', 'Nanti gw share di meeting'],
-    dipanggil: ['Oke oke, gw ke meja dulu', 'Waduh ada yang butuh gw nih'],
-    ditinggal: ['Lah, ditinggal. Ya udah', 'Oke, kita lanjut lain waktu'],
-    gakAda: ['Lho, {c} ke mana? Gw taro di mejanya aja', 'Kebiasaan nih {c}, mejanya kosong'],
-    nonton: ['WOY! Ini kantor, bukan ring tinju!', 'Waduh, waduh, ada apa ini?'],
-    lerai: ['Stop, stop! Kita ini satu tim! Salaman sekarang', 'Udah! Masalah kerjaan diomongin baik-baik. Gw nggak mau liat ini lagi', 'Kalian berdua ke ruangan gw abis ini. Sekarang bubar!'],
-    ngambek: ['Gw kecewa sama kalian berdua', 'Ini bakal masuk evaluasi, ya'],
-    rayakan: ['Mantap! Kerja bagus tim!', 'Gini dong, ini baru tim juara', 'Nanti gw traktir. Kapan-kapan'],
+    balas: ['Ya udah, buruan kerjain!', 'Hmm. Oke. Tapi jangan sampe telat lagi', 'Kok gw baru tau sekarang?! Harusnya lapor dari kemarin!', 'Alesan! Gw nggak mau denger alesan', 'Nah gitu dong. Dari tadi kek', 'Itu doang? Gw kira udah kelar', 'Oke, kita take offline. Tapi cepet!', 'Jangan bikin gw ngulang dua kali ya'],
+    lanjut: ['Pokoknya gw nggak mau tau, harus beres!', 'Gw pantau terus ya, jangan macem-macem', 'Gw udah bilang dari awal kan! Nggak ada yang dengerin!', 'Inget, deadline itu bukan saran'],
+    penutup: ['Udah, balik kerja sana!', 'Gw ke ruangan dulu. Pas gw balik harus udah beres', 'Gw liatin dari jauh ya. Jangan main HP', 'Kabarin progresnya. Tiap jam!'],
+    sendiri: ['Ini laporan kok angkanya kecil semua?!', 'Hmm, enaknya ekspansi ke kota mana ya', 'Siapa sih yang nyusun jadwal meeting ini?!', 'Kopi gw mana?! Perasaan tadi di sini', 'Tarik napas... tarik napas... sabar', 'Kenapa semua orang lambat banget hari ini'],
+    kopi: ['Kopi dulu, sebelum gw meledak', 'Siapa yang beli kopi sachet ini?! Kita harus upgrade', 'Tanpa kopi gw bisa marah dua kali lipat'],
+    pegel: ['Punggung gw pegel gara-gara mikirin kalian', 'Abis ini gw mau olahraga. Mungkin besok', 'Capek juga jadi satu-satunya yang mikir di sini'],
+    kepo: ['{c}! Udah sampe mana?! Dari tadi gw liat lo gitu-gitu aja', '{c}, itu kerjaan atau main game?', 'Lagi ngerjain apa {c}? Jelasin. Singkat. Sekarang', 'Gimana {c}, ada blocker? Jangan bilang nggak ada kalo telat'],
+    jawabKepo: ['Bentar! Gw lagi mikir strategi, jangan diganggu', 'Ini urusan bos, lo fokus kerjaan lo aja', 'Nanti gw share di meeting. Kalo gw inget'],
+    dipanggil: ['Apa lagi sih?! Oke oke, gw ke sana', 'Waduh ada yang butuh gw. Semoga bukan masalah'],
+    ditinggal: ['Heh! Gw belum selesai ngomong!', 'Ditinggal?! Awas ya lo'],
+    gakAda: ['{c} ke mana lagi?! Gw taro di mejanya aja', 'Kebiasaan nih {c}, mejanya kosong mulu'],
+    nonton: ['WOY! Ini kantor, bukan ring tinju!', 'APA-APAAN INI?!'],
+    lerai: ['STOP! Kita ini satu tim! Salaman sekarang!', 'Udah! Masalah kerjaan diomongin baik-baik. Gw nggak mau liat ini lagi!', 'Kalian berdua ke ruangan gw abis ini. SEKARANG. Bubar!'],
+    ngambek: ['Gw kecewa sama kalian berdua. KECEWA!', 'Ini bakal masuk evaluasi, ya. Gw catet'],
+    rayakan: ['Nah! Gini dong dari kemarin!', 'Akhirnya ada yang bener. Kerja bagus', 'Oke, nanti gw traktir. Kapan-kapan'],
   },
   planner: {
     gosip: [

@@ -43,11 +43,17 @@ function isiPdf(md) {
   return isi;
 }
 
+// Model AI (terutama GPT-OSS) suka nulis spasi khusus kayak U+202F ("Oktober 2026", "1 minggu") yang nggak ada di
+// font Roboto PDF, jadinya kotak & spasinya ilang. Semua jenis spasi dijadiin spasi biasa, karakter tak kelihatan dibuang.
+export const rapikanTeks = (teks) => String(teks ?? '').replace(/[\p{Zs}]/gu, ' ').replace(/[​-‍⁠﻿]/g, '');
+
 const tanggal = (d = new Date()) => d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
 export const namaFile = (judul, ext) => `${String(judul || 'laporan').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'laporan'}-${new Date().toISOString().slice(0, 10)}.${ext}`;
 
 // laporan: { judul, tugas, md, meta: [teks kecil, ...], dibuat: Date|string }
-export async function buatPdf({ judul, tugas, md, meta = [], dibuat }) {
+export async function buatPdf({ judul: judulAsli, tugas: tugasAsli, md: mdAsli, meta: metaAsli = [], dibuat }) {
+  const [judul, tugas, md] = [judulAsli, tugasAsli, mdAsli].map(rapikanTeks);
+  const meta = metaAsli.map(rapikanTeks);
   const [{ default: pdfMake }, { default: vfs }] = await Promise.all([import('pdfmake/build/pdfmake'), import('pdfmake/build/vfs_fonts')]);
   pdfMake.vfs = vfs;
   // Judul "# ..." dari Writer biasanya sama kayak judul kop, jadi nggak ditulis dua kali.

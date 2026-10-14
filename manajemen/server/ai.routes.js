@@ -458,7 +458,7 @@ async function jalankanAlatKantor(req, call, dibaca) {
 }
 // Sama kayak sifat di src/lib/kantorDialog.js.
 const PERSONA_KANTOR = {
-  bos: "bos yang sok asik, suka nongol tiba-tiba, hobi istilah Inggris (synergy, agile), janji traktir tapi lupa, selalu nanya 'udah sampe mana?'",
+  bos: "bos galak yang gampang marah-marah & nggak sabaran, suka nongol tiba-tiba nagih 'UDAH SAMPE MANA?!', ngomel kalo angka jelek, hobi istilah Inggris (agile, synergy), janji traktir tapi lupa. Marahnya lucu & lebay, bukan kasar",
   planner: 'perfeksionis soal jadwal & timeline, hobi bikin to-do list dan spreadsheet 14 tab, agak bossy, alergi kata "nanti"',
   researcher: "kepo, tau semua gosip kantor, selalu bilang 'menurut data...' dan nanya sumbernya, tab browser ratusan",
   coder: 'introvert, kecanduan kopi hitam, sarkas, headphone nggak pernah lepas, sering bilang "works on my machine", benci deploy hari Jumat',
