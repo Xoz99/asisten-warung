@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import router, { validateAction, redact, sanitasiAi, bacaGosip, jadwalBerikutnya, bacaJadwal, isiPlaceholder } from '../server/ai.routes.js';
+import router, { validateAction, redact, sanitasiAi, bacaGosip, jadwalBerikutnya, bacaJadwal, isiPlaceholder, pangkasPermintaan } from '../server/ai.routes.js';
 import { bulanKunci, pilihRoom, ringkasData, teksDataRoom } from '../server/kantorRoom.js';
 
 test('jadwal laporan Kantor: waktu jalan berikutnya dihitung pakai jam WIB', () => {
@@ -267,6 +267,58 @@ test('room kantor: data wajib room dibaca server pakai sesi pengguna sebelum ana
   } finally {
     globalThis.fetch = original;
     if (oldKey === undefined) delete process.env.GROQ_API_KEY; else process.env.GROQ_API_KEY = oldKey;
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+test('permintaan ke Groq dipangkas biar muat batas token per menit: hasil alat terpanjang dipotong duluan', () => {
+  const body = {
+    max_tokens: 1800,
+    messages: [
+      { role: 'system', content: 'S'.repeat(3000) },
+      { role: 'user', content: 'Rekap semua lead' },
+      { role: 'assistant', content: null, tool_calls: [{ id: 'c1', type: 'function', function: { name: 'tindakan', arguments: '{}' } }] },
+      { role: 'tool', tool_call_id: 'c1', content: 'x'.repeat(30000) },
+      { role: 'tool', tool_call_id: 'c2', content: 'y'.repeat(9000) },
+    ],
+  };
+  const p = pangkasPermintaan(body, 7600);
+  assert.ok(Math.ceil(JSON.stringify({ messages: p.messages }).length / 3) + 1800 <= 7600);
+  assert.equal(p.messages[0].content, body.messages[0].content);
+  assert.equal(p.messages[1].content, 'Rekap semua lead');
+  assert.match(p.messages[3].content, /^x+\n…\[DIPOTONG biar muat batas AI/);
+  assert.equal(p.messages[3].content.match(/DIPOTONG/g).length, 1);
+  // Aslinya nggak diubah (riwayat chat tetap utuh)
+  assert.equal(body.messages[3].content.length, 30000);
+  // Yang udah muat nggak disentuh
+  const kecil = { max_tokens: 100, messages: [{ role: 'user', content: 'halo' }] };
+  assert.deepEqual(pangkasPermintaan(kecil, 7600), kecil);
+});
+test('Groq nolak 413 (kegedean): dipangkas lebih ketat lalu dicoba lagi, bukan langsung gagal', async () => {
+  const app = express(); app.use(express.json());
+  app.use((req, res, next) => { req.admin = { id: 'besar' }; next(); });
+  app.use(router);
+  app.use((err, req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const original = globalThis.fetch;
+  const lama = { key: process.env.GROQ_API_KEY, models: process.env.GROQ_MODELS };
+  process.env.GROQ_API_KEY = 'test'; process.env.GROQ_MODELS = 'a';
+  const ukuran = [];
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).startsWith(origin)) return original(url, opts);
+    ukuran.push(opts.body.length);
+    if (ukuran.length === 1) return Response.json({ error: { message: 'Request too large' } }, { status: 413 });
+    return Response.json({ choices: [{ message: { role: 'assistant', content: 'muat' } }] });
+  };
+  try {
+    const res = await fetch(origin + '/ai/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'z'.repeat(5900) }) });
+    assert.equal(res.status, 200);
+    assert.equal((await res.json()).message, 'muat');
+    assert.equal(ukuran.length, 2);
+  } finally {
+    globalThis.fetch = original;
+    for (const [k, v] of [['GROQ_API_KEY', lama.key], ['GROQ_MODELS', lama.models]]) if (v === undefined) delete process.env[k]; else process.env[k] = v;
     await new Promise(resolve => server.close(resolve));
   }
 });

@@ -98,7 +98,7 @@ function RoomDivisi({ k, kantor, onMulai }) {
     <section className="adm-kartu kantor-room-kartu" ref={kartu}>
       <div className="adm-kartu-kepala">
         <h2>Room divisi</h2>
-        <span className="adm-redup">Klik room di lantai bawah buat nanya</span>
+        <span className="adm-redup">Klik room di lantai kantor buat nanya</span>
       </div>
       <div className="kantor-room">
         {ROOM.map((r) => {

@@ -136,11 +136,44 @@ export const daftarModel = () => (process.env.GROQ_MODELS || process.env.GROQ_MO
 // 30 detik (jatah harian model habis), langsung pindah ke model berikutnya.
 const TUNGGU_MAKS_DETIK = 30;
 const tunggu = (ms) => new Promise((r) => setTimeout(r, ms));
+// Free tier Groq juga nolak (413) satu permintaan yang lebih gede dari batas token per menit modelnya (8.000, dihitung
+// isi pesan + alat + max_tokens). Sebelum dikirim, isi pesan terpanjang (biasanya hasil baca data) dipotong setengah
+// berulang-ulang sampai muat. Token ditaksir 1 per 3 huruf JSON (bahasa Indonesia + JSON lebih boros dari Inggris).
+const BATAS_TOKEN_PERMINTAAN = () => Number(process.env.GROQ_BATAS_TOKEN || 7600);
+const taksirToken = (body) => Math.ceil(JSON.stringify({ messages: body.messages, tools: body.tools }).length / 3) + (body.max_tokens || 0);
+const TANDA_POTONG = '\n…[DIPOTONG biar muat batas AI. Kalau butuh detail, persempit pakai filter/query.]';
+export function pangkasPermintaan(body, batas = BATAS_TOKEN_PERMINTAAN()) {
+  const messages = body.messages.map((m) => ({ ...m }));
+  const hasil = { ...body, messages };
+  // Pesan sistem & pesan pengguna terakhir dijaga utuh selama masih ada yang lain buat dipotong.
+  const terakhirUser = messages.findLastIndex((m) => m.role === 'user');
+  for (let putaran = 0; putaran < 40 && taksirToken(hasil) > batas; putaran++) {
+    const calon = messages
+      .map((m, i) => ({ i, n: typeof m.content === 'string' ? m.content.length : 0 }))
+      .filter(({ i, n }) => n > 600 && messages[i].role !== 'system')
+      .sort((a, b) => (a.i === terakhirUser) - (b.i === terakhirUser) || b.n - a.n);
+    if (!calon.length) break;
+    const m = messages[calon[0].i];
+    const isi = m.content.endsWith(TANDA_POTONG) ? m.content.slice(0, -TANDA_POTONG.length) : m.content;
+    // Potong secukupnya (kelebihan token x 3 huruf + cadangan), paling dikit setengah kalau ternyata masih kurang.
+    const lebih = (taksirToken(hasil) - batas) * 3 + 400;
+    m.content = isi.slice(0, Math.max(300, Math.min(isi.length - lebih, putaran ? Math.floor(isi.length / 2) : Infinity))) + TANDA_POTONG;
+  }
+  return hasil;
+}
 async function tanyaModel(body) {
+  let batas = BATAS_TOKEN_PERMINTAAN();
+  body = pangkasPermintaan(body, batas);
   let terakhir = null;
   for (const model of daftarModel()) {
     for (let coba = 0; coba < 3; coba++) {
       terakhir = await panggilGroq(model, body);
+      // Taksiran token meleset (data JSON padat): pangkas lebih ketat, coba lagi di model yang sama.
+      if (terakhir.status === 413 && batas > 3000) {
+        batas = Math.floor(batas * 0.7);
+        body = pangkasPermintaan(body, batas);
+        continue;
+      }
       const detik = Number(terakhir.headers.get('retry-after'));
       if (terakhir.status !== 429 || !(detik > 0 && detik <= TUNGGU_MAKS_DETIK)) break;
       await tunggu(detik * 1000 + 250);
