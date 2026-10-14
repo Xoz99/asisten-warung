@@ -77,7 +77,7 @@ export default function KantorJadwal({ api, aktif, onBuka, onSelesai }) {
           + Jadwal
         </button>
       </div>
-      {!aktif && <p className="adm-redup">Laporan otomatis butuh AI aktif (OPENROUTER_API_KEY di server).</p>}
+      {!aktif && <p className="adm-redup">Laporan otomatis butuh AI aktif (GROQ_API_KEY di server).</p>}
       {galat && (
         <p className="adm-error" role="alert">
           {galat}

@@ -123,41 +123,44 @@ const tools = [
   tool('lampirkan', 'Lampirkan file dari server ke chat (CV/foto kandidat, foto kunjungan, foto warung, foto sales, file artifact) supaya pengguna bisa buka/unduh. Pakai kalau pengguna minta file/CV/foto/dokumen. path: /rekrutmen/dokumen/{id dokumen}, /lapangan/foto/{id foto}, /leads/{id lead}/foto, /tim-sales/{id akun}/foto, atau /artifact/{id artifact}. Ambil id dari data dulu, jangan ngarang.', { path: { type: 'string' }, nama: { type: 'string', description: 'Nama file buat ditampilkan' } }, ['path']),
   tool('tindakan', 'Baca data (GET) atau siapkan perubahan untuk ditinjau pengguna. Perubahan BELUM dijalankan sampai tombol pengguna ditekan.', { method: { type: 'string', enum: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'] }, path: { type: 'string' }, query: { type: 'object' }, body: { type: 'object' }, ringkasan: { type: 'string', description: 'Jelaskan dampak, nama target, dan nilai perubahan dalam bahasa Indonesia.' } }, ['method', 'path', 'ringkasan']),
 ];
-// Model: OPENROUTER_MODELS (dipisah koma, urutan = cadangan kalau yang depan penuh/mati) atau OPENROUTER_MODEL.
-// Default model gratis yang bisa pakai tools; OpenRouter pindah otomatis ke model berikutnya kalau yang depan gagal.
-// Diurutin dari hasil uji (Sep 2026): Ling 3.0 Flash paling akurat & cepat buat soal data Makalin, Nemotron Super cadangan
-// cepat, openrouter/free milih sendiri dari model gratis yang diizinin guardrail akun.
-const MODEL_BAWAAN = [
-  'inclusionai/ling-3.0-flash-vl:free',
-  'nvidia/nemotron-3-super-120b-a12b:free',
-  'google/gemma-4-31b-it:free',
-  'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
-  'openrouter/free',
-];
-// Maks 6 model. OpenRouter cuma nerima 3 model per permintaan, jadi dipecah jadi putaran 3-3: putaran berikutnya dicoba
-// kalau semua model di putaran sebelumnya penuh/diblokir/error.
-export const daftarModel = () => (process.env.OPENROUTER_MODELS || process.env.OPENROUTER_MODEL || MODEL_BAWAAN.join(',')).split(',').map((m) => m.trim()).filter(Boolean).slice(0, 6);
-const putaranModel = () => {
-  const m = daftarModel();
-  return [m.slice(0, 3), m.slice(3, 6)].filter((g) => g.length);
-};
+// Model: GROQ_MODELS (dipisah koma, urutan = cadangan kalau yang depan penuh/mati) atau GROQ_MODEL.
+// Default model Groq yang bisa pakai tools (dicek Okt 2026): GPT-OSS 120B paling pinter, Qwen 3.8 27B cepat & rajin
+// manggil alat, GPT-OSS 20B cadangan terakhir. Batas gratis Groq dihitung per model, jadi model berikutnya masih
+// bisa dipakai waktu yang depan kena 429.
+const MODEL_BAWAAN = ['openai/gpt-oss-120b', 'qwen/qwen3.8-27b', 'openai/gpt-oss-20b'];
+// Maks 6 model, dicoba satu-satu (Groq nggak punya fallback model otomatis).
+export const daftarModel = () => (process.env.GROQ_MODELS || process.env.GROQ_MODEL || MODEL_BAWAAN.join(',')).split(',').map((m) => m.trim()).filter(Boolean).slice(0, 6);
+// Free tier Groq dibatasi token per menit, jadi 429 biasanya cuma suruh nunggu beberapa detik (header retry-after).
+// Ditungguin aja (jawaban jadi agak lama, tapi nggak gagal), maks 3x per model. Kalau disuruh nunggu lebih dari
+// 30 detik (jatah harian model habis), langsung pindah ke model berikutnya.
+const TUNGGU_MAKS_DETIK = 30;
+const tunggu = (ms) => new Promise((r) => setTimeout(r, ms));
 async function tanyaModel(body) {
   let terakhir = null;
-  for (const grup of putaranModel()) {
-    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      signal: AbortSignal.timeout(45000),
-      headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: grup[0], ...(grup.length > 1 ? { models: grup } : {}), ...body }),
-    });
-    // 401/402 = masalah akun (key/saldo), putaran lain juga bakal sama - langsung balikin.
-    if (r.ok || [400, 401, 402].includes(r.status)) return r;
-    terakhir = r;
+  for (const model of daftarModel()) {
+    for (let coba = 0; coba < 3; coba++) {
+      terakhir = await panggilGroq(model, body);
+      const detik = Number(terakhir.headers.get('retry-after'));
+      if (terakhir.status !== 429 || !(detik > 0 && detik <= TUNGGU_MAKS_DETIK)) break;
+      await tunggu(detik * 1000 + 250);
+    }
+    // 401/403 = masalah key/akun, model lain juga bakal sama - langsung balikin. 400 tetap lanjut: Groq ngasih 400
+    // (tool_use_failed) kalau model salah nulis panggilan alat, model lain biasanya bener.
+    if (terakhir.ok || [401, 403].includes(terakhir.status)) return terakhir;
   }
   return terakhir;
 }
+function panggilGroq(model, body) {
+  return fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    signal: AbortSignal.timeout(45000),
+    headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+    // GPT-OSS mikir dulu dan token mikirnya ikut max_tokens - dipendekin biar jawabannya nggak kepotong.
+    body: JSON.stringify({ model, ...(model.startsWith('openai/gpt-oss') ? { reasoning_effort: 'low' } : {}), ...body }),
+  });
+}
 const pesanGagalModel = (status) =>
-  status === 402 ? 'Saldo OpenRouter tidak cukup.' : status === 401 ? 'API key OpenRouter ditolak.' : status === 404 ? 'Model tidak tersedia atau diblokir aturan akun OpenRouter. Periksa OPENROUTER_MODEL di server.' : status === 429 ? 'Model AI gratis lagi penuh atau jatah harian akun OpenRouter udah habis (dipakai bareng semua admin). Coba lagi nanti; jatahnya reset otomatis tiap hari.' : 'OpenRouter sedang tidak tersedia. Coba lagi.';
+  status === 401 || status === 403 ? 'API key Groq ditolak.' : status === 404 ? 'Model tidak tersedia di akun Groq. Periksa GROQ_MODEL di server.' : status === 413 ? 'Data yang dikirim ke AI kebanyakan buat batas akun Groq. Persempit pertanyaannya.' : status === 429 ? 'Model AI lagi penuh atau jatah akun Groq udah habis (dipakai bareng semua admin). Coba lagi sebentar lagi.' : 'Groq sedang tidak tersedia. Coba lagi.';
 // Batas harian (reset 00.00 WIB): pesan per admin (AI_PESAN_HARIAN, default 50) dan token semua admin (AI_TOKEN_HARIAN, 0 = tanpa batas).
 const batasPesan = () => Number(process.env.AI_PESAN_HARIAN ?? 50);
 const batasToken = () => Number(process.env.AI_TOKEN_HARIAN ?? 0);
@@ -193,7 +196,7 @@ const catatPemakaian = (adminId, pesan, token) =>
 
 const router = Router();
 router.use('/ai', rateLimit({ windowMs: 60000, limit: 20, standardHeaders: true, legacyHeaders: false, keyGenerator: (req) => 'admin:' + (req.admin?.id || 'anon'), message: { error: 'Terlalu banyak permintaan AI. Coba sebentar lagi.' } }));
-router.get('/ai/status', async (req, res) => res.json({ aktif: Boolean(process.env.OPENROUTER_API_KEY), model: daftarModel()[0], cadangan: daftarModel().slice(1), jatah: await jatahHariIni(req.admin?.id) }));
+router.get('/ai/status', async (req, res) => res.json({ aktif: Boolean(process.env.GROQ_API_KEY), model: daftarModel()[0], cadangan: daftarModel().slice(1), jatah: await jatahHariIni(req.admin?.id) }));
 // ---- Riwayat chat (disimpan permanen per admin) ----
 // Yang disimpan cuma pesan pengguna & jawaban AI (plus lampiran), bukan data mentah hasil alat. Percakapan yang dibuka
 // lagi dilanjutin dari 40 pesan terakhirnya. Riwayat lebih dari 180 hari dibersihin.
@@ -319,7 +322,7 @@ router.post('/ai/chat', async (req, res, next) => {
   let s;
   let panjangAwal = null;
   try {
-    if (!process.env.OPENROUTER_API_KEY) throw error('Isi OPENROUTER_API_KEY di server untuk mengaktifkan AI.', 503);
+    if (!process.env.GROQ_API_KEY) throw error('Isi GROQ_API_KEY di server untuk mengaktifkan AI.', 503);
     if (typeof req.body.message !== 'string' || !req.body.message.trim() || req.body.message.length > 6000) throw error('Pesan wajib diisi, maksimal 6000 karakter.');
     s = await session(req, true);
     if (s.pending) throw error('Jalankan atau batalkan tindakan sebelumnya dulu.', 409);
@@ -478,7 +481,7 @@ export function bacaGosip(teks) {
 }
 
 async function tanyaKantor(req, body) {
-  if (!process.env.OPENROUTER_API_KEY) throw error('Isi OPENROUTER_API_KEY di server untuk mengaktifkan AI.', 503);
+  if (!process.env.GROQ_API_KEY) throw error('Isi GROQ_API_KEY di server untuk mengaktifkan AI.', 503);
   const jatah = await jatahHariIni(req.admin.id);
   if (jatah && jatah.batasToken > 0 && jatah.token >= jatah.batasToken) throw error('Jatah token AI tim hari ini udah habis. Reset jam 00.00 WIB.', 429);
   const r = await tanyaModel(body);
@@ -703,7 +706,7 @@ async function jalankanJadwal(j) {
   let galat = null;
   let laporanId = null;
   try {
-    if (!process.env.OPENROUTER_API_KEY) throw error('AI belum aktif: OPENROUTER_API_KEY di server masih kosong');
+    if (!process.env.GROQ_API_KEY) throw error('AI belum aktif: GROQ_API_KEY di server masih kosong');
     const a = (await query('SELECT * FROM mj_admin WHERE id=$1', [j.admin_id])).rows[0];
     if (!a || !a.aktif || a.peran === 'sales') throw error('Admin pemilik jadwal udah nonaktif. Simpan ulang jadwalnya biar jalan atas nama admin lain.');
     const jatah = await jatahHariIni(a.id);
@@ -835,7 +838,7 @@ router.delete('/ai/kantor/jadwal/:id', async (req, res, next) => {
 router.post('/ai/kantor/jadwal/:id/jalankan', async (req, res, next) => {
   try {
     if (!POLA_ID.test(req.params.id)) throw error('Jadwal nggak ditemukan', 404);
-    if (!process.env.OPENROUTER_API_KEY) throw error('Isi OPENROUTER_API_KEY di server untuk mengaktifkan AI.', 503);
+    if (!process.env.GROQ_API_KEY) throw error('Isi GROQ_API_KEY di server untuk mengaktifkan AI.', 503);
     const r = await dbLaporan(
       "UPDATE mj_kantor_jadwal SET berikutnya=now(), admin_id=$2, admin_nama=$3 WHERE id=$1 AND NOT (COALESCE(status_terakhir, '')='jalan' AND berikutnya IS NULL) RETURNING id",
       [req.params.id, req.admin.id, req.admin.nama || null]
@@ -848,8 +851,8 @@ router.post('/ai/kantor/jadwal/:id/jalankan', async (req, res, next) => {
   }
 });
 
-// Gosip cuma hiburan, tapi makan kuota model yang sama kayak analisa (model gratis OpenRouter dijatah per hari per akun).
-// Jadi: paling cepat sekali tiap 2 menit per admin, dan kalau OpenRouter nolak karena kuota (429), gosip AI libur 30 menit
+// Gosip cuma hiburan, tapi makan kuota model yang sama kayak analisa (akun gratis Groq dijatah per menit & per hari).
+// Jadi: paling cepat sekali tiap 2 menit per admin, dan kalau Groq nolak karena kuota (429), gosip AI libur 30 menit
 // buat semua admin. Ditolak = tampilan pakai dialog bawaan.
 const gosipTerakhir = new Map();
 let gosipLiburSampai = 0;

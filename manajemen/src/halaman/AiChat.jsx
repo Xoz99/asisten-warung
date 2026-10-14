@@ -320,7 +320,7 @@ export default function AiChat({ api }) {
                   </button>
                 ))}
               </div>
-              {status && !status.aktif && <p className="adm-error">AI belum aktif. Isi OPENROUTER_API_KEY di konfigurasi server.</p>}
+              {status && !status.aktif && <p className="adm-error">AI belum aktif. Isi GROQ_API_KEY di konfigurasi server.</p>}
             </div>
           ) : (
             messages.map((m, i) => (
@@ -386,7 +386,7 @@ export default function AiChat({ api }) {
           />
           <button type="submit" disabled={kunci || Boolean(pending) || !status?.aktif || !input.trim()} aria-label="Kirim">Kirim</button>
         </form>
-        <p className="ai-catatan">Enter kirim · Shift+Enter baris baru · data yang diperlukan dikirim ke OpenRouter (data pribadi disaring)</p>
+        <p className="ai-catatan">Enter kirim · Shift+Enter baris baru · data yang diperlukan dikirim ke Groq (data pribadi disaring)</p>
       </div>
     </section>
   );

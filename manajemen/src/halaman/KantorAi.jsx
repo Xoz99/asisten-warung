@@ -84,7 +84,7 @@ export default function KantorAi({ api, admin, kantor }) {
   const [tugas, setTugas] = useState('');
   const [template, setTemplate] = useState(null);
   const [revisi, setRevisi] = useState(true);
-  // Default mati: gosip AI makan kuota model yang sama kayak analisa (model gratis OpenRouter dijatah per hari).
+  // Default mati: gosip AI makan kuota model yang sama kayak analisa (akun gratis Groq dijatah per menit & per hari).
   const [gosipAi, setGosipAi] = useState(false);
   const [, setDetak] = useState(0);
   const [riwayat, setRiwayat] = useState(null);
@@ -228,7 +228,7 @@ export default function KantorAi({ api, admin, kantor }) {
 
       {k.status && !aktif && (
         <p className="kantor-catatan">
-          <b>Mode demo:</b> <code>OPENROUTER_API_KEY</code> belum diisi di server, jadi laporannya contoh dari ringkasan dashboard.
+          <b>Mode demo:</b> <code>GROQ_API_KEY</code> belum diisi di server, jadi laporannya contoh dari ringkasan dashboard.
         </p>
       )}
       {pesan && (

@@ -51,12 +51,12 @@ test('agent proposes writes, isolates owners, consumes actions once, and forward
   await new Promise(resolve => server.once('listening', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
   const original = globalThis.fetch;
-  const oldKey = process.env.OPENROUTER_API_KEY;
-  process.env.OPENROUTER_API_KEY = 'test';
+  const oldKey = process.env.GROQ_API_KEY;
+  process.env.GROQ_API_KEY = 'test';
   let writes = 0;
   globalThis.fetch = async (url, opts) => {
     if (String(url).startsWith(origin)) return original(url, opts);
-    if (String(url).startsWith('https://openrouter.ai/')) return Response.json({ choices: [{ message: { role: 'assistant', tool_calls: [{ id: 'call1', type: 'function', function: { name: 'tindakan', arguments: JSON.stringify({ method: 'POST', path: '/leads', body: { perusahaan: 'Test' }, ringkasan: 'Tambah lead Test' }) } }] } }] });
+    if (String(url).startsWith('https://api.groq.com/')) return Response.json({ choices: [{ message: { role: 'assistant', tool_calls: [{ id: 'call1', type: 'function', function: { name: 'tindakan', arguments: JSON.stringify({ method: 'POST', path: '/leads', body: { perusahaan: 'Test' }, ringkasan: 'Tambah lead Test' }) } }] } }] });
     writes++;
     assert.equal(opts.headers.Authorization, 'Bearer caller');
     assert.equal(new URL(url).hostname, '127.0.0.1');
@@ -82,11 +82,11 @@ test('agent proposes writes, isolates owners, consumes actions once, and forward
     assert.equal(writes, 1);
   } finally {
     globalThis.fetch = original;
-    if (oldKey === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = oldKey;
+    if (oldKey === undefined) delete process.env.GROQ_API_KEY; else process.env.GROQ_API_KEY = oldKey;
     await new Promise(resolve => server.close(resolve));
   }
 });
-test('model dicoba per putaran: putaran 1 penuh (429) -> putaran 2 dipakai', async () => {
+test('limit per menit (429 + retry-after pendek) ditungguin di model yang sama; jatah habis / salah panggil alat -> model berikutnya', async () => {
   const app = express(); app.use(express.json());
   app.use((req, res, next) => { req.admin = { id: 'putaran' }; next(); });
   app.use(router);
@@ -95,25 +95,27 @@ test('model dicoba per putaran: putaran 1 penuh (429) -> putaran 2 dipakai', asy
   await new Promise(resolve => server.once('listening', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
   const original = globalThis.fetch;
-  const lama = { key: process.env.OPENROUTER_API_KEY, model: process.env.OPENROUTER_MODEL, models: process.env.OPENROUTER_MODELS };
-  process.env.OPENROUTER_API_KEY = 'test'; process.env.OPENROUTER_MODEL = ''; process.env.OPENROUTER_MODELS = 'a,b,c,d,e';
+  const lama = { key: process.env.GROQ_API_KEY, model: process.env.GROQ_MODEL, models: process.env.GROQ_MODELS };
+  process.env.GROQ_API_KEY = 'test'; process.env.GROQ_MODEL = ''; process.env.GROQ_MODELS = 'a,b,c,d,e';
   const dikirim = [];
   globalThis.fetch = async (url, opts) => {
     if (String(url).startsWith(origin)) return original(url, opts);
     const body = JSON.parse(opts.body);
-    dikirim.push(body.models || [body.model]);
-    if (dikirim.length === 1) return Response.json({ error: { message: 'penuh' } }, { status: 429 });
-    return Response.json({ choices: [{ message: { role: 'assistant', content: 'halo dari putaran dua' } }] });
+    dikirim.push(body.model);
+    if (dikirim.length === 1) return Response.json({ error: { message: 'limit per menit' } }, { status: 429, headers: { 'retry-after': '1' } });
+    if (dikirim.length === 2) return Response.json({ error: { message: 'jatah harian habis' } }, { status: 429, headers: { 'retry-after': '3600' } });
+    if (dikirim.length === 3) return Response.json({ error: { code: 'tool_use_failed' } }, { status: 400 });
+    return Response.json({ choices: [{ message: { role: 'assistant', content: 'halo dari model ketiga' } }] });
   };
   try {
     const res = await fetch(origin + '/ai/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'halo' }) });
     const data = await res.json();
     assert.equal(res.status, 200);
-    assert.equal(data.message, 'halo dari putaran dua');
-    assert.deepEqual(dikirim, [['a', 'b', 'c'], ['d', 'e']]);
+    assert.equal(data.message, 'halo dari model ketiga');
+    assert.deepEqual(dikirim, ['a', 'a', 'b', 'c']);
   } finally {
     globalThis.fetch = original;
-    for (const [k, v] of [['OPENROUTER_API_KEY', lama.key], ['OPENROUTER_MODEL', lama.model], ['OPENROUTER_MODELS', lama.models]]) if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    for (const [k, v] of [['GROQ_API_KEY', lama.key], ['GROQ_MODEL', lama.model], ['GROQ_MODELS', lama.models]]) if (v === undefined) delete process.env[k]; else process.env[k] = v;
     await new Promise(resolve => server.close(resolve));
   }
 });
@@ -122,7 +124,7 @@ test('gosip kantor: JSON dari model dibaca, sisanya dibuang', () => {
   assert.deepEqual(bacaGosip('bukan json'), []);
   assert.deepEqual(bacaGosip('[{"who":"A","text":"Kopi dulu ☕ biar waras 😂"},{"who":"B","text":"🙄"}]'), [{ who: 'A', text: 'Kopi dulu biar waras' }]);
 });
-test('kantor: peran dicek, kerja & gosip lewat OpenRouter, gosip dijatah per admin', async () => {
+test('kantor: peran dicek, kerja & gosip lewat Groq, gosip dijatah per admin', async () => {
   const app = express(); app.use(express.json());
   app.use((req, res, next) => { req.admin = { id: 'kantor', nama: 'Andri' }; next(); });
   app.use(router);
@@ -131,8 +133,8 @@ test('kantor: peran dicek, kerja & gosip lewat OpenRouter, gosip dijatah per adm
   await new Promise(resolve => server.once('listening', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
   const original = globalThis.fetch;
-  const oldKey = process.env.OPENROUTER_API_KEY;
-  process.env.OPENROUTER_API_KEY = 'test';
+  const oldKey = process.env.GROQ_API_KEY;
+  process.env.GROQ_API_KEY = 'test';
   const dikirim = [];
   const dataDibaca = [];
   globalThis.fetch = async (url, opts) => {
@@ -188,7 +190,7 @@ test('kantor: peran dicek, kerja & gosip lewat OpenRouter, gosip dijatah per adm
     assert.doesNotMatch(alat[1], /6281234567890|3201/);
   } finally {
     globalThis.fetch = original;
-    if (oldKey === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = oldKey;
+    if (oldKey === undefined) delete process.env.GROQ_API_KEY; else process.env.GROQ_API_KEY = oldKey;
     await new Promise(resolve => server.close(resolve));
   }
 });

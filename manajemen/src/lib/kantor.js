@@ -978,7 +978,7 @@ function buatKantor(namaBos) {
     }
   }, 500);
 
-  // Mode demo (tanpa OPENROUTER_API_KEY): contoh laporan analisa pakai angka ringkasan asli kalau udah kemuat.
+  // Mode demo (tanpa GROQ_API_KEY): contoh laporan analisa pakai angka ringkasan asli kalau udah kemuat.
   function jawabDemo(id, tugas) {
     const f = setelan.fakta || {};
     const ada = (v) => v != null;
@@ -998,7 +998,7 @@ function buatKantor(namaBos) {
     }
     if (id === 'reviewer') return putaranReview++ === 0 ? 'REVISE\n- Selisih pemasukan dan pengeluaran belum dihitung' : 'APPROVED\n- Angka cocok sama ringkasan dashboard';
     const angka = jawabDemo('coder', tugas);
-    return `# Laporan analisa Konsulin\n\n## Ringkasan eksekutif\nIni contoh laporan dari mode demo, disusun dari ringkasan dashboard Makalin. Analisa mendalam per data butuh AI aktif.\n\n## Angka kunci\n${angka}\n\n## Temuan\n- ${ada(f.warungLangganan) ? `Baru ${f.warungLangganan} warung yang langganan.` : 'Data warung belum kemuat.'}\n- ${ada(f.leadStuck) ? `${f.leadStuck} lead CRM nyangkut di tahap stuck.` : 'Data CRM belum kemuat.'}\n\n## Rekomendasi\n1. Follow-up warung yang trial-nya habis.\n2. Tindak lanjuti lead yang stuck minggu ini.\n\n## Catatan data\nMode demo: belum dianalisa AI. Isi OPENROUTER_API_KEY buat laporan lengkap.`;
+    return `# Laporan analisa Konsulin\n\n## Ringkasan eksekutif\nIni contoh laporan dari mode demo, disusun dari ringkasan dashboard Makalin. Analisa mendalam per data butuh AI aktif.\n\n## Angka kunci\n${angka}\n\n## Temuan\n- ${ada(f.warungLangganan) ? `Baru ${f.warungLangganan} warung yang langganan.` : 'Data warung belum kemuat.'}\n- ${ada(f.leadStuck) ? `${f.leadStuck} lead CRM nyangkut di tahap stuck.` : 'Data CRM belum kemuat.'}\n\n## Rekomendasi\n1. Follow-up warung yang trial-nya habis.\n2. Tindak lanjuti lead yang stuck minggu ini.\n\n## Catatan data\nMode demo: belum dianalisa AI. Isi GROQ_API_KEY buat laporan lengkap.`;
   }
 
   async function kerjakan(id, prompt, judul = JUDUL_LANGKAH[id]) {
