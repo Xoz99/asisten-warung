@@ -225,3 +225,12 @@ export function obrolanData(a, b, f) {
   }
   return baris;
 }
+
+// Angka jelek yang bikin Bos ngamuk, plus siapa yang pertama disemprot (yang pegang angka itu).
+const PEMILIK_TOPIK = { langganan: 'produk', trialHabis: 'produk', tagihan: 'akuntan', kas: 'akuntan', lead: 'sales', rekrutmen: 'hrd', saldo: 'akuntan' };
+export function topikMarah(f) {
+  if (!f) return [];
+  return Object.keys(PEMILIK_TOPIK)
+    .filter((k) => TOPIK[k].ada(f) && !TOPIK[k].bagus(f))
+    .map((k) => ({ kunci: k, pemilik: PEMILIK_TOPIK[k], angka: FAKTA[k](f) }));
+}

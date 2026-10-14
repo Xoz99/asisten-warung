@@ -1,8 +1,8 @@
 // Mesin halaman Kantor Konsulin: lantai kantor pixel art di <canvas>, karakter yang jalan, kerja, dan ngegosip.
 // Teks (nama, balon obrolan, emote) ditaruh di lapisan HTML di atas canvas biar tetap tajam waktu canvas diperbesar.
 import { ID_ROOM, ROOM_KANTOR, pilihRoom, promptTim } from '../../server/kantorRoom.js';
-import { COLEK, COLEK_KERJA, GOSIP_KEJADIAN, PENONTON, PS, RIBUT, SERAH, SIFAT, SOAL_YANG_KERJA, TERIAK_RIBUT } from './kantorDialog.js';
-import { obrolanData, ringkasFakta, rupiahPendek } from './kantorData.js';
+import { BALAS_DUMEL, COLEK, COLEK_KERJA, DIPANGGIL_BOS, DUMEL, GOSIP_KEJADIAN, NGAMUK, PASRAH, PENONTON, PS, RIBUT, SALAHIN, SERAH, SIFAT, SOAL_YANG_KERJA, TERIAK_RIBUT } from './kantorDialog.js';
+import { obrolanData, ringkasFakta, rupiahPendek, topikMarah } from './kantorData.js';
 // Lantai utama selalu 320x200. Room divisi (80x92, isi room digambar relatif ke pojok kiri atasnya) ditaruh beda
 // tergantung layar:
 // - lebar (desktop/tablet): room 2x2 di kanan lantai utama, tembok x 320-328, lorong di tengah (y 98-106) nyambung
@@ -1178,11 +1178,101 @@ function buatKantor(namaBos) {
     if (masih()) await pulang(a);
   }
 
+  // Bos ngamuk liat angka jelek (data asli): nyamperin yang pegang angkanya & nyemprot, yang disemprot nyalahin
+  // orang lain, Bos teriak manggil yang disalahin dan dia nyamperin. Bisa dilempar lagi (maks 2x), lalu ada yang pasrah,
+  // Bos bubarin, dan yang jadi kambing hitam ngedumel ke yang nyalahin.
+  const teriakNama = (n) => n.toUpperCase() + n.slice(-1).toUpperCase().repeat(2);
+  const hadap = (a, b) => (a.arah = b.x < a.x ? 'kiri' : 'kanan');
+  async function bosNgamuk(bos, masih) {
+    // Dipanggil Bos ya dateng, walau lagi ngobrol/ngopi/main PS (kegiatannya ditinggal). Yang lagi ngerjain tugas aja yang aman.
+    const bisaDipanggil = (o) => o && o !== bos && !o.sibuk;
+    const topik = topikMarah(setelan.fakta).filter((t) => bisaDipanggil(orang[t.pemilik]));
+    const t = topik.length ? pilih(topik) : null;
+    const calon = semua().filter((o) => bisaDipanggil(o) && SALAHIN[o.id]);
+    const a = t ? orang[t.pemilik] : calon.length ? pilih(calon) : null;
+    if (!a) return diMeja(bos, masih);
+    const token = new Map([[a, ambilSantai(a)]]);
+    const hidup = () => masih() && [...token].every(([o, tk]) => o.tok === tk);
+    const terlibat = [a];
+    const panas = (o, ms = 3500) => (o.marahSampai = performance.now() + ms);
+    try {
+      kegiatan(bos, `Nyemprot ${a.nama}`);
+      kegiatan(a, 'Dimarahin Bos');
+      bos.emote('marah', 2000);
+      const sisi = bos.x < a.x ? -1 : 1;
+      if (!(await bos.jalanKe(batasX(a.x + sisi * 16), a.y)) || !hidup()) return;
+      if (a.keadaan === 'duduk') a.keadaan = 'berdiri';
+      hadap(bos, a);
+      hadap(a, bos);
+      panas(bos);
+      bos.emote('teriak', 2500);
+      await bos.bilang(isi(pilih(t ? NGAMUK.buka : NGAMUK.bukaUmum), { b: a.nama, n: t?.angka || '' }), 5000);
+      const penonton = semua().filter((o) => !terlibat.includes(o) && o !== bos && bebas(o));
+      penonton.forEach((o) => o.emote('kaget', 2000));
+      if (penonton.length && Math.random() < 0.5) pilih(penonton).bilang(pilih(NGAMUK.nonton));
+      // Posisi berdiri yang dipanggil: sisi lain Bos, lalu depannya.
+      const tempat = [{ x: -sisi * 16, y: 0 }, { x: 0, y: 14 }];
+      let sekarang = a;
+      for (let lempar = 0; hidup(); lempar++) {
+        sekarang.emote('keringat', 2500);
+        const opsi = (SALAHIN[sekarang.id] || []).filter((s) => bisaDipanggil(orang[s.ke]) && !terlibat.includes(orang[s.ke]) && (!s.topik || s.topik.includes(t?.kunci)));
+        if (!opsi.length || lempar >= 2 || (lempar > 0 && Math.random() < 0.45)) break;
+        const s = pilih(opsi);
+        const c = orang[s.ke];
+        await sekarang.bilang(isi(s.teks, { c: c.nama }));
+        if (!hidup()) return;
+        token.set(c, ambilSantai(c));
+        terlibat.push(c);
+        kegiatan(c, 'Dipanggil Bos');
+        panas(bos);
+        bos.emote('teriak', 2600);
+        await bos.bilang(isi(pilih(NGAMUK.teriak), { C: teriakNama(c.nama) }), 2600);
+        semua()
+          .filter((o) => !terlibat.includes(o) && o !== bos)
+          .forEach((o) => o.emote('kaget', 1500));
+        c.emote('kaget', 1500);
+        c.bilang(pilih(DIPANGGIL_BOS[c.id] || DIPANGGIL_BOS.planner));
+        const p = tempat[lempar] || tempat[0];
+        if (!(await c.jalanKe(batasX(bos.x + p.x), bos.y + p.y)) || !hidup()) return;
+        hadap(c, bos);
+        hadap(bos, c);
+        panas(bos);
+        bos.emote('marah', 2500);
+        await bos.bilang(isi(pilih(NGAMUK.semprot), { b: sekarang.nama }));
+        sekarang = c;
+      }
+      if (!hidup()) return;
+      sekarang.emote('sedih', 2500);
+      await sekarang.bilang(pilih(PASRAH[sekarang.id] || PASRAH.planner));
+      if (!hidup()) return;
+      panas(bos, 2500);
+      bos.emote('marah', 2500);
+      await bos.bilang(pilih(NGAMUK.tutup));
+      bos.marahSampai = 0;
+      if (terlibat.length > 1 && hidup()) {
+        const korban = terlibat.at(-1);
+        const pelaku = terlibat.at(-2);
+        hadap(korban, pelaku);
+        hadap(pelaku, korban);
+        korban.emote('sebel', 2500);
+        await korban.bilang(isi(pilih(DUMEL), { b: pelaku.nama }));
+        if (hidup() && Math.random() < 0.6) {
+          pelaku.emote(pilih(['bisik', 'keringat']), 2000);
+          await pelaku.bilang(pilih(BALAS_DUMEL));
+        }
+      }
+    } finally {
+      bos.marahSampai = 0;
+      for (const [o, tk] of token) if (o.tok === tk) pulang(o).then(() => lepasSantai(o, tk));
+    }
+    if (masih()) await pulang(bos);
+  }
+
   const KEGIATAN = [[26, ngobrol], [12, ngopi], [10, jalanJalan], [20, diMeja], [10, kepoin], [6, pegel], [8, ribut], [8, mainPS]];
   async function santai(o) {
     const tok = ambilSantai(o);
     try {
-      await pilihBerbobot(KEGIATAN)(o, () => o.tok === tok);
+      await (o.id === 'bos' && Math.random() < 0.3 ? bosNgamuk : pilihBerbobot(KEGIATAN))(o, () => o.tok === tok);
     } finally {
       lepasSantai(o, tok);
     }

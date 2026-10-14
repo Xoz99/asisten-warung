@@ -320,6 +320,57 @@ export const COLEK = {
 };
 export const COLEK_KERJA = ['Bentar! Lagi kerja!', 'Nanti dulu, lagi ngerjain tugas Bos', 'Jangan ganggu, lagi fokus nih'];
 
+// Adegan "Bos ngamuk": Bos nyemprot yang pegang angka jelek, yang disemprot nyalahin orang lain, Bos teriak manggil
+// yang disalahin, dia nyamperin, kadang dilempar lagi. {b} = yang lagi disemprot, {n} = angka asli, {C} = nama teriakan.
+export const NGAMUK = {
+  buka: ['{b}! Gw liat {n}. INI GIMANA SIH?!', '{b}, sini lo. Ini apa-apaan, {n}?!', '{b}!!! Jelasin ke gw kenapa {n}!', '{b}! Angka apaan nih, {n}?! Malu gw sama investor!'],
+  bukaUmum: ['{b}! Kerjaan yang gw minta kemarin mana?! Udah lewat deadline!', '{b}, laporan gw mana?! Dari pagi gw nunggu!', '{b}! Kenapa kerjaan lo belum kelar juga?!'],
+  teriak: ['{C}!!! MANA SINI KAMU!', '{C}! KE SINI SEKARANG!', 'WOY {C}! SINI LO!'],
+  semprot: ['Bener kata {b}, ini gara-gara lo?!', 'Kata {b} lo biang keroknya. Jelasin!', 'Jadi lo yang bikin berantakan?!'],
+  tutup: ['Gw nggak mau tau. Minggu ini harus beres! Bubar!', 'Gw kasih waktu sampe Jumat. Kalo nggak, kita bicara serius!', 'Udah, balik kerja semua! Gw pantau!'],
+  nonton: ['Waduh, Bos ngamuk lagi', 'Ssst, jangan sampe kita yang dipanggil', 'Kasian...', 'Mampus, Bos lagi badmood'],
+};
+// Kambing hitam favorit tiap role (ke: id role) plus alasannya. {c} = nama yang disalahin. topik = alasan ini cuma
+// dipakai waktu Bos ngamuk soal angka itu (lihat topikMarah); tanpa topik = alasan umum, bisa kapan aja.
+export const SALAHIN = {
+  planner: [{ ke: 'researcher', teks: 'Bos, datanya {c} telat masuk, rencana gw jadi molor' }, { ke: 'hrd', teks: 'Jadwal tim berantakan Bos, {c} nggak ngabarin siapa yang cuti' }],
+  researcher: [{ ke: 'sales', teks: 'Data lapangannya kosong Bos. {c} nggak pernah ngisi CRM' }, { ke: 'coder', teks: 'Dashboard-nya error Bos, {c} belum benerin' }],
+  coder: [{ ke: 'produk', teks: 'Requirement-nya ganti mulu Bos. Tanya {c} tuh' }, { ke: 'reviewer', teks: 'Udah jadi dari kemarin Bos, {c} yang nahan di review' }],
+  reviewer: [{ ke: 'coder', teks: 'Angka dari {c} salah terus Bos, gw suruh benerin' }, { ke: 'writer', teks: 'Laporan {c} typo semua Bos, nggak bisa gw loloskan' }],
+  writer: [{ ke: 'reviewer', teks: '{c} revisi mulu Bos, udah tujuh kali' }, { ke: 'researcher', teks: 'Bahan dari {c} belum lengkap, Bos. Gw bisa apa' }],
+  akuntan: [{ ke: 'sales', teks: '{c} kasih diskon sembarangan Bos, terus nggak nagih juga', topik: ['tagihan', 'kas', 'saldo', 'trialHabis'] }, { ke: 'hrd', teks: '{c} bikin acara kantor mulu Bos, pengeluaran bengkak', topik: ['kas', 'saldo'] }],
+  sales: [{ ke: 'produk', teks: 'Warung minta fitur yang belum ada Bos, {c} belum bikin', topik: ['lead', 'langganan', 'trialHabis'] }, { ke: 'akuntan', teks: 'Harganya kemahalan Bos, {c} nggak ngizinin diskon', topik: ['lead', 'langganan', 'trialHabis'] }],
+  produk: [{ ke: 'sales', teks: 'Aplikasinya udah bagus Bos. Itu {c}-nya aja nggak gerak', topik: ['langganan', 'trialHabis', 'lead'] }, { ke: 'coder', teks: 'Fitur yang diminta warung belum dikerjain {c}, Bos', topik: ['langganan', 'trialHabis'] }],
+  hrd: [{ ke: 'planner', teks: 'Jadwal interview belum dibikin {c}, Bos', topik: ['rekrutmen'] }, { ke: 'sales', teks: '{c} nggak dateng training kandidat, Bos', topik: ['rekrutmen'] }],
+};
+// Dipanggil Bos sambil jalan nyamperin.
+export const DIPANGGIL_BOS = {
+  planner: ['I-iya Bos! Bentar, gw bawa sheet-nya', 'Siap Bos, meluncur!'],
+  researcher: ['Hah? Gw? Oke, oke, gw ke sana', 'Bentar Bos, gw bawa datanya'],
+  coder: ['Ck. Iya, iya, gw lepas headphone dulu', 'Apa lagi sih... iya Bos, ke sana'],
+  reviewer: ['Ada apa, Bos? Gw nggak salah apa-apa', 'Hmm. Oke, gw ke sana'],
+  writer: ['Ya ampun, ada apa ini... iya Bos', 'Gw dipanggil? Perasaan gw nggak enak'],
+  akuntan: ['Iya Bos! Gw bawa pembukuannya', 'Bentar Bos, kalkulator gw ketinggalan'],
+  sales: ['Iya Bos! Gw baru balik dari lapangan nih', 'Siap Bos! Ada kabar bagus kok, beneran'],
+  produk: ['Iya Bos, gw bawa roadmap-nya', 'Oke Bos, gw jelasin ya'],
+  hrd: ['Iya Bos, ada apa sayang? Eh, maksudnya Bos', 'Bentar Bos, gw ke sana'],
+};
+// Udah nggak bisa nyalahin siapa-siapa: pasrah & janji.
+export const PASRAH = {
+  planner: ['Oke Bos, gw bikin rencana pemulihan hari ini', 'Siap, timeline-nya gw kejar'],
+  researcher: ['Iya Bos, gw gali penyebabnya sekarang', 'Oke, gw cek ulang datanya'],
+  coder: ['Iya, iya. Gw lembur malam ini', 'Oke Bos. Besok pagi beres'],
+  reviewer: ['Baik Bos. Gw percepat review-nya', 'Oke, gw longgarin dikit standarnya. Dikit'],
+  writer: ['Maafkan aku, Bos. Gw tebus besok', 'Iya Bos... gw tulis ulang malam ini'],
+  akuntan: ['Iya Bos, gw tagih satu-satu hari ini', 'Oke Bos, gw rapihin pengeluarannya'],
+  sales: ['Siap Bos! Besok gw kunjungin semua warungnya', 'Oke Bos, gw follow-up hari ini juga'],
+  produk: ['Oke Bos, gw prioritasin minggu ini', 'Iya Bos, gw ngobrol langsung sama user-nya'],
+  hrd: ['Iya Bos, maaf. Gw beresin hari ini', 'Oke Bos, gw perbaiki. Janji'],
+};
+// Ngedumel ke yang nyalahin setelah Bos pergi. {b} = yang nyalahin.
+export const DUMEL = ['Makasih ya {b}. Makasih banget', 'Kok gw sih {b}?!', 'Awas lo {b}, gw inget ini', 'Tega lo {b}', 'Lain kali ngomong dulu ke gw, {b}'];
+export const BALAS_DUMEL = ['Ya emang bener kan', 'Sori, refleks', 'Daripada gw yang kena', 'Hehe. Peace'];
+
 // Gosip soal yang lagi kerja (dari sudut pandang siapa pun).
 export const SOAL_YANG_KERJA = [
   'Liat deh {c}, serius banget dari tadi',
