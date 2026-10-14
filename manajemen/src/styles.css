@@ -1371,7 +1371,7 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 .kantor-ruang{position:relative;border:var(--garis);background:#a87c4f;max-width:max(560px,calc((100vh - 230px) * var(--rasio,1.6)));margin:0 auto}
 .kantor-ruang canvas{display:block;width:100%;height:auto;image-rendering:pixelated;cursor:pointer}
 .kantor-lapisan{position:absolute;inset:0;pointer-events:none}
-.kantor-tag{position:absolute;transform:translate(-50%,0);font-size:9px;font-weight:700;line-height:1;padding:2px 3px;border:1.5px solid var(--hitam);white-space:nowrap;text-transform:uppercase;letter-spacing:.04em}
+.kantor-tag{position:absolute;z-index:1;transform:translate(-50%,0);font-size:9px;font-weight:700;line-height:1;padding:2px 3px;border:1.5px solid var(--hitam);white-space:nowrap;text-transform:uppercase;letter-spacing:.04em}
 .kantor-balon{position:absolute;transform:translate(-50%,-100%) scale(.6);transform-origin:bottom center;opacity:0;transition:opacity .15s,transform .15s;background:var(--putih);color:var(--tinta);font-size:13px;font-weight:600;line-height:1.3;padding:5px 9px;border:var(--garis-tipis);box-shadow:3px 3px 0 var(--hitam);width:max-content;max-width:200px;text-align:center;z-index:2}
 .kantor-balon.tampil{opacity:1;transform:translate(-50%,-100%) scale(1);z-index:3}
 .kantor-balon::after{content:"";position:absolute;left:50%;bottom:-10px;margin-left:-5px;border:5px solid transparent;border-top-color:var(--hitam)}

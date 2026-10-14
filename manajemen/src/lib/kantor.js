@@ -482,6 +482,7 @@ function buatKantor(namaBos) {
       ms = ms || Math.min(6000, 1500 + teks.length * 45);
       this._selesaiBilang?.();
       this.balon.textContent = teks;
+      this.mulaiBilang = performance.now();
       this.balon.classList.add('tampil');
       this.ngomong = true;
       ubah((k) => ({ obrolan: [...k.obrolan.slice(-119), { id: this.id, nama: this.nama, warna: this.warna, teks, jam: jam() }] }));
@@ -832,6 +833,44 @@ function buatKantor(namaBos) {
     tLalu = t;
     semua().forEach((o) => o.gerak(dt));
   }, 40);
+  // Balon omongan & label nama yang tabrakan (karakter berdiri deketan) disusun biar kebaca: balon yang paling baru
+  // tetap di atas kepala yang ngomong, balon yang lebih lama naik numpuk di atasnya; label nama yang numpuk digeser ke
+  // bawah. Dihitung dalam piksel layar tiap frame (balon: top = sisi bawahnya, ekornya 10px di bawah itu).
+  const nabrakX = (a, b, jarak = 4) => Math.abs(a.cx - b.cx) < (a.w + b.w) / 2 + jarak;
+  function rapikanTumpukan() {
+    const lebar = lapisan.clientWidth;
+    const tinggi = lapisan.clientHeight;
+    if (!lebar || !tinggi) return;
+    const dipasang = [];
+    for (const o of semua()
+      .filter((x) => x.ngomong && !x.sembunyi)
+      .sort((a, b) => b.mulaiBilang - a.mulaiBilang)) {
+      const b = { cx: parseFloat(o.balon.style.left) || 0, w: o.balon.offsetWidth, h: o.balon.offsetHeight };
+      let bawah = ((o.y - 21) / T.H) * tinggi;
+      for (let ulang = 0; ulang < dipasang.length; ulang++) {
+        const kena = dipasang.find((d) => nabrakX(b, d) && bawah + 10 > d.atas && bawah - b.h < d.bawah + 10);
+        if (!kena) break;
+        bawah = kena.atas - 14;
+      }
+      o.balon.style.top = bawah + 'px';
+      dipasang.push({ ...b, atas: bawah - b.h, bawah });
+    }
+    const label = [];
+    for (const o of semua()
+      .filter((x) => !x.sembunyi)
+      .sort((a, b) => a.y - b.y || a.x - b.x)) {
+      const l = { cx: (o.x / T.W) * lebar, w: o.tag.offsetWidth, h: o.tag.offsetHeight };
+      let atas = ((o.y + 1) / T.H) * tinggi;
+      for (let ulang = 0; ulang < label.length; ulang++) {
+        const kena = label.find((d) => nabrakX(l, d, 2) && atas < d.atas + d.h && atas + l.h > d.atas);
+        if (!kena) break;
+        atas = kena.atas + kena.h + 1;
+      }
+      o.tag.style.top = atas + 'px';
+      label.push({ ...l, atas });
+    }
+  }
+
   function bingkai(t) {
     if (mati) return;
     if (elemen.isConnected) {
@@ -844,6 +883,7 @@ function buatKantor(namaBos) {
       antre.sort((a, b) => a.y - b.y).forEach((i) => i.f());
       gambarAwan(t);
       semua().forEach((o) => o.tempatkan());
+      rapikanTumpukan();
     }
     raf = requestAnimationFrame(bingkai);
   }
