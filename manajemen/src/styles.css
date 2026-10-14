@@ -1083,6 +1083,7 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 .ai-tindakan-tombol button.utama{background:var(--biru);color:var(--putih);box-shadow:3px 3px 0 var(--hitam)}
 
 .ai-galat{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0;padding:8px 18px;background:#FEE2E2;border-top:var(--garis-tipis);color:#991B1B;font-weight:700;font-size:13px}
+.ai-dari-kantor{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0;padding:8px 18px;background:var(--kuning);border-top:var(--garis-tipis);font-size:13px}
 .ai-tulis{display:flex;align-items:flex-end;gap:10px;padding:12px 18px 6px;border-top:var(--garis);background:var(--putih)}
 .ai-tulis textarea{flex:1;min-width:0;resize:none;border:var(--garis-tipis);padding:11px 12px;line-height:1.45;max-height:200px;background:var(--kertas)}
 .ai-tulis textarea:focus{background:var(--putih)}
@@ -1346,3 +1347,145 @@ input[type=date]::-webkit-date-and-time-value,input[type=time]::-webkit-date-and
 .kt-angka-tombol.on{background:var(--hitam);color:var(--putih)}
 .kt-aksi label.btn{cursor:pointer;white-space:nowrap}
 .kt-sibuk{opacity:.6;pointer-events:none}
+
+/* ---------- Kantor Konsulin ----------
+   Lantai kantor sengaja pixel art berwarna (identitas halaman ini); bingkai, kartu, dan balon obrolan tetap ikut
+   garis hitam + bayangan keras panel. Halaman ini pakai lebar penuh: lantai kantornya yang jadi pusat perhatian. */
+.adm-isi:has(>.kantor){max-width:none}
+.kantor{display:flex;flex-direction:column;gap:20px}
+.kantor-kepala{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.kantor-status{display:flex;gap:8px;flex-wrap:wrap}
+.kantor-catatan{border:var(--garis-tipis);background:var(--kuning);padding:10px 14px;margin:0;font-size:14px}
+/* Dua kolom yang tingginya bebas (nggak saling narik): kiri lantai + laporan, kanan form + obrolan + jadwal + riwayat. */
+.kantor-isi{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:20px;align-items:start}
+.kantor-kiri,.kantor-kanan{display:flex;flex-direction:column;gap:20px;min-width:0}
+/* Kartu nggak boleh ikut melar ngikutin isi yang lebar (lantai kantor di HP digeser, bukan bikin halaman melebar). */
+.kantor-kiri>*,.kantor-kanan>*{min-width:0;max-width:100%}
+
+.kantor-lantai{display:flex;flex-direction:column}
+.kantor-live{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+.kantor-live i{width:9px;height:9px;background:var(--hijau);border:1.5px solid var(--putih);animation:kantor-kedip 1.4s steps(2) infinite}
+@keyframes kantor-kedip{50%{opacity:.2}}
+.kantor-wadah{margin:0 -4px}
+.kantor-geser{display:none;font-size:11px;color:var(--redup);margin:6px 0 0}
+.kantor-ruang{position:relative;border:var(--garis);background:#a87c4f;max-width:max(560px,calc((100vh - 230px) * 1.6));margin:0 auto}
+.kantor-ruang canvas{display:block;width:100%;height:auto;image-rendering:pixelated}
+.kantor-lapisan{position:absolute;inset:0;pointer-events:none}
+.kantor-tag{position:absolute;transform:translate(-50%,0);font-size:9px;font-weight:700;line-height:1;padding:2px 3px;border:1.5px solid var(--hitam);white-space:nowrap;text-transform:uppercase;letter-spacing:.04em}
+.kantor-balon{position:absolute;transform:translate(-50%,-100%) scale(.6);transform-origin:bottom center;opacity:0;transition:opacity .15s,transform .15s;background:var(--putih);color:var(--tinta);font-size:13px;font-weight:600;line-height:1.3;padding:5px 9px;border:var(--garis-tipis);box-shadow:3px 3px 0 var(--hitam);width:max-content;max-width:200px;text-align:center;z-index:2}
+.kantor-balon.tampil{opacity:1;transform:translate(-50%,-100%) scale(1);z-index:3}
+.kantor-balon::after{content:"";position:absolute;left:50%;bottom:-10px;margin-left:-5px;border:5px solid transparent;border-top-color:var(--hitam)}
+.kantor-papan{position:absolute;left:50%;top:2.5%;transform:translateX(-50%);background:var(--kuning);border:var(--garis-tipis);font-size:12px;font-weight:700;letter-spacing:.14em;padding:2px 10px}
+
+.kantor-avatar{width:28px;height:28px;flex:none;display:grid;place-items:center;border:2px solid var(--hitam);font-weight:700;font-size:13px;background:var(--kertas);text-transform:uppercase}
+.kantor-agen{list-style:none;margin:14px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px}
+.kantor-agen li{display:flex;align-items:center;gap:8px;border:var(--garis-tipis);padding:8px;background:var(--kertas);min-width:0}
+.kantor-agen li.kerja{background:#FFFBEA;box-shadow:3px 3px 0 var(--hitam)}
+.kantor-agen-isi{display:flex;flex-direction:column;flex:1;min-width:0}
+.kantor-agen-isi b{font-size:13px}
+.kantor-agen-isi small{font-size:11px;line-height:1.3;color:var(--redup);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+.kantor-tugas{display:flex;flex-direction:column;gap:10px}
+.kantor-tugas .adm-kartu-kepala{margin-bottom:4px}
+.kantor-tugas textarea{min-height:96px;resize:vertical;width:100%}
+.kantor-opsi{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600}
+.kantor-opsi label{display:flex;align-items:center;gap:8px;cursor:pointer}
+.kantor-opsi input{width:18px;height:18px;accent-color:var(--biru)}
+.kantor-obrolan{display:flex;flex-direction:column}
+.kantor-feed{height:380px;overflow-y:auto;margin:0 -18px -18px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;background:var(--kertas)}
+.kantor-pesan{display:flex;gap:8px;align-items:flex-start}
+.kantor-pesan>div{min-width:0;flex:1}
+.kantor-pesan-kepala{display:flex;gap:6px;align-items:baseline;font-size:12px}
+.kantor-pesan-kepala time{color:var(--redup);font-size:11px;font-family:ui-monospace,Menlo,monospace}
+.kantor-pesan p{margin:3px 0 0;background:var(--putih);border:var(--garis-tipis);padding:6px 10px;font-size:14px;line-height:1.4;display:inline-block;max-width:100%;overflow-wrap:anywhere}
+
+.kantor-aksi{display:flex;gap:8px}
+.kantor-tugas-kutip{margin:0 0 14px;padding:10px 14px;border-left:6px solid var(--biru);background:var(--kertas);font-size:16px;font-weight:600;display:flex;flex-direction:column;gap:4px;overflow-wrap:anywhere}
+.kantor-tugas-kutip .adm-label{font-size:10px;color:var(--redup)}
+.kantor-tahapan{list-style:none;margin:0 0 12px;padding:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border:var(--garis-tipis)}
+.kantor-tahapan li{padding:8px 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;text-align:center;border-right:var(--garis-tipis);background:var(--putih);color:var(--redup)}
+.kantor-tahapan li:last-child{border-right:0}
+.kantor-tahapan li.beres{background:var(--hijau);color:var(--tinta)}
+.kantor-tahapan li.sekarang{background:var(--kuning);color:var(--tinta)}
+.kantor-meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.kantor-meta span{border:var(--garis-tipis);padding:4px 10px;font-size:12px;background:var(--putih)}
+.kantor-meta b{font-size:16px;margin-right:4px}
+.kantor-hasil-isi{max-width:80ch;border-top:var(--garis-tipis);padding-top:16px}
+.kantor-tunggu{border:2px dashed var(--hitam);padding:18px;text-align:center;color:var(--redup);font-weight:600;margin:0}
+
+.kantor-alur ol{list-style:none;margin:0;padding:0}
+.kantor-alur li{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:2px solid #E4E4E7}
+.kantor-alur li:last-child{border-bottom:0}
+.kantor-alur details{flex:1;min-width:0}
+.kantor-alur summary{cursor:pointer;list-style:none;display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center}
+.kantor-alur summary::-webkit-details-marker{display:none}
+.kantor-alur summary::after{content:"Lihat";grid-column:2;grid-row:1/3;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border:1.5px solid var(--hitam);padding:2px 6px;background:var(--putih)}
+.kantor-alur details[open] summary::after{content:"Tutup";background:var(--kuning)}
+.kantor-alur details[open] summary{margin-bottom:8px}
+.kantor-alur-judul{display:flex;align-items:center;gap:6px;font-size:14px;flex-wrap:wrap}
+.kantor-alur summary small{font-size:11px;color:var(--redup)}
+.kantor-alur details .ai-teks{font-size:13.5px;border:var(--garis-tipis);background:var(--kertas);padding:10px 12px;max-height:360px;overflow:auto}
+.kantor-dibaca{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+.kantor-dibaca code{font-size:11px;border:1.5px solid var(--hitam);background:var(--ungu);padding:1px 6px}
+.kantor-alur-tunggu small{color:var(--redup);font-weight:600;align-self:center}
+
+.kantor-label{font-size:10px;color:var(--redup)}
+.kantor-template{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.kantor-template button{display:flex;flex-direction:column;gap:2px;text-align:left;padding:7px 8px;border:var(--garis-tipis);background:var(--putih);cursor:pointer;font:inherit;color:var(--tinta);min-height:52px}
+.kantor-template button b{font-size:12.5px;line-height:1.25}
+.kantor-template button small{font-size:10.5px;color:var(--redup);line-height:1.3}
+.kantor-template button:hover:not(:disabled){background:#FFFBEA;box-shadow:3px 3px 0 var(--hitam)}
+.kantor-template button.on{background:var(--kuning);box-shadow:3px 3px 0 var(--hitam)}
+.kantor-template button:disabled{opacity:.45;cursor:not-allowed}
+.kantor-unduh{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.kantor-unduh .btn.hitam{background:var(--hitam);color:var(--putih)}
+.kantor-rekom{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto;margin:12px 0}
+.kantor-rekom label{display:flex;gap:10px;align-items:flex-start;padding:9px 11px;border:var(--garis-tipis);background:var(--putih);cursor:pointer;font-size:14px;line-height:1.4}
+.kantor-rekom label.on{background:#FFFBEA}
+.kantor-rekom input{width:18px;height:18px;flex:none;margin-top:1px;accent-color:var(--biru)}
+.kantor-riwayat ul{list-style:none;margin:0;padding:0;max-height:460px;overflow-y:auto}
+.kantor-riwayat li{display:flex;gap:8px;align-items:flex-start;padding:10px 0;border-bottom:2px solid #E4E4E7}
+.kantor-riwayat li:last-child{border-bottom:0}
+.kantor-riwayat li.on .kantor-riwayat-buka b{text-decoration:underline;text-decoration-thickness:3px;text-decoration-color:var(--kuning)}
+.kantor-riwayat-buka{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;text-align:left;background:none;border:0;padding:0;font:inherit;color:var(--tinta);cursor:pointer}
+.kantor-riwayat-buka b{font-size:13.5px;line-height:1.3;overflow-wrap:anywhere}
+.kantor-riwayat-buka small{font-size:11px;color:var(--redup)}
+.kantor-riwayat-chip{display:flex;gap:4px;flex-wrap:wrap}
+.kantor-riwayat-aksi{display:flex;flex-direction:column;gap:6px}
+.kantor-jadwal ul{list-style:none;margin:0;padding:0}
+.kantor-jadwal li{display:flex;gap:8px;align-items:flex-start;padding:10px 0;border-bottom:2px solid #E4E4E7}
+.kantor-jadwal li:last-child{border-bottom:0}
+.kantor-jadwal li.mati .kantor-jadwal-isi{opacity:.55}
+.kantor-jadwal-isi{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.kantor-jadwal-isi b{font-size:13.5px;overflow-wrap:anywhere}
+.kantor-jadwal-isi small{font-size:11.5px;color:var(--redup)}
+.kantor-jadwal-isi small.adm-error{margin:0;font-weight:600;color:var(--merah)}
+.kantor-jadwal-isi .adm-link{font-size:12px;align-self:flex-start}
+.kantor-jadwal-waktu{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0 10px}
+
+@media (max-width:1280px){
+  .kantor-isi{grid-template-columns:minmax(0,1fr) 320px}
+}
+@media (max-width:1000px){
+  /* Satu kolom: kartu diurutin ulang biar yang dipakai duluan ada di atas. */
+  .kantor-isi{display:flex;flex-direction:column}
+  .kantor-kiri,.kantor-kanan{display:contents}
+  .kantor-lantai{order:1}
+  .kantor-tugas{order:2}
+  .kantor-hasil{order:3}
+  .kantor-alur{order:4}
+  .kantor-obrolan{order:5}
+  .kantor-jadwal{order:6}
+  .kantor-riwayat{order:7}
+  .kantor-feed{height:300px}
+}
+@media (max-width:700px){
+  /* HP: lantai kantor tetap ukuran kebaca, digeser ke samping. */
+  .kantor-wadah{overflow-x:auto;margin:0 -18px;padding:0 18px 4px}
+  .kantor-ruang{min-width:620px;max-width:none}
+  .kantor-geser{display:block}
+  .kantor-agen{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .kantor-balon{font-size:12px;max-width:170px}
+  .kantor-template{grid-template-columns:1fr}
+  .kantor-template button{min-height:0}
+}

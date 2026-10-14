@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { bacaSesi, bukaFile } from '../lib/api.js';
+import { bacaDrafAi, hapusDrafAi } from '../lib/drafAi.js';
 import TeksAi from '../komponen/TeksMarkdown.jsx';
 
 // Lampiran file dari AI: dibuka/diunduh langsung dari server pakai sesi login (file Artifact lewat link sementara).
@@ -151,7 +152,10 @@ export default function AiChat({ api }) {
   const [sessionId, setSessionId] = useState(null);
   const [judul, setJudul] = useState('');
   const [pending, setPending] = useState(null);
-  const [input, setInput] = useState('');
+  // Draf dari laporan Kantor Konsulin ("Eksekusi di AI Chat"): diisi ke kotak pesan, nggak langsung dikirim.
+  const [input, setInput] = useState(bacaDrafAi);
+  const [dariKantor, setDariKantor] = useState(() => Boolean(bacaDrafAi()));
+  useEffect(() => hapusDrafAi(), []);
   const [busy, setBusy] = useState(false);
   const [memuat, setMemuat] = useState(false);
   const [error, setError] = useState('');
@@ -361,7 +365,13 @@ export default function AiChat({ api }) {
         </div>
 
         {error && <p className="ai-galat" role="alert">{error}<button type="button" className="ai-mini" onClick={() => setError('')}>Tutup</button></p>}
-        <form className="ai-tulis" onSubmit={(e) => { e.preventDefault(); kirim(input); }}>
+        {dariKantor && (
+          <p className="ai-dari-kantor">
+            <span>Pesan dari laporan <b>Kantor Konsulin</b> udah diisi di bawah. Baca & edit dulu, lalu Kirim. AI bakal ngecek data aktual dan ngusulin perubahan satu per satu buat kamu setujui.</span>
+            <button type="button" className="ai-mini" onClick={() => setDariKantor(false)}>Tutup</button>
+          </p>
+        )}
+        <form className="ai-tulis" onSubmit={(e) => { e.preventDefault(); setDariKantor(false); kirim(input); }}>
           <label htmlFor="ai-message" className="sr-only">Pesan untuk AI</label>
           <textarea
             id="ai-message"

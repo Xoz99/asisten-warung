@@ -85,6 +85,12 @@ export const NAMA_AKSI = {
   'artifact.sampah.kosongkan': 'ngosongin sampah artifact',
   'artifact.unduh': 'unduh file artifact',
   'ops.keuangan.hapus': 'hapus transaksi',
+  'kantor.laporan.terjadwal': 'laporan otomatis Kantor Konsulin udah jadi',
+  'kantor.laporan.gagal': 'laporan otomatis Kantor Konsulin gagal',
+  'kantor.laporan.hapus': 'hapus laporan Kantor',
+  'kantor.jadwal.tambah': 'bikin jadwal laporan otomatis',
+  'kantor.jadwal.ubah': 'ubah jadwal laporan otomatis',
+  'kantor.jadwal.hapus': 'hapus jadwal laporan otomatis',
 };
 export const ringkasDetail = (d) =>
   d

@@ -11,6 +11,7 @@
     "start": "node server/index.js",
     "lint": "oxlint",
     "buat-admin": "node server/buatAdmin.js",
+    "seed:demo": "node server/seedDemo.js",
     "dev:tampilan": "vite"
   },
   "dependencies": {
@@ -28,6 +29,7 @@
     "@vitejs/plugin-react": "^6.1.0",
     "leaflet": "^1.9.4",
     "oxlint": "^1.79.0",
+    "pdfmake": "^0.2.23",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "vite": "^8.2.2"

@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { bacaSesi, panggil, simpanSesi } from './lib/api.js';
 import Dashboard from './halaman/Dashboard.jsx';
 import AiChat from './halaman/AiChat.jsx';
+import KantorAi from './halaman/KantorAi.jsx';
+import { buatKantor, namaPendek } from './lib/kantor.js';
+import { susunFakta } from './lib/kantorData.js';
 import Leads from './halaman/Leads.jsx';
 import Keuangan from './halaman/Keuangan.jsx';
 import Notifikasi from './halaman/Notifikasi.jsx';
@@ -18,7 +21,7 @@ import Katalog from './halaman/Katalog.jsx';
 
 // Makalin Ops: kerangka (sidebar + topbar), login per admin, dan navigasi lewat alamat (#/leads/crm dst) biar
 // halaman yang lagi dibuka tetap kebuka pas di-refresh & bisa dibagiin linknya.
-const NAMA_HALAMAN = { ai: 'AI Chat', dashboard: 'Dashboard', leads: 'Leads', lapangan: 'Sales Lapangan', katalog: 'Katalog barang', rekrutmen: 'Rekrutmen', karyawan: 'Karyawan', artifact: 'Artifact', keuangan: 'Keuangan', notifikasi: 'Notifikasi', pengaturan: 'Pengaturan', profile: 'Profile' };
+const NAMA_HALAMAN = { ai: 'AI Chat', kantor: 'Kantor Konsulin',dashboard: 'Dashboard', leads: 'Leads', lapangan: 'Sales Lapangan', katalog: 'Katalog barang', rekrutmen: 'Rekrutmen', karyawan: 'Karyawan', artifact: 'Artifact', keuangan: 'Keuangan', notifikasi: 'Notifikasi', pengaturan: 'Pengaturan', profile: 'Profile' };
 
 function bacaRute() {
   const [halaman, tab] = window.location.hash.replace(/^#\/?/, '').split('/');
@@ -112,6 +115,42 @@ export default function App() {
     return () => clearInterval(t);
   }, [cekNotif]);
 
+  // Kantor Konsulin hidup selama admin login, bukan cuma pas halamannya dibuka: karakter tetap jalan & tugas tetap
+  // dikerjain waktu pindah halaman.
+  const [kantor, setKantor] = useState(null);
+  const namaAdmin = sesi?.admin?.nama;
+  useEffect(() => {
+    if (!token || sales) return;
+    const k = buatKantor(namaPendek(bacaSesi()?.admin?.nama));
+    setKantor(k);
+    let batal = false;
+    const ai = {
+      kerja: (peran, isi) => api('POST', '/ai/kantor/kerja', { peran, isi }),
+      gosip: (a, b, situasi, terakhir) => api('POST', '/ai/kantor/gosip', { a, b, situasi, terakhir }).then((r) => r.baris),
+    };
+    k.atur({ simpanLaporan: (laporan) => api('POST', '/ai/kantor/laporan', laporan) });
+    api('GET', '/ai/status')
+      .then((s) => !batal && k.atur({ status: s, ai: s.aktif ? ai : null }))
+      .catch(() => !batal && k.atur({ status: { aktif: false }, ai: null }));
+    // Angka asli buat obrolan kerjaan karyawan kantor (langganan, kas, lead, pelamar), diperbarui tiap 2 menit.
+    const muatFakta = async () => {
+      const [dash, rek, kry] = await Promise.allSettled(['/dashboard', '/rekrutmen/ringkasan', '/karyawan/ringkasan'].map((p) => api('GET', p)));
+      const isi = (r) => (r.status === 'fulfilled' ? r.value : null);
+      if (!batal) k.atur({ fakta: susunFakta(isi(dash), isi(rek), isi(kry)) });
+    };
+    muatFakta();
+    const ulangFakta = setInterval(muatFakta, 120000);
+    return () => {
+      batal = true;
+      clearInterval(ulangFakta);
+      k.hapus();
+      setKantor(null);
+    };
+  }, [token, sales, api]);
+  useEffect(() => {
+    kantor?.gantiNamaBos(namaPendek(namaAdmin));
+  }, [kantor, namaAdmin]);
+
   const produkWp = produk?.find((p) => p.id === 'warung-pintar') || null;
   // Harus stabil - halaman ngambil datanya di useEffect yang bergantung sama fungsi ini.
   const apiProduk = useMemo(() => (produkWp ? (m, path, b) => api(m, '/warung-pintar' + path, b) : null), [api, produkWp]);
@@ -173,6 +212,7 @@ export default function App() {
           {halaman === 'lapangan' && <Lapangan key={tab} {...props} />}
           {halaman === 'dashboard' && <Dashboard {...props} />}
           {halaman === 'ai' && <AiChat {...props} />}
+          {halaman === 'kantor' && <KantorAi {...props} kantor={kantor} />}
           {halaman === 'leads' && <Leads key={tab} {...props} />}
           {halaman === 'katalog' && <Katalog key={tab} {...props} />}
           {halaman === 'rekrutmen' && <Rekrutmen key={tab} {...props} />}
@@ -200,6 +240,7 @@ const IKON_NAV = {
   keuangan: <><path d="M3 6h16v14H3zM3 6l13-3v3" /><path d="M15 12h6v4h-6z" /></>,
   artifact: <><path d="M3 5h7l2 2h9v13H3z" /></>,
   ai: <><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" /><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z" /></>,
+  kantor: <><path d="M4 21V4h11v17M15 9h5v12M2 21h20" /><path d="M8 8h3M8 12h3M8 16h3" /></>,
   notifikasi: <><path d="M6 16V11a6 6 0 1 1 12 0v5l2 2H4z" /><path d="M10 21h4" /></>,
   pengaturan: <><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></>,
   profile: <><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zM4 21v-1a8 8 0 0 1 16 0v1" /></>,
@@ -289,6 +330,7 @@ function Samping({ halaman, admin, foto, notifBaru, buka }) {
         <div className="adm-nav-grup">
           {link('artifact', 'Artifact')}
           {link('ai', 'AI Chat')}
+          {link('kantor', 'Kantor Konsulin')}
         </div>
         <div className="adm-nav-grup">
           {link('notifikasi', 'Notifikasi', { ekstra: hitung })}

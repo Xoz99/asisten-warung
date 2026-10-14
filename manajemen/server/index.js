@@ -6,7 +6,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { authRouter, requireAdmin } from './auth.js';
 import adminRoutes from './admin.routes.js';
-import aiRoutes from './ai.routes.js';
+import aiRoutes, { mulaiPenjadwalKantor } from './ai.routes.js';
 import opsRoutes from './ops.routes.js';
 import rekrutmenRoutes, { publikRouter, DAFTAR_URL } from './rekrutmen.routes.js';
 import rekrutmenAlurRoutes, { publikAlurRouter } from './rekrutmenAlur.js';
@@ -45,6 +45,8 @@ app.use('/api/warung-pintar/katalog/impor', express.json({ limit: '2mb' }));
 app.use(/^\/api\/warung-pintar\/katalog\/[^/]+\/foto$/, express.json({ limit: '3mb' }));
 // Jawaban kuis kandidat: esai jumlahnya bebas (tiap jawaban maks 3.000 huruf), jadi nggak muat di batas 100kb.
 app.use('/api/publik/kuis', express.json({ limit: '1mb' }));
+// Laporan Kantor Konsulin disimpan bareng isi kerja tiap agent (rencana, riset data, review), bisa lebih dari 100kb.
+app.use('/api/ai/kantor/laporan', express.json({ limit: '1mb' }));
 app.use(express.json({ limit: '100kb' }));
 
 app.get('/health', (req, res) => res.json({ ok: true }));
@@ -113,4 +115,8 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = Number(process.env.PORT || 4100);
-app.listen(PORT, () => console.log(`Manajemen Konsulin jalan di port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Manajemen Konsulin jalan di port ${PORT}`);
+  // Laporan otomatis Kantor Konsulin (lihat ai.routes.js). Matikan pakai KANTOR_PENJADWAL=0.
+  if (process.env.KANTOR_PENJADWAL !== '0') mulaiPenjadwalKantor();
+});

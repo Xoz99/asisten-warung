@@ -14,7 +14,8 @@ function Inline({ teks }) {
   });
 }
 const selTabel = (baris) => baris.trim().replace(/^\||\|$/g, '').split('|').map((x) => x.trim());
-function susunBlok(teks) {
+// Dipakai juga buat bikin PDF laporan Kantor Konsulin (lib/laporan.js), biar tampilan & file-nya sama.
+export function susunBlok(teks) {
   const baris = String(teks || '').replace(/\r/g, '').split('\n');
   const blok = [];
   for (let i = 0; i < baris.length; i++) {
